@@ -89,6 +89,15 @@ end
 function BaseService:SetBusyChecker(callback)
 	self.BusyChecker = callback
 end
+-- R153 (owner: "make it so that players can also roll and open packs whilst on the treadmill"): the chase's IsPlayerBusy also counts a pack reveal (ChestService:IsOpening), so the
+-- fifth click of a pack used to end the treadmill session on the spot. Training asks this checker instead: a chase (running or starting) still stops it, a reveal does not.
+-- Everything else (the garden, the treadmill upgrade) keeps BusyChecker. Without a training checker it is BusyChecker.
+function BaseService:SetTrainingBusyChecker(callback)
+	self.TrainingBusyChecker = callback
+end
+function BaseService:_trainingBusy(player)
+	return (self.TrainingBusyChecker or self.BusyChecker)(player)
+end
 
 function BaseService:ResetLootDisplay(record)
 	-- Chest opening was removed in V0.66. These checks only clean up a place
@@ -330,7 +339,7 @@ function BaseService:StopTraining(player, jumpOff)
 		humanoid.AutoRotate = session.AutoRotate
 	end
 	if player.Character == session.Character and humanoid.Parent
-		and humanoid.Health > 0 and not self.BusyChecker(player) then
+		and humanoid.Health > 0 and not self:_trainingBusy(player) then
 		self:_applyPhysicalSpeed(player, humanoid,
 			self.PlayerData:GetOrCreateSpeedValue(player).Value)
 		if jumpOff and root.Parent then
@@ -431,7 +440,7 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local record = self:GetPlayerBase(player)
 	local belt = record and record.Treadmill
 	local canTrain = humanoid and root and humanoid.Health > 0
-		and self.PlayerData:IsLoaded(player) and not self.BusyChecker(player)
+		and self.PlayerData:IsLoaded(player) and not self:_trainingBusy(player)
         and not (player:GetAttribute("StudioTestFlying") or player:GetAttribute("StudioTestNoclip"))
 		and not player:GetAttribute("GuardianFlingActive")
 		and not player:GetAttribute("GuardianRagdollActive")
@@ -472,7 +481,9 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
 	local multiplier = self:GetTreadmillMultiplier(player)
 	if multiplier ~= multiplier or multiplier == math.huge then multiplier = 1 end
 	multiplier = math.max(1, multiplier)
-	local gainRate = self.Config.TrainingPointsPerSecond * multiplier
+	-- R148: friends in the server speed up the speed GAINED here (not the walk speed, and not the treadmill animation).
+	local gainMultiplier = multiplier * self:GetFriendGainMultiplier(player)
+	local gainRate = self.Config.TrainingPointsPerSecond * gainMultiplier
 	if player:GetAttribute("TreadmillGainPerSecond") ~= gainRate then player:SetAttribute("TreadmillGainPerSecond", gainRate) end
 	local animationSpeed = self:_getTreadmillAnimationSpeed(multiplier)
 	local previousAnimationSpeed = session.AnimationSpeed or animationSpeed
@@ -486,7 +497,7 @@ function BaseService:_updateTrainingPlayer(player, deltaTime)
         if session.TutorialSeconds>=3 then session.TutorialTrained=true;self.PlayerData:TutorialEvent(player,'Train')end
     end
 	local speed = self.PlayerData:GetOrCreateSpeedValue(player)
-	local gain, ticks = self:_collectTreadmillGain(player, deltaTime, multiplier)
+	local gain, ticks = self:_collectTreadmillGain(player, deltaTime, gainMultiplier)
 	if gain <= 0 then return end
 	local actualGain = self.PlayerData:AddSpeed(player,gain)
 	self:_applyPhysicalSpeed(player, humanoid, speed.Value)
@@ -526,6 +537,16 @@ function BaseService:StartTraining()
         or "[V0.50] Treadmill training loaded.")
 end
 
+-- R148 (owner: "the speed boost should only apply to the speed gain, not how fast the player goes"): the friend boost
+-- (SocialService sets FriendSpeedBoost; DailyRewards has the numbers: +10% per friend, 3 friends at most) multiplies the
+-- speed points earned from treadmill training, 1 .. DailyRewards.MaxMultiplier() whatever the attribute says. Bought
+-- speed, gifts, owner commands and treadmill bonus rolls never go through here.
+function BaseService:GetFriendGainMultiplier(player)
+    local boost=player and player:GetAttribute('FriendSpeedBoost')
+    return type(boost)=='number'and boost==boost
+        and math.clamp(boost,1,require(ReplicatedStorage.DailyRewards).MaxMultiplier())or 1
+end
+
 function BaseService:GetTreadmillMultiplier(player)
     local tier=self.PlayerData:GetTreadmillData(player).Tier
     local boost=tonumber(player:GetAttribute('TreadmillMultiplier'))or 1
@@ -541,7 +562,7 @@ function BaseService:TreadmillSnapshot(player,message)
             Unlocked=true,Owned=i<=data.Tier}
     end
     return {Tier=data.Tier,Skin=data.Skin,Tiers=tiers,Cash=self.PlayerData:GetCash(player),
-        Rate=self.Config.TrainingPointsPerSecond*self:GetTreadmillMultiplier(player),Message=message}
+        Rate=self.Config.TrainingPointsPerSecond*self:GetTreadmillMultiplier(player)*self:GetFriendGainMultiplier(player),Message=message} -- R148: the friend boost is part of the gain
 end
 function BaseService:CanManageTreadmill(player)
     local record=self:GetPlayerBase(player)
@@ -558,7 +579,8 @@ function BaseService:RefreshTreadmill(player)
     local record=self:GetPlayerBase(player);if not record then return end
     self:StopTraining(player,false)
     local Art=require(script.Parent.BiomeVisuals)
-    local belt,prompt=Art.BuildTreadmillV131(record.Model,self.PlayerData:GetTreadmillData(player).Skin)
+    local data=self.PlayerData:GetTreadmillData(player)
+    local belt,prompt=Art.BuildTreadmillV131(record.Model,data.Skin,data.Tier) -- R151: the level sets the dressing grade and the "+N/step" label
     record.Treadmill=belt;prompt:SetAttribute('OwnerUserId',player.UserId)
     prompt.Enabled=false
     require(script.Parent.GardenUpgradeService).Refresh(self,player)
@@ -575,14 +597,14 @@ function BaseService:SetupTreadmillRemotes(folder)
     local request=remote('ManageTreadmill','RemoteFunction')
     request.OnServerInvoke=function(player,action,expected)
         if not require(script.Parent.SecurityGate).Allow(player,'ManageTreadmill',action,expected)or not require(script.Parent.MovementGuard).Check(player)then return {Error='Please try again.'}end
-        if not self:CanManageTreadmill(player)then return {Error='Go to your own treadmill.'}end
+        if not self:CanManageTreadmill(player)then return {Error='Go to your own treadmill!'}end
         local now=os.clock()
-        if now-(self.TreadmillRequests[player]or -math.huge)<.25 then return {Error='Please wait a moment.'}end
+        if now-(self.TreadmillRequests[player]or -math.huge)<.25 then return {Error='Wait a sec!'}end
         self.TreadmillRequests[player]=now
         if action=='Info'then return self:TreadmillSnapshot(player)end
         local ok,message
         if action=='Upgrade'then ok,message=self.PlayerData:BuyTreadmill(player,expected)
-        else return {Error='Unknown request.'}end
+        else return {Error='Try again!'}end
         if ok then
             local rendered,why=pcall(function()self:RefreshTreadmill(player)end)
             if not rendered then warn('[V131] Treadmill appearance needs retry: '..tostring(why))end

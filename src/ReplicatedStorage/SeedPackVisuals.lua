@@ -1,5 +1,6 @@
 -- V124. The same approved meshes serve world, dropped, held and opening packs.
 local Rules = require(script.Parent.SeedPackRules)
+local Shadow = require(script.Parent.SmallShadow154) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 local Visuals = {}
 local function part(model,name,size,frame,color,root,shape)
     local p = Instance.new("Part")
@@ -9,6 +10,7 @@ local function part(model,name,size,frame,color,root,shape)
     p.CanCollide=false; p.CanTouch=false; p.CanQuery=false
     p.TopSurface=Enum.SurfaceType.Smooth; p.BottomSurface=Enum.SurfaceType.Smooth
     if shape then p.Shape=shape end
+    Shadow.Part(p)
     p.Parent=model
     if root and not p.Anchored then
         local w=Instance.new("WeldConstraint"); w.Part0=root; w.Part1=p; w.Parent=p
@@ -21,7 +23,10 @@ local function rootPart(model,origin,weldRoot)
     return p
 end
 -- Solid server-authored geometry stays visible independently of client animation.
-function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize)
+-- R151: the chip-bag shape of the pouch. `defaultShape` (true): the design's own mesh with no shape variation, whatever `shape` says: what the catalogue, shop, reward and market
+-- pictures pass (the bag is flagged DefaultPackShape; ItemPictures and the renderers follow the flag). `shape` (optional, 0..6) is the pack's own variation
+-- (PackShapes151): the world pack's / the item record's PackShape. No shape (nil / 0) is the default shape too: ONE default shape for every context.
+function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,displaySize,defaultShape,shape)
     local variant=Rules.GetVariant(variantKey);local theme=Rules.GetTheme(stage)
     packSize=Rules.SanitizePackSize(packSize);mutation=Rules.MutationKey(mutation)
     scale=(scale or 1)*variant.BagScale*theme.Scale*(displaySize or packSize)
@@ -38,6 +43,10 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
             origin*CFrame.new((-1.9/2+(i-.5)*1.9/8)*scale,1.11*scale,0),seal,visualWeldRoot)
         strip:SetAttribute("TearIndex",i);strip:SetAttribute("TearCount",8)
     end
+    -- R151: GiantVisualSafety fades every GiantVisualPart near the camera, and the pouch's own builders (SeedPackRenderer, EclipsePackArt, SpecialPackArt89
+    -- and the Verity pack's) tag the pouch's parts for a giant (> 10x) pack, but the seal and the 8 tear strips (built here) were never tagged: close to a
+    -- giant pack the pouch faded away and nine solid bars stayed behind in the air. They fade with the rest now.
+    if packSize>10 then for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart')and p~=root then game:GetService('CollectionService'):AddTag(p,'GiantVisualPart')end end end
     for _,side in ipairs({-1,1}) do
         local grip=Instance.new("Attachment");grip.Name=side<0 and "LeftGrip" or "RightGrip"
         grip.CFrame=CFrame.new(Vector3.new(side*.73,-.30,.12)*scale);grip.Parent=root
@@ -45,6 +54,8 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
     m:SetAttribute("SeedArtVersion",123);m:SetAttribute("VisualScale",scale);m:SetAttribute("TearLipY",1.11)
     m:SetAttribute("Stage",stage or 1);m:SetAttribute("BagVariant",Rules.VariantKey(variantKey))
     m:SetAttribute("PackArtKey",Rules.DesignKey(stage,variantKey));m:SetAttribute("PackVisible",true)
+    if defaultShape==true then m:SetAttribute('DefaultPackShape',true)
+    elseif shape~=nil then local Shapes=require(script.Parent.PackShapes151);if Shapes.Applies(variantKey)then m:SetAttribute("PackShape",Shapes.Sanitize(shape))end end
     m:SetAttribute("SeedScale",Rules.SanitizeSeedScale(seedScale));m:SetAttribute("PaperColor",theme.Body)
     m:SetAttribute("BiomeMark",theme.Mark)
     local tier,rank=Rules.GetPackTier(variantKey)
@@ -56,7 +67,7 @@ function Visuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,pac
     local coating=Rules.PackMutations[mutation]
     if coating.Color then
         m:SetAttribute('PaperColor',coating.Color)
-        for _,p in ipairs(m:GetDescendants())do if p:IsA('BasePart')and p~=root then
+        for _,p in ipairs(m:GetDescendants())do if p:IsA('BasePart')and p~=root and not p:GetAttribute('MechCoatKeep')then -- (R155: the Mech pack's lit parts and hazard stripes keep their colour: MechPackArt153)
             -- Remove a mesh's appearance override so Roblox's real material shades it.
             for _,v in ipairs(p:GetChildren())do if v:IsA('SurfaceAppearance')then v:Destroy()end end
             p.Color=coating.Color;p.Material=coating.Material;p.MaterialVariant=''
@@ -81,10 +92,31 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
   m.ModelStreamingMode=Enum.ModelStreamingMode.Atomic
   game:GetService('CollectionService'):AddTag(m,Rules.SeedMotion.Tag);return m
  end
+ if require(script.Parent.VerityCatalog).Is(seed.Id)then
+  -- R147: the Verity seed is one small ball with Verity's face (VerityPlantArt); coat, King sparkle and motion tag as for every seed.
+  local Cat=require(script.Parent.VerityCatalog);scale=scale or 1
+  local m=require(script.Parent.VerityPlantArt).BuildSeed(origin,scale,weldRoot)
+  m:SetAttribute('SeedId',seed.Id);m:SetAttribute('SeedArtVersion',147);m:SetAttribute('Rarity',Cat.Rarity)
+  m:SetAttribute('SeedVisualScale',scale);m:SetAttribute('SeedBiome',Cat.Biome);m.ModelStreamingMode=Enum.ModelStreamingMode.Atomic
+  require(script.Parent.PlantVisuals).Coat(m,mutation)
+  local style=Rules.Rarities[Cat.Rarity]
+  local glow=Instance.new("ParticleEmitter");glow.Name="SeedRaritySparkles"
+  glow.Texture="rbxasset://textures/particles/sparkles_main.dds";glow.Color=ColorSequence.new(style.Color)
+  glow.LightEmission=1;glow.Rate=style.Rank>=4 and 3 or 1;glow.Lifetime=NumberRange.new(.5,.85)
+  glow.Speed=NumberRange.new(.2,.4);glow.SpreadAngle=Vector2.new(180,180);glow.LightInfluence=0
+  glow.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,.05*scale),NumberSequenceKeypoint.new(.3,.08*scale),NumberSequenceKeypoint.new(1,.02*scale)})
+  glow.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.2,.15),NumberSequenceKeypoint.new(1,1)})
+  glow.Parent=m.PrimaryPart
+  if style.Rank>=3 then game:GetService("CollectionService"):AddTag(m,Rules.SeedMotion.Tag)end
+  m.Parent=parent;return m
+ end
  local V,CF,RGB=Vector3.new,CFrame.new,Color3.fromRGB
  local function rgb(hex)return RGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))end
  scale=scale or 1
  local spec=assert(Rules.SeedDesignById[seed.Id],"Unknown seed design: "..tostring(seed.Id))
+ -- R134: seeds that shared a recoloured design get their own signature (SeedSignatures).
+ local sig=require(script.Parent.SeedSignatures).Get(seed.Id)
+ local pattern=sig and sig.Pattern or spec.pattern
  local m=Instance.new("Model");m.Name="LooseSeed";m:SetAttribute("SeedId",seed.Id)
  m:SetAttribute("SeedArtVersion",139);m:SetAttribute("Rarity",spec.rarity)
  m:SetAttribute("SeedVisualScale",scale);m:SetAttribute("SeedBiome",spec.biome)
@@ -103,22 +135,41 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
  local function line(name,a,b,width,color,mat)
   return p(name,V(width,width,(b-a).Magnitude),CFrame.lookAt((a+b)/2,b,math.abs((b-a).Unit.Y)>.98 and Vector3.zAxis or Vector3.yAxis),color,mat)
  end
- -- Exact current seed body proportions and 28 gradient bands from V119.
- for i=1,28 do
-  local y=-1+(i-.5)*2/28;local radius=math.sqrt(math.max(0,1-y*y))
-  p('Gradient',V(1.50/28+.008,1.08*radius,.76*radius),CF(0,y*.75,0)*CFrame.Angles(0,0,math.pi/2),bottom:Lerp(top,(y+1)/2),nil,Enum.PartType.Cylinder)
- end
+ -- R134: the body follows the seed's shape (SeedShapes); 'Oval' is exactly the V119 body (28 bands).
+ local Shapes=require(script.Parent.SeedShapes)
+ local body=Shapes.Body(require(script.Parent.SeedSignatures).Shape(seed.Id))
+ local capColor=top:Lerp(Color3.new(0,0,0),.45)
+ for _,band in ipairs(body.Bands)do for _,sp in ipairs(band.Spans)do
+  local color=sp.Cap and capColor or bottom:Lerp(top,(band.T+1)/2)
+  if body.Faceted then
+   p('Gradient',V(body.Step+.008,sp.W/1.414,sp.D/1.414),CF(sp.X,band.Y,0)*CFrame.Angles(0,math.pi/4,0)*CFrame.Angles(0,0,math.pi/2),color)
+  elseif body.Classic then
+   -- The classic oval stays exactly as before (part cylinders are round: min(width, depth) across).
+   p('Gradient',V(body.Step+.008,sp.W,sp.D),CF(sp.X,band.Y,0)*CFrame.Angles(0,0,math.pi/2),color,nil,Enum.PartType.Cylinder)
+  else
+   -- Other shapes need wide, flat slices: stretched sphere slices overlap into a smooth body.
+   oval('Gradient',V(sp.X,band.Y,0),V(sp.W,body.Step*3.2,sp.D),color)
+  end
+ end end
  local function mark(x,y,w,h,angle)
-  local z=-.38*math.sqrt(math.max(.1,1-(x/.54)^2-(y/.75)^2))-.017
-  oval('Mark',V(x,y,z),V(w,h,.03),ink,CFrame.Angles(0,0,angle or 0))
+  y=y*body.H/.75
+  local z=Shapes.FrontZ(body,x,y);if not z then return end
+  oval('Mark',V(x,y,z-.017),V(w,h,.03),ink,CFrame.Angles(0,0,angle or 0))
  end
- if spec.pattern=='Stripes'then
+ if pattern=='None'then
+ elseif pattern=='Stripes'then
   for _,x in ipairs({-.23,0,.23})do for j=-2,2 do mark(x+math.sin(j*.9)*.024,j*.12,.058,.16)end end
- elseif spec.pattern=='Dots'then for j=-1,1 do mark(j*.11,j*.18,.14,.14)end
- elseif spec.pattern=='Specks'then for _,v in ipairs({{0,.29},{-.23,.06},{.23,.06},{-.13,-.23},{.13,-.23}})do mark(v[1],v[2],.085,.135)end
- elseif spec.pattern=='Leaf'then mark(0,.06,.23,.40,-.6);mark(-.09,-.16,.035,.2,-.6)
- else mark(0,0,.08,.45);mark(0,0,.38,.08);p('Sparkle',V(.19,.19,.03),CF(0,0,-.4)*CFrame.Angles(0,0,math.pi/4),ink)end
- local a=spec.addition
+ elseif pattern=='Dots'then for j=-1,1 do mark(j*.11,j*.18,.14,.14)end
+ elseif pattern=='Specks'then for _,v in ipairs({{0,.29},{-.23,.06},{.23,.06},{-.13,-.23},{.13,-.23}})do mark(v[1],v[2],.085,.135)end
+ elseif pattern=='Leaf'then mark(0,.06,.23,.40,-.6);mark(-.09,-.16,.035,.2,-.6)
+ else mark(0,0,.08,.45);mark(0,0,.38,.08)
+  -- R134: the sparkle sits on the front surface of whatever shape the body is (it floated off non-oval bodies).
+  local z=Shapes.FrontZ(body,0,0);if z then p('Sparkle',V(.19,.19,.03),CF(0,0,z-.02)*CFrame.Angles(0,0,math.pi/4),ink)end
+ end
+ local a=(sig and not sig.KeepAddition)and'none'or spec.addition
+ -- R134 (owner: "remove that wing like design, it's ugly"): the side crystal/thorn shards are gone for every seed.
+ if a=='crystals'or a=='thorns'then a='none'end
+ local topY,bottomY=Shapes.Extent(body)
  local leafColor=(spec.biome=='Snow'and RGB(175,230,231))or(spec.biome=='Crystal'and RGB(210,220,238))or RGB(64,133,66)
  local function leaf(x,y,z,angle,color,size)
   oval('Petal',V(x,y,z),size or V(.25,.65,.09),color or leafColor,CFrame.Angles(0,0,angle or 0))
@@ -173,13 +224,34 @@ function Visuals.Seed(seed,index,origin,parent,scale,weldRoot,mutation)
  end
  if a=='bolts'or a=='crownBolts'then bolt(-.67,.24,-1);bolt(.67,.24,1);ring(.86,.15,true,ink)end
  if a:sub(1,5)=='crown'then
+  -- R134: the crown hugs the body just below its top (it used to float in a fixed ring on non-oval bodies).
+  local cy=topY-.08;local cx,hw,hd=Shapes.Span(body,cy);hw=math.max(hw,.16);hd=math.max(hd,.14)
   for i=1,7 do
-   local angle=(i-1)*math.pi*2/7
-   local x,z=math.sin(angle)*.40,math.cos(angle)*.29
-   line('Crown rim',V(x,.72,z),V(math.sin(angle+math.pi*2/7)*.4,.72,math.cos(angle+math.pi*2/7)*.29),.09,ink,Enum.Material.Metal)
-   shard(V(x,.90,z),.34+(.12*(i%2)),spec.biome=='Lava'and RGB(74,43,39)or ink)
+   local angle=(i-1)*math.pi*2/7;local nextAngle=angle+math.pi*2/7
+   local x,z=cx+math.sin(angle)*hw,math.cos(angle)*hd
+   line('Crown rim',V(x,cy,z),V(cx+math.sin(nextAngle)*hw,cy,math.cos(nextAngle)*hd),.09,ink,Enum.Material.Metal)
+   if sig and sig.Crown=='ice'then line('Icicle spike',V(x,cy,z),V(x,cy+.36+.14*(i%2),z),.08,RGB(205,240,255),Enum.Material.Glass)
+   else shard(V(x,cy+.17,z),.34+(.12*(i%2)),spec.biome=='Lava'and RGB(74,43,39)or ink)end
   end
-  p('Royal gem',V(.24,.32,.07),CF(0,.68,-.4)*CFrame.Angles(0,0,math.pi/4),spec.biome=='Snow'and RGB(48,117,219)or top,Enum.Material.Glass)
+  local gz=Shapes.FrontZ(body,0,cy-.06)or-hd
+  p('Royal gem',V(.24,.32,.07),CF(0,cy-.06,gz-.03)*CFrame.Angles(0,0,math.pi/4),spec.biome=='Snow'and RGB(48,117,219)or top,Enum.Material.Glass)
+ end
+ if sig and sig.Draw then
+  -- R134: the kit also knows the body (top/bottom, spans, surface points) so every addition attaches to it, and
+  -- k.anim tags parts the client animates on Legendary+ seeds (Flicker, Pulse or Twinkle; see SeedMotion).
+  local function lay(name,at,dir,len,width,thick,color,mat)
+   return oval(name,at,V(width,thick,len),color,CFrame.lookAt(Vector3.zero,dir.Unit,math.abs(dir.Unit.Y)>.98 and Vector3.zAxis or Vector3.yAxis),mat)
+  end
+  local function path(name,points,width,color,mat)
+   local made={};for i=1,#points-1 do made[#made+1]=line(name,points[i],points[i+1],width,color,mat)end;return made
+  end
+  local function anim(item,kind)
+   if typeof(item)=='Instance'then item:SetAttribute('SeedAnim',kind)else for _,x in ipairs(item)do x:SetAttribute('SeedAnim',kind)end end
+   return item
+  end
+  sig.Draw({p=p,oval=oval,line=line,leaf=leaf,shard=shard,ring=ring,bolt=bolt,top=top,bottom=bottom,ink=ink,leafColor=leafColor,
+   H=topY,Bottom=bottomY,body=body,span=function(y)return Shapes.Span(body,y)end,surface=function(a,y,out)return Shapes.Surface(body,a,y,out)end,
+   front=function(x,y)return Shapes.FrontZ(body,x,y)end,lay=lay,path=path,anim=anim,V=V,CF=CF,RGB=RGB})
  end
  -- V139: the approved soft motes replace the small straight rarity rays.
 
@@ -208,11 +280,11 @@ function Visuals.CarryFrame(character,stage,variantKey,packSize)
     local torso,frame,avatar=Visuals.CarryLayout(character,stage,variantKey,packSize)
     return torso,frame,avatar
 end
-function Visuals.CarryBag(character,stage,variantKey,seedScale,packSize,mutation)
+function Visuals.CarryBag(character,stage,variantKey,seedScale,packSize,mutation,shape)
     local torso,frame,avatar,display,visual,info=Visuals.CarryLayout(character,stage,variantKey,packSize)
     if not torso then return nil end
     -- Base scale 1 exactly matches world/dropped geometry, regardless of avatar body size.
-    local m=Visuals.Bag(frame,character,1,torso,stage,variantKey,seedScale,packSize,mutation,display)
+    local m=Visuals.Bag(frame,character,1,torso,stage,variantKey,seedScale,packSize,mutation,display,nil,shape)
     m.Name='CarriedSeed';m:SetAttribute('SeedPackCarry',true);m:SetAttribute('AvatarScale',avatar)
     m:SetAttribute('CarryDisplayMultiplier',display)
     m:SetAttribute('CarryRootOffset',info.Offset);m:SetAttribute('CarryBackZ',info.BackZ)
@@ -296,11 +368,12 @@ function Visuals.Platform(origin,stage,variant,size)
  if theme.Moss then
   for i,a in ipairs({.6,3.5,4.4})do
    local offset=Vector3.new(math.cos(a),0,math.sin(a))*d.Radius*.72
-   disk('MossPatch',d.Radius*(i==1 and .22 or .15),.022,top,theme.Moss,Enum.Material.Grass,offset,.72)
+   -- R151: .028 thick (was .022): a patch's top stood .018 over the pad's top face, inside the .02 band where two same-way faces can flicker at a distance (tools/zfight.py); .021 now
+   disk('MossPatch',d.Radius*(i==1 and .22 or .15),.028,top,theme.Moss,Enum.Material.Grass,offset,.72)
   end
  end
  if theme.Ice then
-  local ice=disk('IceGlaze',d.Radius*.95,.024,top,Color3.fromRGB(207,244,255),Enum.Material.Glass)
+  local ice=disk('IceGlaze',d.Radius*.95,.030,top,Color3.fromRGB(207,244,255),Enum.Material.Glass) -- R151: .030 thick (was .024), its top .022 over the pad's, like the moss
   ice.Transparency=.28;ice.Reflectance=.12
  end
  local color=theme.Vein or theme.Stone:Lerp(Color3.new(),.25)
@@ -319,6 +392,8 @@ end
 -- V139 client-only seed decoration. Never moves or welds the authoritative seed.
 -- One owner updates/destroys each returned object; no per-particle event loops.
 local SeedMotion={};SeedMotion.__index=SeedMotion
+-- R152 perf: a seed aura's per-frame values are written only when they change (its own pieces; PropCache152, without it every write as before)
+local Cache do local ok,m=pcall(require,script.Parent.PropCache152);Cache=ok and m or{new=function()return{Set=function(o,k,v)o[k]=v end}end}end
 local V,CF=Vector3.new,CFrame.new
 local SOFT="rbxasset://textures/particles/flare_main.dds"
 local biomeColors={Forest=Color3.fromRGB(198,239,160),Jungle=Color3.fromRGB(255,203,104),
@@ -405,6 +480,7 @@ function Visuals.CreateSeedMotion(seed,parent,detailed)
  local self=setmetatable({Seed=seed,Rank=style.Rank,Color=style.Color,
   Biome=seed:GetAttribute("SeedBiome")or "Forest",Detailed=detailed~=false,
   Groups={},Rings={},Orbits={},Motes={},GlowItems={},Trails={},Destroyed=false},SeedMotion)
+ self.Set=Cache.new().Set
  local folder=Instance.new("Folder");folder.Name="SeedMotionV139";self.Folder=folder
  self.Anchor=fxPart(folder,"Seed aura anchor",Vector3.one*.02,self.Color,1)
  self.Core=softGlow(folder,self.Anchor,self.Color,self.Rank>=7 and 3.35 or 2.5,self.Rank>=7 and .19 or .14)
@@ -440,21 +516,40 @@ function Visuals.CreateSeedMotion(seed,parent,detailed)
   end
  end
  -- Parent once all objects are configured; first Update sets their visible transforms.
+ -- R134 (owner: "rare can just add minor effects, and as we scale up more and more effects and animations"):
+ -- Legendary and rarer seeds animate their own signature parts (flames flicker, crystals twinkle, glows pulse;
+ -- colour only, so welded held seeds are never moved), and King seeds add slow golden rays behind them.
+ self.Anim={}
+ if self.Rank>=4 and self.Detailed then
+  for _,d in ipairs(seed:GetDescendants())do
+   local kind=d:IsA('BasePart')and d:GetAttribute('SeedAnim')
+   if kind then table.insert(self.Anim,{Part=d,Kind=kind,Color=d.Color,Phase=#self.Anim*1.7})end
+  end
+ end
+ if self.Rank==8 and self.Detailed then
+  self.Rays=group(folder)
+  for i=0,7 do
+   local a=i*math.pi/4;local r=1.05+(i%2)*.28
+   linePiece(self.Rays,'Royal ray',V(math.sin(a)*.5,math.cos(a)*.5,.4),V(math.sin(a)*r,math.cos(a)*r,.4),.07,self.Color)
+   self.Rays.Pieces[#self.Rays.Pieces].Alpha=.45
+  end
+  table.insert(self.Groups,self.Rays)
+ end
  folder.Parent=parent;return self
 end
-local function placeGroup(g,frame,scale,opacity,rescale)
+local function placeGroup(S,g,frame,scale,opacity,rescale)
  for _,p in ipairs(g.Pieces)do
-  p.Part.CFrame=frame*scaled(p.Frame,scale)
+  S(p.Part,'CFrame',frame*scaled(p.Frame,scale))
   if rescale then p.Part.Size=p.Size*scale end
-  p.Part.Transparency=1-(1-p.Alpha)*opacity
+  S(p.Part,'Transparency',1-(1-p.Alpha)*opacity)
  end
  if g.Trail then
   if rescale then g.TrailEnds[1].Position=V(0,.035*scale,0);g.TrailEnds[2].Position=V(0,-.035*scale,0)end
-  g.Trail.Enabled=opacity>.05
+  S(g.Trail,'Enabled',opacity>.05)
  end
 end
-local function placeRing(r,frame,scale,opacity,rescale)
- r.Anchor.CFrame=frame
+local function placeRing(S,r,frame,scale,opacity,rescale)
+ S(r.Anchor,'CFrame',frame)
  for _,a in ipairs(r.Arcs)do
   if rescale then
    local radius=r.Radius*scale
@@ -463,7 +558,7 @@ local function placeRing(r,frame,scale,opacity,rescale)
    local curve=4/3*math.tan((a.Finish-a.Start)/4)*radius
    a.Beam.CurveSize0=curve;a.Beam.CurveSize1=curve;a.Beam.Width0=r.Width*scale;a.Beam.Width1=r.Width*scale
   end
-  a.Beam.Enabled=opacity>.01
+  S(a.Beam,'Enabled',opacity>.01)
   if r.LastOpacity~=opacity then a.Beam.Transparency=NumberSequence.new(1-(1-r.Alpha)*opacity)end
  end
  r.LastOpacity=opacity
@@ -476,42 +571,54 @@ function SeedMotion:Update(frame,age,scale,opacity)
  if self.LastPosition and(self.LastPosition-frame.Position).Magnitude>math.max(8,4*scale)or opacity==0 then
   for _,t in ipairs(self.Trails)do t:Clear()end
  end
- self.LastPosition=frame.Position;self.Anchor.CFrame=frame
- self.Light.Enabled=opacity>.01;self.Light.Brightness=(.4+.14*math.sin(age*1.35))*opacity
- self.Light.Range=math.min(18,6*scale)
+ local S=self.Set
+ self.LastPosition=frame.Position;S(self.Anchor,'CFrame',frame)
+ S(self.Light,'Enabled',opacity>.01);S(self.Light,'Brightness',(.4+.14*math.sin(age*1.35))*opacity)
+ S(self.Light,'Range',math.min(18,6*scale))
  for _,g in ipairs(self.GlowItems)do
   if rescale then g.Gui.Size=UDim2.fromScale(g.Size*scale,g.Size*scale)end
-  g.Gui.Enabled=opacity>.01;g.Image.ImageTransparency=1-g.Opacity*opacity
+  S(g.Gui,'Enabled',opacity>.01);S(g.Image,'ImageTransparency',1-g.Opacity*opacity)
  end
- self.Core.Image.ImageTransparency=1-(self.Core.Opacity+.035*math.sin(age*1.35))*opacity
+ S(self.Core.Image,'ImageTransparency',1-(self.Core.Opacity+.035*math.sin(age*1.35))*opacity)
  for _,p in ipairs(self.Motes)do
   local life=(age*p.Speed+p.Offset)%1;local fade=math.sin(life*math.pi)^2
   local x=math.cos(p.Phase)*(1.05+(p.Index%3)*.13)+math.sin(age*.48+p.Phase)*.15
   local z=math.sin(p.Phase)*(.78+(p.Index%4)*.12)+math.sin(age*.33+p.Phase*1.4)*.14
-  p.Part.CFrame=frame*CF(V(x,-.86+life*2.3,z)*scale)
-  p.Glow.Image.ImageTransparency=1-fade*(.44+.12*math.sin(age*.9+p.Phase))*opacity
+  S(p.Part,'CFrame',frame*CF(V(x,-.86+life*2.3,z)*scale))
+  S(p.Glow.Image,'ImageTransparency',1-fade*(.44+.12*math.sin(age*.9+p.Phase))*opacity)
  end
  for _,o in ipairs(self.Orbits)do
   local plane=frame*CFrame.Angles(o.TiltX,math.sin(age*.17+o.Index)*.1,o.TiltZ)
-  placeRing(o.Ring,plane,scale,opacity,rescale)
+  placeRing(S,o.Ring,plane,scale,opacity,rescale)
   for _,item in ipairs(o.Nodes)do
    local a=item.Phase+age*o.Speed*o.Direction
    local offset=CF(V(math.cos(a)*o.Radius,0,math.sin(a)*o.Radius)*scale)*CFrame.Angles(age*.32,a,age*.22)
-   placeGroup(item.Group,plane*offset,scale,opacity,rescale)
+   placeGroup(S,item.Group,plane*offset,scale,opacity,rescale)
   end
  end
  if self.Eclipse then
-  placeRing(self.Eclipse,frame*CFrame.Angles(math.pi/2,0,.18-age*.10),scale,opacity*(.8+.2*math.sin(age*1.2)),rescale)
+  placeRing(S,self.Eclipse,frame*CFrame.Angles(math.pi/2,0,.18-age*.10),scale,opacity*(.8+.2*math.sin(age*1.2)),rescale)
  end
+ for _,a in ipairs(self.Anim)do
+  local t=age+a.Phase;local k
+  if a.Kind=='Flicker'then k=.5+.5*math.sin(t*11)*math.sin(t*6.7+1.3)
+  elseif a.Kind=='Twinkle'then k=math.max(0,math.sin(t*2.6))^6
+  else k=.5+.5*math.sin(t*2.2)end
+  k=1-(1-k)*opacity
+  local dark,bright=a.Color:Lerp(Color3.new(0,0,0),.4),a.Color:Lerp(Color3.new(1,1,1),.35)
+  S(a.Part,'Color',dark:Lerp(bright,k)) -- (the seed's own part: only this aura writes its colour while it runs)
+ end
+ if self.Rays then placeGroup(S,self.Rays,frame*CFrame.Angles(0,0,age*.25),scale,opacity*(.75+.25*math.sin(age*1.1)),rescale)end
  if self.Crown then
   local cf=frame*CF(0,(1.72+math.sin(age*1.3)*.04)*scale,0)*CFrame.Angles(0,-age*.16,0)
-  placeRing(self.Crown,cf,scale,opacity,rescale);placeGroup(self.CrownTeeth,cf,scale,opacity,rescale)
-  for _,j in ipairs(self.CrownJewels)do placeGroup(j.Group,cf*CF(V(math.cos(j.Angle)*.61,j.Height,math.sin(j.Angle)*.61)*scale),scale,opacity,rescale)end
+  placeRing(S,self.Crown,cf,scale,opacity,rescale);placeGroup(S,self.CrownTeeth,cf,scale,opacity,rescale)
+  for _,j in ipairs(self.CrownJewels)do placeGroup(S,j.Group,cf*CF(V(math.cos(j.Angle)*.61,j.Height,math.sin(j.Angle)*.61)*scale),scale,opacity,rescale)end
  end
 end
 function SeedMotion:Destroy()
  if self.Destroyed then return end
  self.Destroyed=true;self.Folder:Destroy()
+ for _,a in ipairs(self.Anim or{})do if a.Part.Parent then a.Part.Color=a.Color end end
  table.clear(self.Groups);table.clear(self.Rings);table.clear(self.Orbits);table.clear(self.Motes);table.clear(self.GlowItems);table.clear(self.Trails)
 end
 

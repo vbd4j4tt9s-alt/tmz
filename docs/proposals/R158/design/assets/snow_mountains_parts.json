@@ -1,0 +1,2952 @@
+[
+ {
+  "ref": 0,
+  "parent": -1,
+  "ClassName": "Model",
+  "Name": "Low Poly Island Hills"
+ },
+ {
+  "ref": 1,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 2,
+  "parent": 1,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   60.62800598144531,
+   0.7028762102127075,
+   56.17951965332031
+  ],
+  "CFrame": {
+   "pos": [
+    -19.997848510742188,
+    25.98480224609375,
+    689.6822509765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 3,
+  "parent": 2,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 4,
+  "parent": 1,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   77.3166275024414,
+   21.633352279663086,
+   71.12918090820312
+  ],
+  "CFrame": {
+   "pos": [
+    -19.834274291992188,
+    14.816688537597656,
+    689.9678344726562
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 5,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 6,
+  "parent": 5,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   63.0199089050293,
+   0.7306060791015625,
+   58.39592361450195
+  ],
+  "CFrame": {
+   "pos": [
+    83.09745788574219,
+    26.852144241333008,
+    761.0491943359375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 7,
+  "parent": 6,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 8,
+  "parent": 5,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   80.36692810058594,
+   22.486835479736328,
+   73.93537902832031
+  ],
+  "CFrame": {
+   "pos": [
+    83.26756286621094,
+    15.243427276611328,
+    761.3460083007812
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 9,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 10,
+  "parent": 9,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   63.0199089050293,
+   0.7306060791015625,
+   58.39592361450195
+  ],
+  "CFrame": {
+   "pos": [
+    76.04777526855469,
+    26.852144241333008,
+    689.6710205078125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 11,
+  "parent": 10,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 12,
+  "parent": 9,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   80.36692810058594,
+   22.486835479736328,
+   73.93537902832031
+  ],
+  "CFrame": {
+   "pos": [
+    76.21788024902344,
+    15.243427276611328,
+    689.9678344726562
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 13,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 14,
+  "parent": 13,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   27.141340255737305,
+   0.3146566152572632,
+   25.14988899230957
+  ],
+  "CFrame": {
+   "pos": [
+    -36.65052795410156,
+    13.841938018798828,
+    791.1793823242188
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 15,
+  "parent": 14,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 16,
+  "parent": 13,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   34.612342834472656,
+   9.684603691101074,
+   31.8424072265625
+  ],
+  "CFrame": {
+   "pos": [
+    -36.57725524902344,
+    8.842321395874023,
+    791.3071899414062
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 17,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 18,
+  "parent": 17,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   39.10086441040039,
+   0.45330649614334106,
+   36.231903076171875
+  ],
+  "CFrame": {
+   "pos": [
+    95.49900817871094,
+    18.17868423461914,
+    804.3412475585938
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 19,
+  "parent": 18,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 20,
+  "parent": 17,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   49.86387634277344,
+   13.952014923095703,
+   45.8734016418457
+  ],
+  "CFrame": {
+   "pos": [
+    95.60456848144531,
+    10.976020812988281,
+    804.525390625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 21,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 22,
+  "parent": 21,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   79.76322937011719,
+   0.9247159361839294,
+   73.91072845458984
+  ],
+  "CFrame": {
+   "pos": [
+    17.842605590820312,
+    32.9235725402832,
+    827.061279296875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 23,
+  "parent": 22,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 24,
+  "parent": 21,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   101.71908569335938,
+   28.46120262145996,
+   93.57876586914062
+  ],
+  "CFrame": {
+   "pos": [
+    18.057876586914062,
+    18.23061180114746,
+    827.4368896484375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 25,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 26,
+  "parent": 25,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   103.6822738647461,
+   1.20201575756073,
+   96.07476806640625
+  ],
+  "CFrame": {
+   "pos": [
+    22.184127807617188,
+    41.59703063964844,
+    711.5098266601562
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 27,
+  "parent": 26,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 28,
+  "parent": 25,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   132.22215270996094,
+   36.99602508544922,
+   121.64075469970703
+  ],
+  "CFrame": {
+   "pos": [
+    22.463912963867188,
+    22.498023986816406,
+    711.9981689453125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 29,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 30,
+  "parent": 29,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   31.92514991760254,
+   0.37011656165122986,
+   29.582693099975586
+  ],
+  "CFrame": {
+   "pos": [
+    -29.613754272460938,
+    15.576641082763672,
+    656.3314208984375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 31,
+  "parent": 30,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 32,
+  "parent": 29,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   40.712955474853516,
+   11.391568183898926,
+   37.45480728149414
+  ],
+  "CFrame": {
+   "pos": [
+    -29.527587890625,
+    9.695802688598633,
+    656.4817504882812
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 33,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 34,
+  "parent": 33,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   63.0199089050293,
+   0.7306060791015625,
+   58.39592361450195
+  ],
+  "CFrame": {
+   "pos": [
+    -20.004318237304688,
+    26.852144241333008,
+    827.1400756835938
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 35,
+  "parent": 34,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 36,
+  "parent": 33,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   80.36692810058594,
+   22.486835479736328,
+   73.93537902832031
+  ],
+  "CFrame": {
+   "pos": [
+    -19.834274291992188,
+    15.243427276611328,
+    827.4368896484375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 37,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 38,
+  "parent": 37,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   98.89847564697266,
+   1.146555781364441,
+   91.6419677734375
+  ],
+  "CFrame": {
+   "pos": [
+    37.17765808105469,
+    39.862327575683594,
+    779.3856811523438
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 39,
+  "parent": 38,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 40,
+  "parent": 37,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   126.12155151367188,
+   35.289066314697266,
+   116.02836608886719
+  ],
+  "CFrame": {
+   "pos": [
+    37.44453430175781,
+    21.644529342651367,
+    779.8514404296875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 41,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 42,
+  "parent": 41,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   82.15513610839844,
+   0.9524458646774292,
+   76.12713623046875
+  ],
+  "CFrame": {
+   "pos": [
+    23.123428344726562,
+    33.79092025756836,
+    653.451171875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 43,
+  "parent": 42,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 44,
+  "parent": 41,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   104.76937866210938,
+   29.314687728881836,
+   96.38495635986328
+  ],
+  "CFrame": {
+   "pos": [
+    23.345138549804688,
+    18.657363891601562,
+    653.838134765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 45,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 46,
+  "parent": 45,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   34.317054748535156,
+   0.3978465795516968,
+   31.799100875854492
+  ],
+  "CFrame": {
+   "pos": [
+    77.88768005371094,
+    16.443994522094727,
+    658.0825805664062
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 47,
+  "parent": 46,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 48,
+  "parent": 45,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   43.76326370239258,
+   12.245052337646484,
+   40.26100540161133
+  ],
+  "CFrame": {
+   "pos": [
+    77.98027038574219,
+    10.122535705566406,
+    658.244140625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 49,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 50,
+  "parent": 49,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   39.10086441040039,
+   0.45330649614334106,
+   36.231903076171875
+  ],
+  "CFrame": {
+   "pos": [
+    95.49900817871094,
+    18.17868423461914,
+    726.7945556640625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 51,
+  "parent": 50,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 52,
+  "parent": 49,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   49.86387634277344,
+   13.952014923095703,
+   45.8734016418457
+  ],
+  "CFrame": {
+   "pos": [
+    95.60456848144531,
+    10.976020812988281,
+    726.978759765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 53,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 54,
+  "parent": 53,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   27.141340255737305,
+   0.3146566152572632,
+   25.14988899230957
+  ],
+  "CFrame": {
+   "pos": [
+    -34.00691223144531,
+    13.841938018798828,
+    719.8012084960938
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 55,
+  "parent": 54,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 56,
+  "parent": 53,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   34.612342834472656,
+   9.684603691101074,
+   31.8424072265625
+  ],
+  "CFrame": {
+   "pos": [
+    -33.93365478515625,
+    8.842321395874023,
+    719.9290161132812
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 57,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 58,
+  "parent": 57,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   55.84418869018555,
+   0.6474162340164185,
+   51.7467155456543
+  ],
+  "CFrame": {
+   "pos": [
+    66.37382507324219,
+    24.250118255615234,
+    838.629638671875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 59,
+  "parent": 58,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 60,
+  "parent": 57,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   71.21601104736328,
+   19.926387786865234,
+   65.51678466796875
+  ],
+  "CFrame": {
+   "pos": [
+    66.52455139160156,
+    13.963218688964844,
+    838.8927001953125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 61,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Model"
+ },
+ {
+  "ref": 62,
+  "parent": 61,
+  "ClassName": "MeshPart",
+  "Name": "Grass",
+  "size": [
+   70.19561004638672,
+   0.8137959837913513,
+   65.04512786865234
+  ],
+  "CFrame": {
+   "pos": [
+    -20.023666381835938,
+    29.454187393188477,
+    756.609375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150938211",
+  "TextureID": ""
+ },
+ {
+  "ref": 63,
+  "parent": 62,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 64,
+  "parent": 61,
+  "ClassName": "MeshPart",
+  "Name": "Stone",
+  "size": [
+   89.51785278320312,
+   25.047277450561523,
+   82.35396575927734
+  ],
+  "CFrame": {
+   "pos": [
+    -19.834274291992188,
+    16.523649215698242,
+    756.93994140625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   107,
+   107,
+   107
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5150934668",
+  "TextureID": ""
+ },
+ {
+  "ref": 65,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 66,
+  "parent": 65,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -7.2574615478515625,
+    48.23902130126953,
+    687.5554809570312
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 67,
+  "parent": 66,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 68,
+  "parent": 65,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -7.6267242431640625,
+    53.21257781982422,
+    687.7283935546875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 69,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 70,
+  "parent": 69,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -41.62469482421875,
+    32.37721252441406,
+    685.7930908203125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 71,
+  "parent": 70,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 72,
+  "parent": 69,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -41.99395751953125,
+    37.350730895996094,
+    685.9660034179688
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 73,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 74,
+  "parent": 73,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    44.73405456542969,
+    48.238990783691406,
+    682.2681884765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 75,
+  "parent": 74,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 76,
+  "parent": 73,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    44.36479187011719,
+    53.21250915527344,
+    682.441162109375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 77,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 78,
+  "parent": 77,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -34.57502746582031,
+    33.25846862792969,
+    828.5494384765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 79,
+  "parent": 78,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 80,
+  "parent": 77,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -34.94425964355469,
+    38.23200988769531,
+    828.7223510742188
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 81,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 82,
+  "parent": 81,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    73.81404113769531,
+    30.614816665649414,
+    841.767578125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 83,
+  "parent": 82,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 84,
+  "parent": 81,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    73.44480895996094,
+    35.588340759277344,
+    841.9405517578125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 85,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 86,
+  "parent": 85,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    57.95225524902344,
+    46.47657012939453,
+    771.2706298828125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 87,
+  "parent": 86,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 88,
+  "parent": 85,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    57.58299255371094,
+    51.45011901855469,
+    771.4435424804688
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 89,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 90,
+  "parent": 89,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -37.21864318847656,
+    35.902061462402344,
+    765.9833374023438
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 91,
+  "parent": 90,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 92,
+  "parent": 89,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -37.587921142578125,
+    40.875587463378906,
+    766.1563110351562
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 93,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 94,
+  "parent": 93,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    4.1983184814453125,
+    46.476531982421875,
+    777.4390869140625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 95,
+  "parent": 94,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 96,
+  "parent": 93,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    3.8290557861328125,
+    51.4500732421875,
+    777.612060546875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 97,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 98,
+  "parent": 97,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    95.84434509277344,
+    33.25843811035156,
+    752.7651977539062
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 99,
+  "parent": 98,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 100,
+  "parent": 97,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    95.47514343261719,
+    38.231964111328125,
+    752.9381103515625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 101,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 102,
+  "parent": 101,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -9.019882202148438,
+    40.308074951171875,
+    648.7821655273438
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 103,
+  "parent": 102,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 104,
+  "parent": 101,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -9.389114379882812,
+    45.28160095214844,
+    648.955078125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 105,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 106,
+  "parent": 105,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    33.27827453613281,
+    40.308074951171875,
+    648.7821655273438
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 107,
+  "parent": 106,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 108,
+  "parent": 105,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    32.90907287597656,
+    45.28160095214844,
+    648.955078125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 109,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 110,
+  "parent": 109,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    -9.019882202148438,
+    48.238990783691406,
+    734.259765625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 111,
+  "parent": 110,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 112,
+  "parent": 109,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    -9.389114379882812,
+    53.21250915527344,
+    734.4326171875
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 113,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 114,
+  "parent": 113,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    37.68434143066406,
+    48.239013671875,
+    720.1603393554688
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 115,
+  "parent": 114,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 116,
+  "parent": 113,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    37.31510925292969,
+    53.21257019042969,
+    720.333251953125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 117,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 118,
+  "parent": 117,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    0.6734466552734375,
+    39.426841735839844,
+    835.59912109375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 119,
+  "parent": 118,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 120,
+  "parent": 117,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    0.3042144775390625,
+    44.400390625,
+    835.7720336914062
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 121,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Loy Poly Small Tree"
+ },
+ {
+  "ref": 122,
+  "parent": 121,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    87.91343688964844,
+    33.25843811035156,
+    683.1494140625
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 123,
+  "parent": 122,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 124,
+  "parent": 121,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    87.54420471191406,
+    38.231964111328125,
+    683.3223876953125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   243,
+   242,
+   250
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ },
+ {
+  "ref": 125,
+  "parent": 0,
+  "ClassName": "Model",
+  "Name": "Tree"
+ },
+ {
+  "ref": 126,
+  "parent": 125,
+  "ClassName": "MeshPart",
+  "Name": "TreeTrunk",
+  "size": [
+   3.181770086288452,
+   12.083210945129395,
+   3.2109248638153076
+  ],
+  "CFrame": {
+   "pos": [
+    35.92195129394531,
+    46.476531982421875,
+    799.4694213867188
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   124,
+   92,
+   70
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153142324",
+  "TextureID": ""
+ },
+ {
+  "ref": 127,
+  "parent": 126,
+  "ClassName": "Weld",
+  "Name": "Weld"
+ },
+ {
+  "ref": 128,
+  "parent": 125,
+  "ClassName": "MeshPart",
+  "Name": "TreeLeaves",
+  "size": [
+   8.804781913757324,
+   17.447072982788086,
+   8.778115272521973
+  ],
+  "CFrame": {
+   "pos": [
+    35.55268859863281,
+    51.4500732421875,
+    799.642333984375
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   233,
+   233,
+   244
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": true,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5153169732",
+  "TextureID": ""
+ }
+]

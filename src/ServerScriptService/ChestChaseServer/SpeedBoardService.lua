@@ -80,7 +80,7 @@ function S:Render()
    Landscape.Apply(model);local board=model:FindFirstChild('Board');local gui=board and board:FindFirstChild('Display');if not gui then continue end
    local state=self.Boards[spec.Key];if not state or state.Gui~=gui then state=self:_build(spec,gui);self.Boards[spec.Key]=state end
    local rows=self:Top(spec.Stat);state.Empty.Visible=#rows==0
-   state.Empty.Text=self.Failed[spec.Stat]and'Global rankings unavailable. Retrying…'or self.Updated[spec.Stat]and'Be the first to rank!'or'Loading global rankings…'
+   state.Empty.Text=self.Failed[spec.Stat]and'Can\'t load the rankings. Trying again…'or self.Updated[spec.Stat]and'Be the first to rank!'or'Loading global rankings…'
    state.Scope.Text=self.Failed[spec.Stat]and'GLOBAL • RETRYING UPDATE'or'GLOBAL • UPDATES EVERY MINUTE'
    -- Rows for every player's own scrollable board (LeaderboardClient). The server sign keeps a short top 10 fallback.
    local packed={}

@@ -14,16 +14,31 @@ function Renderer.Clear(bag)
 end
 function Renderer.Build(bag,isValid)
     if bag:GetAttribute('BagVariant')=='EclipseReliquary'then return require(script.Parent.EclipsePackArt).Build(bag)end
+    if bag:GetAttribute('BagVariant')==require(script.Parent.VerityCatalog).Variant then return require(script.Parent.VerityPackArt).Build(bag,isValid)end -- R149: the pure yellow pouch with Verity's face (VerityPackArt)
     if bag:GetAttribute('BagVariant')=='MechLimited'then
         if bag:GetAttribute('CompactPackReady')then return true end
         return require(script.Parent.MechArt).Pack(bag)
     end
-    return Renderer.BuildStandard(bag,bag:GetAttribute('PackArtKey')or'',isValid)
+    -- R151: an ordinary pack's pouch takes the shape variation the pack rolled (the attribute PackShape, set by SeedPackVisuals.Bag from the world pack / the item
+    -- record; absent = the place's own mesh): the baked template of its (design, variation) pair when it is ready, else the place's own. Never yields. The Void, the
+    -- Mech and the special packs never come through here; the Verity pack takes its roll in VerityPackArt.
+    -- (a bag flagged DefaultPackShape, which the catalogue / shop / reward pictures are, is built from the design's own mesh whatever it says: no variation is asked for, nothing is baked)
+    if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
+    local key=bag:GetAttribute('PackArtKey')or''
+    local shape=bag:GetAttribute('DefaultPackShape')~=true and bag:GetAttribute('PackShape')or nil
+    local template
+    if shape~=nil then
+        local shown;template,shown=require(script.Parent.PackShapes151).ForBag(key,shape,false)
+        bag:SetAttribute('PackShapeShown',shown)
+    end
+    return Renderer.BuildStandard(bag,key,isValid,template)
 end
-function Renderer.BuildStandard(bag,key,isValid)
+-- R151: `template` (optional) is a template Model to build from instead of the place's own (VerityPackArt passes the neutral Verity pouch, a clone of
+-- Storm_02 with white vertex colours); everything else is the same code, so such a pack is built exactly like a plain one.
+function Renderer.BuildStandard(bag,key,isValid,template)
     if bag:GetAttribute('CompactPackReady') and bag:FindFirstChild('PackGeometry') then return true end
     local root=bag.PrimaryPart
-    local template=Renderer.GetGeometry(key)
+    template=template or Renderer.GetGeometry(key)
     assert(root and template,'[V123] Missing approved pack mesh. Finish the V123 installer in Edit mode first.')
     local folder=Instance.new('Folder');folder.Name='PackGeometry'
     local scale=bag:GetAttribute('VisualScale') or 1

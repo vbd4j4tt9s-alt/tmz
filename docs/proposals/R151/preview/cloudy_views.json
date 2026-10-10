@@ -1,0 +1,41 @@
+{
+ "note": "Cameras for the R151 Cloudy sky render (render_cloudy.mjs + cloudy.html). Each view is drawn twice, under a Clear and under a Cloudy default sky. 'base': leaving Base 1, camera zoomed out behind the player (across the festival square to the market, the street lamps of the left side street in front); 'market': from the market looking toward the back of the hub; 'lanterns': the market's front, its two porch lanterns and the lamps either side of the avenue, from a low camera.",
+ "views": [
+  {
+   "name": "base",
+   "title": "From Base 1 (leaving it, camera zoomed out): the side-street lamps, the avenue and the market ahead",
+   "fov": 70,
+   "pos": [-150, 34, -196],
+   "look": [-30, 6, -300],
+   "avatars": [[-118, 4, -186, -2.1, 13775418]],
+   "shadowAt": [-60, 4, -260],
+   "shadowExtent": 300,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "market",
+   "title": "From the market (camera zoomed out): the lamps and wall lanterns down the hub",
+   "fov": 70,
+   "pos": [30, 30, -292],
+   "look": [110, 6, -520],
+   "avatars": [[44, 4, -316, 2.4, 4285074]],
+   "shadowAt": [80, 4, -450],
+   "shadowExtent": 300,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "lanterns",
+   "title": "At the market's front: the porch lanterns, the market square's double lamps and the wall lanterns",
+   "fov": 62,
+   "pos": [20, 13, -318],
+   "look": [0, 9, -276],
+   "avatars": [[-8, 4, -300, 0.4, 2976360]],
+   "shadowAt": [0, 4, -280],
+   "shadowExtent": 160,
+   "fogNear": 700,
+   "fogFar": 2000
+  }
+ ]
+}

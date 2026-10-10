@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Fx=require(game:GetService('ReplicatedStorage'):WaitForChild('ClientFxBudget'))
 -- V146: bounded moving glints and orbits aligned to the visible pack geometry.
 local ContentProvider=game:GetService('ContentProvider')
@@ -12,6 +13,7 @@ local Gui=game:GetService('GuiService')
 local Budget=require(RS:WaitForChild('CosmeticBudget'))
 local View=require(RS:WaitForChild('PlantDetailPlanner'))
 local BRIGHT_DISTANCE,DETAIL_DISTANCE,LIGHT_DISTANCE=900,160,42
+local NEAR_BRIGHT,FAR_BRIGHT=150,8 -- R153 perf (D7): tier 2 keeps every outline within 150 studs, and beyond that only among the nearest 8 packs
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
 local WHITE=Color3.new(1,1,1)
 local ACCENTS = {["Snow_01"]={{0.0,0.1,-0.5061}},["Snow_02"]={{0,0.12,-0.62}},["Snow_03"]={{0.475,0.0498,-0.5005},{-0.475,0.0499,-0.5005},{-0.0223,0.067,-0.6491}},["Snow_04"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{-0.1799,0.705,-0.4184}},["Snow_05"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Snow_06"]={{-0.5196,-0.0299,-0.5595},{0.5194,0.0049,-0.582},{0.0,0.03,-0.7265}},["Crystal_01"]={{0.0008,0.0698,-0.6575}},["Crystal_02"]={{-0.4905,-0.2784,-0.5804},{-0.6706,-0.4807,-0.434},{0.5834,0.6359,-0.4033}},["Crystal_03"]={{-0.0006,0.1837,-0.7388},{-0.1943,-0.0503,-0.7139}},["Crystal_04"]={{0.0,0.02,-0.7468},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_05"]={{0.0,0.02,-0.7668},{-0.6232,0.6926,-0.4463},{0.5338,0.6974,-0.4386}},["Crystal_06"]={{0.0,0.03,-0.7965},{-0.5588,-0.076,-0.2964},{0.5562,-0.0751,-0.2964}}} -- GENERATED_ACCENTS
@@ -128,6 +130,7 @@ local function ring(fx,name,color,radius,height,speed,tilt,gap)
 end
 local function discardDetails(r)
     if r.Fx then r.Fx.Folder:Destroy();r.Fx=nil end
+    if r.MechMotion then r.MechMotion:Live(false)end -- (R153: the Mech pack's hum and sparks)
 end
 local function discard(r)
     discardDetails(r)
@@ -311,8 +314,11 @@ local function initialize(bag,r)
     r.Ready=true;r.Hidden=not r.Opening and (bag:GetAttribute('PackVisible')==false or bag:GetAttribute('RevealAt')~=nil)
     setVisible(r);return true
 end
+local VerityVariant=require(RS:WaitForChild('VerityCatalog')).Variant
 local function track(bag)
-    if bag:GetAttribute('BagVariant')=='EclipseReliquary'then return end
+    -- R147: the Void pack has its own motion and fx (VoidPackFx via VeiledEventClient81), so no generic rarity glints. R149: the Verity pack has no effects at all (pure yellow with her face), so it is left alone too.
+    local v=bag:GetAttribute('BagVariant')
+    if v=='EclipseReliquary'or v==VerityVariant then return end
     if not bag:IsA('Model')or records[bag]then return end
     local r={Bag=bag,Connections={}};records[bag]=r
     local function visibility()
@@ -331,6 +337,11 @@ table.insert(connections,CollectionService:GetInstanceRemovedSignal('BiomeSeedPa
 local function choose(camera,now,low)
     local cameraPosition=camera.CFrame.Position;local view=View.View(camera)
     local MAX_HIGHLIGHTS,MAX_DETAILS,MAX_LIGHTS,MAX_DISTANT=low and 12 or 24,low and 3 or 8,low and 1 or 4,low and 16 or 48
+    -- R153 perf (lag audit D7): the outlines share Roblox's 31 with every other Highlight (ClientFxBudget.HighlightRoom: weather glows, mutation
+    -- outlines, plant auras, Void packs), and on tier 2 (phones) a pack past NEAR_BRIGHT studs keeps its outline only among the nearest FAR_BRIGHT
+    -- (it keeps its distant aura); within NEAR_BRIGHT studs every pack keeps its outline as before.
+    local room=MAX_HIGHLIGHTS;do local ok,n=pcall(Fx.HighlightRoom);if ok and type(n)=='number'then room=math.min(room,n)end end
+    local farBright=(not low and Fx.Get()==2)and FAR_BRIGHT or room
     local candidates={};local character=Players.LocalPlayer and Players.LocalPlayer.Character
     for bag,r in pairs(records)do
         if not r.Ready then initialize(bag,r)end
@@ -356,7 +367,7 @@ local function choose(camera,now,low)
     table.sort(candidates,function(a,b)return a.Score<b.Score end)
     local count,lights=0,0
     for i,r in ipairs(candidates)do
-        r.Bright=i<=MAX_HIGHLIGHTS;r.HasDistant=i<=MAX_DISTANT
+        r.Bright=i<=room and(i<=farBright or r.Distance<=NEAR_BRIGHT);r.HasDistant=i<=MAX_DISTANT
         if r.Bright and r.Distance<=DETAIL_DISTANCE and count<MAX_DETAILS then
             count+=1;r.Detailed=true
             r.Lit=r.Distance<=LIGHT_DISTANCE and lights<MAX_LIGHTS
@@ -372,7 +383,7 @@ local function choose(camera,now,low)
     for _,r in ipairs(candidates)do
         if r.Bright then highlight(r)end
         if r.HasDistant then distant(r);r.Distant.Enabled=not r.Detailed end
-        if r.Detailed then details(r);r.Fx.Light.Enabled=r.Lit end
+        if r.Detailed then details(r);r.Fx.Light.Enabled=r.Lit;if r.MechMotion then r.MechMotion:Live(true,low)end end
     end
 end
 local selectionClock,detailClock,distantClock=.25,0,0
@@ -383,6 +394,9 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
     selectionClock+=dt;detailClock+=dt;distantClock+=dt
     local select=selectionClock>=.25;if select then selectionClock=0;choose(camera,now,Fx.Low())end
     local low=Fx.Low()
+    -- R153 (owner: "fix all jittery type effects"): an on-screen pack within 240 studs hovers, and a detailed one's aura / orbits / rings / rays turn,
+    -- every rendered frame (they stepped at 30 Hz, 20 Hz low). Bounded by the selection: details for 8 packs (3 low) within 160 studs.
+    -- What still ticks: the Highlight's faint outline pulse (+-.04, 30 Hz) and the distant rays' rotor (well under a pixel a tick); packs past 240 studs keep PackDue.
     local polish=detailClock>=(low and 1/20 or 1/30);if polish then detailClock=0 end
     local distantPolish=distantClock>=(low and 1/6 or 1/12);if distantPolish then distantClock=0 end
     table.clear(moveParts);table.clear(moveFrames)
@@ -390,7 +404,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
     for bag,r in pairs(records)do
         if not r.Ready or not r.Root.Parent or not bag:IsDescendantOf(workspace)or r.Hidden then continue end
         local rootFrame=r.Root.CFrame;local worldMoved=false
-        if r.World and Budget.PackDue(r.Distance or math.huge,r.OnScreen,now,r.LastMove,low)then
+        if r.World and(r.OnScreen and(r.Distance or math.huge)<=240 or Budget.PackDue(r.Distance or math.huge,r.OnScreen,now,r.LastMove,low))then
             local moveDt=math.min(.15,now-(r.LastMove or now-dt));r.LastMove=now
             local near=(r.Distance or math.huge)<=240
             local pos=r.Origin.Position+Vector3.new(0,.16+(near and math.sin(now*1.65+r.Phase)*.12 or 0),0)
@@ -404,7 +418,9 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
         end
         -- The shared rig also drives held packs. Servos change joint offsets;
         -- anchored parts join this frame's batch exactly once.
-        if r.MechMotion and(worldMoved or(polish and r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
+        -- R128 (owner): a carried pack's aura, orbit and Mech rig follow it every frame (they trailed behind at 30 Hz).
+        local carried=not r.World and r.OnScreen
+        if r.MechMotion and(worldMoved or carried or(r.OnScreen and(r.Distance or math.huge)<=DETAIL_DISTANCE))then
             r.MechMotion:Step(Gui.ReducedMotionEnabled and 0 or now,rootFrame,move)
         end
         if r.Distant and not r.Detailed and distantPolish then
@@ -416,7 +432,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
             r.Highlight.OutlineTransparency=r.Rank==1 and .94 or math.max(.25,.80-r.Rank*.07)+.04*math.sin(now*1.4+r.Phase)
         end
         local fx=r.Fx
-        if fx and polish then
+        if fx then
             move(fx.Anchor,rootFrame)
             local orbitFrame=AuraGeometry.Frame(rootFrame,r.OrbitBounds)
             move(fx.OrbitAnchor,orbitFrame)
@@ -424,8 +440,7 @@ table.insert(connections,RunService.RenderStepped:Connect(function(dt)
                 local a=now*.9+r.Phase+(i-1)*math.pi
                 move(p,orbitFrame*CFrame.new(math.cos(a)*(r.OrbitBounds.Half.X+.2*r.Scale),math.sin(a)*(r.OrbitBounds.Half.Y+.22*r.Scale),math.sin(a*2)*.5*r.Scale))
             end
-            if polish then
-                local breath=1+.065*math.sin(now*1.25+r.Phase)
+            do
                 for _,g in ipairs(fx.SurfaceGlints)do
                     local sweep=now*.26+r.Phase+g.Index*.19
                     local cycle=math.floor(sweep)

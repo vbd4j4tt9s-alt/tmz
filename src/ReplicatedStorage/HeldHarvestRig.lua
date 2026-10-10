@@ -57,6 +57,8 @@ function Rig.Step(r,t,wantEffects,audible)
   if r.Effects then Effects.Step(r,t,nil,r.Handle.CFrame*r.Offset)end
  elseif r.FxStarted then Effects.Clear(r);r.FxStarted=false end
 end
+-- R128: move a running effect set to the hand's current frame (no animation work, no new parts).
+function Rig.Follow(r,t)if r.FxStarted and r.Effects and r.Handle.Parent then Effects.Step(r,t,nil,r.Handle.CFrame*r.Offset)end end
 function Rig.Apply(r)for _,g in ipairs(r.Joints)do if g.Motor.Parent then g.Motor.Transform=g.Transform or CFrame.new()end end end
 function Rig.Destroy(r)Effects.Clear(r);r.Container:Destroy();r.Visual:Destroy()end
 return Rig

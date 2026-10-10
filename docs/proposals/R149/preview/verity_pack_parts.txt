@@ -1,0 +1,186 @@
+R149 Verity pack: every part of the pack in every context it is shown (Roblox mock, the real Storm_02 template: one MeshPart).
+Positions / z ranges are in the pack's own frame (front is -Z); pack scale 1.12 = the Verity stage-7 theme.
+
+######## BEFORE: the base commit's art (0b08836, R148)
+== on the ground / dropped (anchored world pack) ==  (pack scale 1.1200, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [214,190,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip1      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip2      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip3      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip4      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip5      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip6      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip7      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip8      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Folder PackGeometry
+  MeshPart  ApprovedMesh01  color [255,255,0]   SmoothPlastic T 0.00 size (2.2064,2.3072,1.1245) at (0.0000,-0.0112,-0.0526) z [-0.6149..0.5096] TextureID=""
+  Part      VerityFaceFront color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,-0.6171) z [-0.6283..-0.6059] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityFaceBack  color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,0.5118) z [0.5006..0.5230] children: Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+== held / carried (CarryBag: welded to the character) ==  (pack scale 1.1200, Anchored root false)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: WeldConstraint, Attachment, Attachment
+  Part      BottomSeal      color [214,190,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip1      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip2      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip3      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip4      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip5      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip6      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip7      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip8      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Folder PackGeometry
+  MeshPart  ApprovedMesh01  color [255,255,0]   SmoothPlastic T 0.00 size (2.2064,2.3072,1.1245) at (0.0000,-0.0112,-0.0526) z [-0.6149..0.5096] TextureID=""; children: WeldConstraint
+  Part      VerityFaceFront color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,-0.6171) z [-0.6283..-0.6059] children: WeldConstraint, Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityFaceBack  color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,0.5118) z [0.5006..0.5230] children: WeldConstraint, Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+== hotbar / Bag picture (ItemPictures builds exactly this into a ViewportFrame) ==  (pack scale 1.1200, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [214,190,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (-0.0000,-1.2544,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip1      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip2      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip3      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip4      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip5      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip6      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip7      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip8      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Folder PackGeometry
+  MeshPart  ApprovedMesh01  color [255,255,0]   SmoothPlastic T 0.00 size (2.2064,2.3072,1.1245) at (-0.0000,-0.0112,-0.0526) z [-0.6149..0.5096] TextureID=""
+  Part      VerityFaceFront color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (-0.0000,-0.0000,-0.6171) z [-0.6283..-0.6059] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityFaceBack  color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,0.5118) z [0.5006..0.5230] children: Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+== opening: the clone SeedPackClient animates ==  (pack scale 1.0000, Anchored root false)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: WeldConstraint, Attachment, Attachment
+  Part      BottomSeal      color [214,190,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip1      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip2      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip3      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip4      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip5      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip6      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip7      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip8      color [214,190,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Folder PackGeometry
+  MeshPart  ApprovedMesh01  color [255,255,0]   SmoothPlastic T 0.00 size (2.2064,2.3072,1.1245) at (0.0000,-0.0112,-0.0526) z [-0.6149..0.5096] TextureID=""; children: WeldConstraint
+  Part      VerityFaceFront color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,-0.6171) z [-0.6283..-0.6059] children: WeldConstraint, Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityFaceBack  color [255,255,0]   SmoothPlastic T 0.00 size (1.6943,1.6943,0.0224) at (0.0000,0.0000,0.5118) z [0.5006..0.5230] children: WeldConstraint, Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+== giant (PackSize 25) ==  (pack scale 28.0000, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [214,190,0]   SmoothPlastic T 0.00 size (53.2000,4.4800,0.9800) at (0.0000,-31.3600,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip1      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-23.2750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip2      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-16.6250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip3      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-9.9750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip4      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-3.3250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip5      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (3.3250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip6      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (9.9750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip7      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (16.6250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip8      color [214,190,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (23.2750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Folder PackGeometry
+  MeshPart  ApprovedMesh01  color [255,255,0]   SmoothPlastic T 0.00 size (55.1600,57.6800,28.1120) at (0.0000,-0.2800,-1.3160) z [-15.3720..12.7400] TextureID=""
+  Part      VerityFaceFront color [255,255,0]   SmoothPlastic T 0.00 size (42.3584,42.3584,0.5600) at (0.0000,0.0000,-15.4280) z [-15.7080..-15.1480] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityFaceBack  color [255,255,0]   SmoothPlastic T 0.00 size (42.3584,42.3584,0.5600) at (0.0000,0.0000,12.7960) z [12.5160..13.0760] children: Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+
+######## AFTER: this checkout (R149)
+== on the ground / dropped (anchored world pack) ==  (pack scale 1.1200, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [255,255,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip1      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip2      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip3      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip4      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip5      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip6      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip7      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip8      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Folder PackGeometry
+  Part      VerityFace      color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,1.5767,0.6297) at (0.0000,-0.0112,0.0000) z [-0.3149..0.3149] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000), Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityBodyTop   color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,0.9542,0.0000) z [-0.3104..0.3104] 
+  Part      VerityBodyBottom color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,-0.9766,0.0000) z [-0.3104..0.3104] 
+  Part      VerityEdgeLeft  color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (-0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder
+  Part      VerityEdgeRight color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder
+  Part      VerityTaperTopFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,-0.1585) z [-0.3149..-0.0022] 
+  Part      VerityTaperTopBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,0.1585) z [0.0022..0.3149] 
+  Part      VerityTaperBottomFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,-0.1585) z [-0.3149..-0.0022] 
+  Part      VerityTaperBottomBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,0.1585) z [0.0022..0.3149] 
+== held / carried (CarryBag: welded to the character) ==  (pack scale 1.1200, Anchored root false)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: WeldConstraint, Attachment, Attachment
+  Part      BottomSeal      color [255,255,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip1      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip2      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip3      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip4      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip5      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip6      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip7      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip8      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Folder PackGeometry
+  Part      VerityFace      color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,1.5767,0.6297) at (0.0000,-0.0112,0.0000) z [-0.3149..0.3149] children: WeldConstraint, Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000), Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityBodyTop   color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,0.9542,0.0000) z [-0.3104..0.3104] children: WeldConstraint
+  Part      VerityBodyBottom color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,-0.9766,0.0000) z [-0.3104..0.3104] children: WeldConstraint
+  Part      VerityEdgeLeft  color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (-0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder; children: WeldConstraint
+  Part      VerityEdgeRight color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder; children: WeldConstraint
+  Part      VerityTaperTopFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,-0.1585) z [-0.3149..-0.0022] children: WeldConstraint
+  Part      VerityTaperTopBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,0.1585) z [0.0022..0.3149] children: WeldConstraint
+  Part      VerityTaperBottomFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,-0.1585) z [-0.3149..-0.0022] children: WeldConstraint
+  Part      VerityTaperBottomBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,0.1585) z [0.0022..0.3149] children: WeldConstraint
+== hotbar / Bag picture (ItemPictures builds exactly this into a ViewportFrame) ==  (pack scale 1.1200, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [255,255,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (-0.0000,-1.2544,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip1      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip2      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip3      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip4      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip5      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,-0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip6      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip7      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] 
+  Part      TearStrip8      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] 
+  Folder PackGeometry
+  Part      VerityFace      color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,1.5767,0.6297) at (-0.0000,-0.0112,0.0000) z [-0.3149..0.3149] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000), Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityBodyTop   color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,0.9542,0.0000) z [-0.3104..0.3104] 
+  Part      VerityBodyBottom color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (-0.0000,-0.9766,0.0000) z [-0.3104..0.3104] 
+  Part      VerityEdgeLeft  color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (-0.7883,-0.0112,-0.0000) z [-0.3149..0.3149] Shape=Cylinder
+  Part      VerityEdgeRight color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder
+  Part      VerityTaperTopFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,-0.1585) z [-0.3149..-0.0022] 
+  Part      VerityTaperTopBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,0.1585) z [0.0022..0.3149] 
+  Part      VerityTaperBottomFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (-0.0000,-1.2400,-0.1585) z [-0.3149..-0.0022] 
+  Part      VerityTaperBottomBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,0.1585) z [0.0022..0.3149] 
+== opening: the clone SeedPackClient animates ==  (pack scale 1.0000, Anchored root false)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: WeldConstraint, Attachment, Attachment
+  Part      BottomSeal      color [255,255,0]   SmoothPlastic T 0.00 size (2.1280,0.1792,0.0392) at (0.0000,-1.2544,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip1      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip2      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip3      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip4      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (-0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip5      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.1330,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip6      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.3990,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip7      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.6650,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Part      TearStrip8      color [255,255,0]   SmoothPlastic T 0.00 size (0.2671,0.2016,0.0392) at (0.9310,1.2432,0.0000) z [-0.0196..0.0196] children: WeldConstraint
+  Folder PackGeometry
+  Part      VerityFace      color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,1.5767,0.6297) at (0.0000,-0.0112,0.0000) z [-0.3149..0.3149] children: WeldConstraint, Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000), Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityBodyTop   color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,0.9542,0.0000) z [-0.3104..0.3104] children: WeldConstraint
+  Part      VerityBodyBottom color [255,255,0]   SmoothPlastic T 0.00 size (1.5767,0.3765,0.6207) at (0.0000,-0.9766,0.0000) z [-0.3104..0.3104] children: WeldConstraint
+  Part      VerityEdgeLeft  color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (-0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder; children: WeldConstraint
+  Part      VerityEdgeRight color [255,255,0]   SmoothPlastic T 0.00 size (2.3072,0.6297,0.6297) at (0.7883,-0.0112,0.0000) z [-0.3149..0.3149] Shape=Cylinder; children: WeldConstraint
+  Part      VerityTaperTopFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,-0.1585) z [-0.3149..-0.0022] children: WeldConstraint
+  Part      VerityTaperTopBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,1.2176,0.1585) z [0.0022..0.3149] children: WeldConstraint
+  Part      VerityTaperBottomFront color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,-0.1585) z [-0.3149..-0.0022] children: WeldConstraint
+  Part      VerityTaperBottomBack color [255,255,0]   SmoothPlastic T 0.00 size (1.8915,0.3454,0.0336) at (0.0000,-1.2400,0.1585) z [0.0022..0.3149] children: WeldConstraint
+== giant (PackSize 25) ==  (pack scale 28.0000, Anchored root true)
+  Part      VisualRoot      color [0,0,0]       SmoothPlastic T 1.00 size (0.1000,0.1000,0.1000) at (0.0000,0.0000,0.0000) z [-0.0500..0.0500] children: Attachment, Attachment
+  Part      BottomSeal      color [255,255,0]   SmoothPlastic T 0.00 size (53.2000,4.4800,0.9800) at (0.0000,-31.3600,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip1      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-23.2750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip2      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-16.6250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip3      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-9.9750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip4      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (-3.3250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip5      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (3.3250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip6      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (9.9750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip7      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (16.6250,31.0800,0.0000) z [-0.4900..0.4900] 
+  Part      TearStrip8      color [255,255,0]   SmoothPlastic T 0.00 size (6.6780,5.0400,0.9800) at (23.2750,31.0800,0.0000) z [-0.4900..0.4900] 
+  Folder PackGeometry
+  Part      VerityFace      color [255,255,0]   SmoothPlastic T 0.00 size (39.4173,39.4173,15.7427) at (0.0000,-0.2800,0.0000) z [-7.8714..7.8714] children: Decal(Front rbxassetid://102712963740896 tint [255,255,255] T0.0000), Decal(Back rbxassetid://102712963740896 tint [255,255,255] T0.0000)
+  Part      VerityBodyTop   color [255,255,0]   SmoothPlastic T 0.00 size (39.4173,9.4114,15.5187) at (0.0000,23.8543,0.0000) z [-7.7594..7.7594] 
+  Part      VerityBodyBottom color [255,255,0]   SmoothPlastic T 0.00 size (39.4173,9.4114,15.5187) at (0.0000,-24.4143,0.0000) z [-7.7594..7.7594] 
+  Part      VerityEdgeLeft  color [255,255,0]   SmoothPlastic T 0.00 size (57.6800,15.7427,15.7427) at (-19.7086,-0.2800,0.0000) z [-7.8714..7.8714] Shape=Cylinder
+  Part      VerityEdgeRight color [255,255,0]   SmoothPlastic T 0.00 size (57.6800,15.7427,15.7427) at (19.7086,-0.2800,0.0000) z [-7.8714..7.8714] Shape=Cylinder
+  Part      VerityTaperTopFront color [255,255,0]   SmoothPlastic T 0.00 size (47.2886,8.6345,0.8400) at (0.0000,30.4410,-3.9628) z [-7.8714..-0.0542] 
+  Part      VerityTaperTopBack color [255,255,0]   SmoothPlastic T 0.00 size (47.2886,8.6345,0.8400) at (0.0000,30.4410,3.9628) z [0.0542..7.8714] 
+  Part      VerityTaperBottomFront color [255,255,0]   SmoothPlastic T 0.00 size (47.2886,8.6345,0.8400) at (0.0000,-31.0010,-3.9628) z [-7.8714..-0.0542] 
+  Part      VerityTaperBottomBack color [255,255,0]   SmoothPlastic T 0.00 size (47.2886,8.6345,0.8400) at (0.0000,-31.0010,3.9628) z [0.0542..7.8714] 

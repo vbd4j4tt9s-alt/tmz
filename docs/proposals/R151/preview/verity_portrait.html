@@ -1,0 +1,72 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Verity portrait preview R151</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of the window's portrait of Verity (a ViewportFrame: a yellow ball, her smiley, the portrait camera, the gold dais under her) from
+// the numbers dump_verity_portrait.luau printed for one build of VerityClient: the ball's size and place, the mouth oval if that build has one (R150), the
+// portrait camera and the layout rectangles. The smiley is drawn from the proportions in VerityConfig's notes (eyes .18 .. .07 of her diameter above her
+// centre, a smile from .055 above it at +-.27 across to .13 below it in the middle): the real picture (rbxassetid://102712963740896) is not available
+// offline. Plain lighting: a design preview of the motion and the framing, not a screenshot.
+import * as THREE from 'three';
+const NAVY='#1a1e3f',GOLD='#ffce40';
+function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+function renderBall(f,px,withMouth){
+  const r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});r.setSize(px,px);r.setClearColor(0x000000,0);
+  const s=new THREE.Scene();
+  s.add(new THREE.AmbientLight(0xc3c3b9,1.0));
+  const dir=new THREE.DirectionalLight(0xfff7e4,2.2);dir.position.set(.45*10,.8*10,-1*10);s.add(dir); // Roblox LightDirection (-.45,-.8,1): light travels that way
+  const cam=new THREE.PerspectiveCamera(f.cam.fov,1,.1,500);cam.position.set(f.cam.x,f.cam.y,f.cam.z);cam.lookAt(0,0,0);
+  const ball=new THREE.Mesh(new THREE.SphereGeometry(f.ball.d/2,64,48),withMouth?new THREE.MeshBasicMaterial({colorWrite:false}):new THREE.MeshStandardMaterial({color:0xffff00,roughness:.6}));
+  ball.position.set(f.ball.x,f.ball.y,f.ball.z);s.add(ball);
+  if(withMouth&&f.mouth){
+    const m=new THREE.Mesh(new THREE.SphereGeometry(.5,32,24),new THREE.MeshBasicMaterial({color:new THREE.Color(34/255,8/255,14/255)}));
+    m.scale.set(f.mouth.w,f.mouth.h,f.mouth.d);m.position.set(f.mouth.x,f.mouth.y,f.mouth.z);s.add(m);
+  }
+  r.render(s,cam);
+  // the ball's centre and apparent radius on screen
+  const c=new THREE.Vector3(f.ball.x,f.ball.y,f.ball.z).project(cam);
+  const up=new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld,1);
+  const t=new THREE.Vector3(f.ball.x,f.ball.y,f.ball.z).addScaledVector(up,f.ball.d/2).project(cam);
+  const cx=(c.x+1)/2*px,cy=(1-c.y)/2*px,rad=Math.abs(t.y-c.y)/2*px;
+  const out=r.domElement;return {cv:out,cx,cy,rad,dispose:()=>r.dispose()};
+}
+function face(g,cx,cy,rad){ // the smiley, D = 2 * rad
+  const D=rad*2;g.save();g.strokeStyle='#0c0c0c';g.fillStyle='#0c0c0c';g.lineCap='round';
+  for(const sx of [-1,1]){g.beginPath();g.ellipse(cx+sx*.14*D,cy-.125*D,.028*D,.055*D,0,0,Math.PI*2);g.fill()}
+  g.lineWidth=D*.016;g.beginPath();g.moveTo(cx-.27*D,cy-.055*D);g.quadraticCurveTo(cx,cy+.30*D,cx+.27*D,cy-.055*D);g.stroke();
+  g.restore();
+}
+window.shoot=function(frames,cellW,label){
+  const gap=18,labelH=34;
+  const cells=frames.map(f=>{const sc=cellW/f.portrait.w;return {f,sc,w:cellW,h:Math.round(f.portrait.h*sc)}});
+  const H=Math.max(...cells.map(c=>c.h))+labelH+gap*2,W=cells.length*cellW+(cells.length+1)*gap;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+  g.fillStyle='#14161c';g.fillRect(0,0,W,H);
+  cells.forEach((c,i)=>{
+    const f=c.f,sc=c.sc,x0=gap+i*(cellW+gap),y0=gap+labelH;
+    g.save();g.translate(x0,y0);
+    roundRect(g,0,0,c.w,c.h,12*sc);g.fillStyle=NAVY;g.fill();
+    g.save();roundRect(g,0,0,c.w,c.h,12*sc);g.clip();
+    // the gold dais (a Frame behind the transparent viewport)
+    const dx=(f.dais.x-f.portrait.x)*sc,dy=(f.dais.y-f.portrait.y)*sc,dw=f.dais.w*sc,dh=f.dais.h*sc;
+    g.globalAlpha=.65;roundRect(g,dx,dy,dw,dh,Math.min(40*sc,dh/2));g.fillStyle=GOLD;g.fill();g.globalAlpha=1;
+    // the viewport: the ball, its smiley, then the mouth if there is one
+    const vx=(f.view.x-f.portrait.x)*sc,vy=(f.view.y-f.portrait.y)*sc,vs=f.view.w*sc;
+    g.save();g.beginPath();g.rect(vx,vy,vs,vs);g.clip();
+    const a=renderBall(f,Math.round(vs),false);g.drawImage(a.cv,vx,vy,vs,vs);face(g,vx+a.cx,vy+a.cy,a.rad);a.dispose();
+    if(f.mouth){const b=renderBall(f,Math.round(vs),true);g.drawImage(b.cv,vx,vy,vs,vs);b.dispose()}
+    // the viewport's edge: anything of the ball outside it is cut off
+    g.restore();
+    g.restore();
+    roundRect(g,1,1,c.w-2,c.h-2,12*sc);g.strokeStyle=GOLD;g.lineWidth=2;g.stroke();
+    g.setLineDash([4,4]);g.strokeStyle='rgba(255,255,255,.25)';g.lineWidth=1;g.strokeRect(vx+.5,vy+.5,vs-1,vs-1);g.setLineDash([]);
+    g.restore();
+    g.fillStyle='#e6e6e6';g.font='700 16px "DejaVu Sans",sans-serif';g.fillText(f.name+(f.mouth?'  (mouth open)':''),x0,gap+22);
+  });
+  g.fillStyle='#9aa0ad';g.font='13px "DejaVu Sans",sans-serif';g.fillText(label,gap,H-8);
+  return cv.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

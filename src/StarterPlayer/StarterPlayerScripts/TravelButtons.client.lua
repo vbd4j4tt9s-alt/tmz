@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R113b: BASE / TRACK fast-travel rectangles in Roblox's top bar row (owner request). R114: centred on the whole screen. The server checks every request
 -- (FastTravelService); this script only shows the buttons, the shared cooldown and a dimmed state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local GuiService=game:GetService('GuiService')
@@ -6,10 +7,12 @@ local remotes=RS:WaitForChild('ChestChaseRemotes')
 local requestBase=remotes:WaitForChild('RequestBaseTeleport');local requestTrack=remotes:WaitForChild('RequestTrackTeleport')
 local Bright=require(RS:WaitForChild('BrightUI'));local Fit=require(RS:WaitForChild('GardenTextFit'))
 local Tween=game:GetService('TweenService')
+local Sfx=require(RS:WaitForChild('LocalSfx'));Sfx.Preload({Sfx.WhooshId}) -- R150: the arrival whoosh is warm before the first teleport
 local old=pg:FindFirstChild('TravelButtons');if old then old:Destroy()end
 -- Below the tutorial card (25) and the menu hub (33): anything important draws above these buttons.
 local gui=Instance.new('ScreenGui');gui.Name='TravelButtons';gui.ResetOnSpawn=false;gui.DisplayOrder=24;gui.ScreenInsets=Enum.ScreenInsets.None;gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling;gui.Parent=pg
 local holder=Instance.new('Frame');holder.Name='TravelPair';holder.BackgroundTransparency=1;holder.Visible=false;holder.Parent=gui
+-- R157: DAILY and INVITE live in the menu wheel (HudLayout.Navigation 4 and 5); this row holds BASE / TRACK alone.
 local connections={};local lastSent=0
 -- R116: text-only buttons (pictures removed, owner request) with a stronger glossy highlight, a drop shadow and a
 -- hover / press bounce.
@@ -67,9 +70,9 @@ end
 -- too close to Roblox's buttons it centres in the free part instead.
 local function layout()
  local area=gui.AbsoluteSize;if area.X<=0 or area.Y<=0 then return end
- local inset=GuiService.TopbarInset;local left,right,top,rowHeight=0,area.X,0,52
- if typeof(inset)=='Rect'and inset.Width>0 and inset.Height>0 then left,right,top,rowHeight=inset.Min.X,inset.Max.X,inset.Min.Y,inset.Height end
- local gap=8;local height=math.clamp(rowHeight-8,30,44)
+ -- (R157: the row by HudLayout.TravelRow, which HudLayout.TravelBottom - the reveal card's top edge - measures by too)
+ local left,right,top,rowHeight,height=require(RS:WaitForChild('HudLayout')).TravelRow(GuiService.TopbarInset,area.X)
+ local gap=8
  local centre=area.X/2;local half=math.min(centre-left,right-centre)-8
  if half<80 then centre=(left+right)/2;half=(right-left)/2-8 end
  local width=math.floor(math.clamp((half*2-gap)/2,72,132))
@@ -86,6 +89,14 @@ local sized=gui:GetPropertyChangedSignal('AbsoluteSize'):Connect(layout);task.de
 local inset=GuiService:GetPropertyChangedSignal('TopbarInset'):Connect(layout)
 local function stopLayout()sized:Disconnect();inset:Disconnect()end
 for _,key in ipairs({'TitleActive','SeedMenu'})do connections[#connections+1]=pg:GetAttributeChangedSignal(key):Connect(refresh)end
+-- R150: arrival. The server writes FastTravelReadyAt (now + cooldown) right after it moves the character, so a rise to a time still in
+-- the future is "you arrived": a short whoosh. A stale value at join, or the cooldown draining, never plays it.
+local lastReady=tonumber(player:GetAttribute('FastTravelReadyAt'))or 0
+connections[#connections+1]=player:GetAttributeChangedSignal('FastTravelReadyAt'):Connect(function()
+ local ready=tonumber(player:GetAttribute('FastTravelReadyAt'))or 0
+ local rose=ready-lastReady>.5 and ready>workspace:GetServerTimeNow();lastReady=ready
+ if rose then Sfx.Play(Sfx.WhooshId,nil,.22,1.4,2)end
+end)
 for _,key in ipairs({'FastTravelReadyAt','ChestChaseSeedCarrying','ChestChaseRunActive','TreadmillTraining','GuardianRagdollActive','GuardianFlingActive'})do connections[#connections+1]=player:GetAttributeChangedSignal(key):Connect(paint)end
 paint();refresh()
 gui.Destroying:Connect(function()

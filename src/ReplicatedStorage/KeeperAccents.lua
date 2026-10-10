@@ -1,6 +1,11 @@
 -- R113: a few client-only accent parts per keeper (biome read + silhouette), moved with the pose groups.
 -- They exist only on clients: the server's KeeperContact never sees them, so reach and hits are unchanged.
 -- Budget: at most 5 parts per keeper, no collision/query/touch/shadow.
+-- R149 (owner: "add gear to the snow tiger, like silver sapphire gear"): the Snow keeper (stage 3, Ice Fang, the tiger) also wears
+-- silver-and-sapphire armour (A.Gear below, 38 parts). It is the same kind of part as an accent: client only, anchored, never
+-- collidable / queryable / touchable, moved every pose frame with its limb's group frame (root*group*rest), so it follows the
+-- gait, the sleep curl, the wake roar, the strike and the fling exactly like the mesh under it and changes no hit shape.
+-- Detail pieces (studs, facets) are hidden beyond DetailRange studs and in low graphics, and are not moved while hidden.
 local A={}
 local V,CF=Vector3.new,CFrame.new
 local function rgb(r,g,b)return Color3.fromRGB(r,g,b)end
@@ -34,27 +39,125 @@ A.Specs={
   {Group='Head',At=V(2.4,33.4,3.6),Size=V(6.8,3.6,6.0),Shape='Ball',Material='SmoothPlastic',Color=rgb(66,72,88),Transparency=.12,Anim='Drift',Index=4},
  },
 }
-function A.new(model,stage)
- local specs=A.Specs[stage];if not specs then return nil end
+-- R149 snow tiger gear. Rig space = the keeper's root space (head toward -Z), fitted to the tiger's mesh hulls (KeeperRigConfig
+-- FloorSamples / Bounds: skull top 5.85, back top 4.5, front legs x +-1.2..3.3, back legs z 8..11.5, tail z 11.5..22).
+-- Fields as for A.Specs plus: Name, Rot (degrees, CFrame.Angles order), Reflectance, Detail (hidden when far / low graphics).
+local SILVER,SILVER_DK=rgb(200,205,215),rgb(132,142,160)
+local SAPPHIRE,FACET=rgb(30,80,200),rgb(90,150,255)
+local function tigerGear()
+ local g={}
+ local function plate(name,group,at,size,rot,dark)
+  g[#g+1]={Name=name,Group=group,At=at,Size=size,Rot=rot,Material='Metal',Color=dark and SILVER_DK or SILVER,Reflectance=dark and .18 or .26,Gear=true}
+ end
+ -- A sapphire: a glassy deep-blue body (ball or cut block) ...
+ local function stone(name,group,at,size,rot,ball,detail)
+  g[#g+1]={Name=name,Group=group,At=at,Size=size,Rot=rot,Shape=ball and 'Ball'or nil,Material='Glass',Color=SAPPHIRE,Transparency=.08,Reflectance=.2,Gear=true,Detail=detail}
+ end
+ -- ... and a lighter glowing facet set on it.
+ local function facet(name,group,at,size,rot)
+  g[#g+1]={Name=name,Group=group,At=at,Size=size,Rot=rot,Material='Neon',Color=FACET,Transparency=.25,Gear=true,Detail=true}
+ end
+ -- Helm: two hinged crown plates over the skull, a sapphire between the brows, brow blades and a chin guard on the jaw.
+ plate('HelmFront','Head',V(0,5.33,-8.32),V(2.8,.3,2.1),V(-33.8,0,0))
+ plate('HelmRear','Head',V(0,5.58,-6.3),V(3.2,.3,2.3),V(24.4,0,0))
+ stone('BrowGem','Head',V(0,5.12,-9.2),V(1.3,.7,1.3),V(-33.8,45,0))
+ facet('BrowGemFacet','Head',V(0,5.42,-9.42),V(.8,.5,.8),V(-33.8,0,0))
+ plate('ChinGuard','Jaw',V(0,1.32,-8.65),V(2.4,.24,2.7),V(0,0,0),true)
+ -- Collar behind the head: a top plate, two shoulder bevels, three sapphire studs.
+ plate('CollarTop','Body',V(0,4.61,-3.1),V(3.0,.3,1.1),V(0,0,0))
+ stone('CollarStud','Body',V(0,4.95,-3.1),V(.75,.75,.75),nil,true,true)
+ -- Back: three saddle plates (the ice spines grow through them), two flank plates and the large sapphire between spines 1 and 2.
+ plate('SaddleA','Body',V(0,4.55,-.175),V(2.7,.28,4.05),V(2.7,0,0))
+ plate('SaddleB','Body',V(0,4.4,3.475),V(2.7,.28,2.95),V(2.7,0,0))
+ plate('SaddleC','Body',V(0,4.23,6.45),V(2.7,.28,2.7),V(2.7,0,0))
+ stone('SaddleGem','Body',V(0,5.0,1.15),V(1.45,1.0,1.45),V(0,45,0))
+ facet('SaddleGemFacet','Body',V(0,5.52,1.15),V(.85,.55,.85),V(0,0,0))
+ for _,side in ipairs({-1,1})do
+  local tag=side<0 and'L'or'R';local x=side
+  plate('Flank'..tag,'Body',V(1.95*x,4.33,2.8),V(1.3,.26,9.6),V(2.7,0,-25*x),true)
+  plate('CollarBevel'..tag,'Body',V(2.1*x,4.33,-3.1),V(1.2,.28,1.1),V(0,0,-30*x),true)
+  stone('CollarBevelStud'..tag,'Body',V(2.23*x,4.6,-3.1),V(.65,.65,.65),nil,true,true)
+  -- Brow blade and cheek guard (with a sapphire stud) on the head.
+  plate('BrowBlade'..tag,'Head',V(1.95*x,5.0,-8.45),V(1.1,.26,2.0),V(-34,0,-20*x),true)
+  plate('CheekGuard'..tag,'Head',V(2.77*x,3.0,-7.7),V(.28,2.1,2.5),V(0,9*x,0))
+  stone('CheekStud'..tag,'Head',V(3.0*x,3.0,-7.7),V(.7,.7,.7),nil,true,true)
+  -- Shoulder pauldron riding the front leg, a bracer above each paw, a sapphire stud on each.
+  plate('Pauldron'..tag,(side<0 and'Left'or'Right')..'FrontLeg',V(3.3*x,2.0,-2.7),V(.3,2.4,2.6),V(0,0,10*x))
+  stone('PauldronStud'..tag,(side<0 and'Left'or'Right')..'FrontLeg',V(3.66*x,2.0,-2.7),V(.8,.8,.8),nil,true,true)
+  plate('FrontCuff'..tag,(side<0 and'Left'or'Right')..'FrontLeg',V(2.255*x,-2.55,-3.5),V(2.2,.7,3.5),V(15,0,0),true)
+  stone('FrontCuffStud'..tag,(side<0 and'Left'or'Right')..'FrontLeg',V(3.42*x,-2.55,-3.5),V(.75,.75,.75),nil,true,true)
+  plate('BackCuff'..tag,(side<0 and'Left'or'Right')..'BackLeg',V(2.33*x,-2.55,9.91),V(2.25,.7,3.4),V(-4,0,0),true)
+  stone('BackCuffStud'..tag,(side<0 and'Left'or'Right')..'BackLeg',V(3.52*x,-2.55,9.91),V(.75,.75,.75),nil,true,true)
+ end
+ -- Tail: a silver ring round the tail's root (a cylinder along the tail, which leans toward +X) with a sapphire on top.
+ g[#g+1]={Name='TailRing',Group='Tail',At=V(.52,1.5,13.2),Size=V(.7,2.3,2.3),Rot=V(0,-73,0),Shape='Cylinder',Material='Metal',Color=SILVER_DK,Reflectance=.18,Gear=true}
+ stone('TailRingStud','Tail',V(.52,2.66,13.2),V(.8,.8,.8),nil,true,true)
+ return g
+end
+A.Gear={[3]=tigerGear()}
+-- The rig length the gear was fitted to (K100_3_Body_01, Z). If the keeper's rig is built larger or smaller (rig scaled), the gear
+-- is scaled by the same factor: positions and sizes both, about the rig origin.
+A.ScaleRef={[3]=16.7}
+A.DetailRange=140
+local function rigScale(model,stage)
+ local ref=A.ScaleRef[stage];if not ref then return 1 end
+ local rig=model:FindFirstChild('BeastBody');if not rig then return 1 end
+ local longest=0
+ for _,p in ipairs(rig:GetChildren())do
+  if p:IsA('BasePart')and p:GetAttribute('BeastGroup')=='Body'then longest=math.max(longest,p.Size.Z)end
+ end
+ if longest<=0 then return 1 end
+ local k=longest/ref;if math.abs(k-1)<.02 then return 1 end
+ return math.clamp(k,.25,8)
+end
+-- R152: the baked rev 6 models (variant 'R152') carry the golem's rune and mushrooms, the snow keeper's spines and armour, the knight's
+-- shards and the colossus's cloud in their meshes; only the snake's rattle stays an accent on them.
+A.Kept152={[2]=true}
+function A.new(model,stage,variant)
+ local specs,gear=A.Specs[stage],A.Gear[stage]
+ if variant=='R152'then gear=nil;if not A.Kept152[stage]then specs=nil end end
+ if not specs and not gear then return nil end
  local folder=Instance.new('Folder');folder.Name='KeeperAccentsLocal'
- local self={Folder=folder,Items={},Stage=stage}
- for i,s in ipairs(specs)do
-  local p=Instance.new(s.Shape=='Wedge'and'WedgePart'or'Part');p.Name='KeeperAccent'..i
-  if s.Shape=='Ball'then p.Shape=Enum.PartType.Ball end
-  p.Size=s.Size;p.Color=s.Color;p.Material=Enum.Material[s.Material];p.Transparency=s.Transparency or 0
+ local k=rigScale(model,stage)
+ local self={Folder=folder,Items={},Stage=stage,Scale=k}
+ local list={}
+ for _,s in ipairs(specs or{})do table.insert(list,s)end
+ for _,s in ipairs(gear or{})do table.insert(list,s)end
+ for i,s in ipairs(list)do
+  local p=Instance.new(s.Shape=='Wedge'and'WedgePart'or'Part');p.Name=s.Gear and('KeeperGear_'..s.Name)or('KeeperAccent'..i)
+  if s.Shape=='Ball'then p.Shape=Enum.PartType.Ball elseif s.Shape=='Cylinder'then p.Shape=Enum.PartType.Cylinder end
+  p.Size=k==1 and s.Size or s.Size*k;p.Color=s.Color;p.Material=Enum.Material[s.Material];p.Transparency=s.Transparency or 0
+  if s.Reflectance then p.Reflectance=s.Reflectance end
   p.Anchored=true;p.CanCollide=false;p.CanQuery=false;p.CanTouch=false;p.CastShadow=false
+  if s.Gear then p.Massless=true;p:SetAttribute('KeeperGear',true)end
   p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=folder
-  table.insert(self.Items,{Part=p,Spec=s,Rest=CF(s.At),Hidden=nil})
+  local rest=CF(k==1 and s.At or s.At*k)
+  if s.Rot then rest=rest*CFrame.Angles(math.rad(s.Rot.X),math.rad(s.Rot.Y),math.rad(s.Rot.Z))end
+  table.insert(self.Items,{Part=p,Spec=s,Rest=rest,Hidden=nil})
+  if s.Detail then self.HasDetail=true end
  end
  folder.Parent=model
  return self
 end
--- Appends accent parts/frames to the caller's BulkMoveTo lists.
-function A.Pose(self,frames,root,awake,now,hunting,parts,out)
+-- Appends accent parts/frames to the caller's BulkMoveTo lists. distance (camera to keeper) and low (low graphics) are optional:
+-- beyond DetailRange (15% hysteresis) or in low graphics the Detail pieces are hidden and skipped.
+function A.Pose(self,frames,root,awake,now,hunting,parts,out,distance,low)
  if not self then return end
  local blend=math.clamp((awake-.55)/.35,0,1)
+ local detail=true
+ if self.HasDetail then
+  if low then detail=false
+  elseif distance then detail=distance<=(self.DetailOn and A.DetailRange*1.15 or A.DetailRange)end
+  self.DetailOn=detail
+ end
  for _,item in ipairs(self.Items)do
   local s=item.Spec;local group=frames[s.Group]
+  if s.Detail then
+   if not detail then
+    if not item.Off then item.Part.LocalTransparencyModifier=1;item.Off=true end
+    continue
+   elseif item.Off then item.Part.LocalTransparencyModifier=0;item.Off=false end
+  end
   if group and item.Part.Parent then
    local rest=item.Rest
    if s.Anim=='Rattle'then

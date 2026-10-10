@@ -14,13 +14,27 @@ function SpeedBoost.Clock(seconds)
  return string.format('%ds',s)
 end
 local H={};local C=Color3.fromRGB
-function H.Boosts(player)
+function H.Boosts(player,lucky)
  local tier=math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)
  -- R121: the timed x2 boost multiplies with the permanent pass (same as the server's BaseService).
  local speed=Balance.Training(Balance.TrainingTiers[tier]or 1,player:GetAttribute('TreadmillMultiplier'),player:GetAttribute('DoubleSpeedOwned')==true)*SpeedBoost.PlayerFactor(player)
  local luck=tonumber(player:GetAttribute('ChestLuckMultiplier'))or 1
  if luck~=luck or luck==math.huge or luck==-math.huge then luck=1 end
- return speed,math.clamp(luck,1,require(RS.BalanceValues81).MaxLuck)
+ local balance=require(RS.BalanceValues81)
+ -- R155: lucky = the pack in hand opens as the pack pity's LUCKY 10th (H.LuckyHeld): that roll takes x1.5 and its cap is x1.5 too (LuckyLuckCeiling, x75M); never otherwise
+ if lucky==true then return speed,math.clamp(luck*(balance.LuckyPackBoost or 1.5),1,balance.LuckyLuckCeiling or(balance.LuckCeiling or balance.MaxLuck)*1.5)end
+ return speed,math.clamp(luck,1,balance.LuckCeiling or balance.MaxLuck) -- R154: up to the boots' cap x the clover (R155: x50M)
+end
+-- R155: true while the player holds a pack whose open is the pack pity's lucky 10th of the NORMAL group (the one boots' luck reaches; the Void / Verity / Mech packs
+-- take the clover alone, which this row does not show). The luck row then shows that roll's luck (x1.5) in gold.
+function H.LuckyHeld(player)
+ local c=player.Character;local m=RS:FindFirstChild('PackPity155')
+ if not c or not m then return false end
+ local ok,P=pcall(require,m);if not ok then return false end
+ for _,t in ipairs(c:GetChildren())do
+  if t:IsA('Tool')and t:GetAttribute('SeedPackTool')then return P.Group(t:GetAttribute('BagVariant'))=='Normal'and P.IsLucky(player:GetAttribute(P.Attribute.Normal))end
+ end
+ return false
 end
 function H.Multiplier(n)
  if n>=1000 then
@@ -48,7 +62,7 @@ function H.Create(pg,player)
  local gui=Instance.new('ScreenGui');gui.Name='WorldStatus';gui.ResetOnSpawn=false;gui.DisplayOrder=23;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.Parent=pg
  local root=block(gui,'StatusStack',UDim2.new(1,-12,1,-22),UDim2.fromOffset(190,82),Color3.new());root.AnchorPoint=Vector2.new(1,1);root.BackgroundTransparency=1
  local scale=Instance.new('UIScale');scale.Parent=root
- local rows={};local connections={};local dead=false;local elapsed=0
+ local rows={};local connections={};local dead=false;local elapsed=0;local tickFast=false
  for i,name in ipairs({'Weather','Track'})do
   local card=block(root,name,UDim2.fromOffset(0,(i-1)*43),UDim2.new(1,0,0,39),Color3.new(),7);card.BackgroundTransparency=.73
   local glyph=block(card,'Icon',UDim2.fromOffset(7,4),UDim2.fromOffset(30,30),Color3.new());glyph.BackgroundTransparency=1
@@ -72,7 +86,7 @@ function H.Create(pg,player)
  for i,name in ipairs({'Speed gain','Pack luck'})do
   local card=block(root,i==1 and'SpeedBoost'or'LuckBoost',UDim2.fromOffset(0,(i-1)*43),UDim2.fromOffset(137,39),Color3.new());card.BackgroundTransparency=1;card.Visible=false
   local glyph=block(card,'Icon',UDim2.fromOffset(0,1),UDim2.fromOffset(37,37),Color3.new());glyph.BackgroundTransparency=1
-  require(RS.HudArtwork).Attach(glyph,i==1 and'Bolt'or'Clover')
+  if i==1 then require(RS.HudArtwork).Attach(glyph,'Bolt')else require(RS.CloverIcon153).Attach(glyph)end -- R153: the luck row shows the 4 Leaf Clover picture (the pass's icon / the owner's drawing / the shapes)
   local value=label(card,'Value',UDim2.fromOffset(39,1),UDim2.fromOffset(94,37),26);value.TextXAlignment=Enum.TextXAlignment.Right
   value.TextColor3=i==1 and C(255,211,99)or C(116,243,180);require(RS.GardenTextFit).Attach(value,26,16)
   boostRows[i]={Root=card,Value=value,Label=name}
@@ -107,11 +121,27 @@ function H.Create(pg,player)
   local nextAt=map and map:GetAttribute('VeiledNextAt');local waitFor=type(nextAt)=='number'and nextAt-(now or workspace:GetServerTimeNow())or nil
   local event=active or(waitFor~=nil and waitFor>0)
   special.Visible=event
-  local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'ARRIVES IN '..SpeedBoost.Clock(waitFor))or''
+  local hint=active and(player:GetAttribute('SpecialKeeperChase84')and'CHASING YOU' or'AT STORM PEAKS')or(event and'COMING IN '..SpeedBoost.Clock(waitFor))or''
   if specialHint.Text~=hint then specialHint.Text=hint end
   special:SetAttribute('AccessibleLabel','The Darkened '..hint:lower())
-  scale.Scale=m.StatusScale
-  if m.Phone then
+  -- (R158: a computer's HUD is scaled by m.Scale as a whole: the stack's UIScale is the status scale times it, and its place from the corner is times it; m.Scale is 1 elsewhere)
+  local hudScale=m.Scale or 1
+  -- (R158 review: under a computer's HUD scale the UIScale is called HudScale, like every other piece's (HudLayout.ApplyScale), so GardenTextFit holds its labels' minimums in real px;
+  -- a phone's (hudScale 1) keeps its name)
+  if(scale.Name=='HudScale')~=(hudScale~=1)then scale.Name=hudScale~=1 and'HudScale'or'UIScale'end
+  scale.Scale=m.StatusScale*hudScale
+  -- R129: plain text rows (no card) on landscape phones; cards everywhere else.
+  for _,name in ipairs({'Weather','Track'})do local want=m.StatusPlain and 1 or .73;if rows[name].Root.BackgroundTransparency~=want then rows[name].Root.BackgroundTransparency=want end end
+  if m.StatusCorner then
+   -- R129 (owner reference): landscape phones: one stack in the bottom-right corner above the jump button:
+   -- boosts, then The Darkened card (owner: "together with the other timers"), then the two timers.
+   local list={};for _,row in ipairs(boostRows)do if row.Root.Visible then list[#list+1]=row end end
+   local y=0
+   for _,row in ipairs(list)do row.Root.Position=UDim2.fromOffset(190-137,y);y+=43 end
+   if special.Visible then special.Position=UDim2.fromOffset(0,y);y+=43 end
+   for _,name in ipairs({'Weather','Track'})do rows[name].Root.Position=UDim2.fromOffset(0,y);rows[name].Root.Size=UDim2.fromOffset(190,39);y+=43 end
+   root.Size=UDim2.fromOffset(190,y-4)
+  elseif m.Phone then
    local width=m.StatusHorizontal and 388 or 190
    root.Size=UDim2.fromOffset(width,m.StatusHorizontal and 39 or 82)
    for i,name in ipairs({'Weather','Track'})do
@@ -130,18 +160,19 @@ function H.Create(pg,player)
    root.Size=UDim2.fromOffset(hasBoosts and not stacked and 337 or 190,82+offset+(stacked and 86 or 0));
    special.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,0)
    for i,row in ipairs(boostRows)do row.Root.Position=UDim2.fromOffset(stacked and 26 or 0,offset+(i-1)*43)end
-   scale.Scale=m.StatusScale
+   scale.Scale=m.StatusScale*hudScale
    for i,name in ipairs({'Weather','Track'})do
    rows[name].Root.Position=UDim2.fromOffset(hasBoosts and not stacked and 147 or 0,offset+(stacked and 86 or 0)+(i-1)*43);rows[name].Root.Size=UDim2.fromOffset(190,39)
    end
   end
   root.AnchorPoint=Vector2.new(1,m.StatusTop and 0 or 1)
-  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-12,1,-m.StatusBottom)
+  root.Position=m.StatusTop and UDim2.new(1,-12,0,m.StatusTop)or UDim2.new(1,-(m.StatusRight or 12)*hudScale,1,-m.StatusBottom*hudScale)
   root.Visible=pg:GetAttribute('SeedMenu')==nil
   local character=player.Character;local hum=character and character:FindFirstChildOfClass('Humanoid');local part=character and character:FindFirstChild('HumanoidRootPart')
   local point=part and hum and hum.Health>0 and part.Position or nil
   local weather,track=State.Read(RS,workspace:FindFirstChild('ChestChaseMap'),point,now or workspace:GetServerTimeNow())
   paint(rows.Weather,weather,weather.Kind);paint(rows.Track,track,track.Closed and'Refresh'or'Track')
+  tickFast=track.Closed==true and(tonumber(track.Left)or 0)>0 and(tonumber(track.Left)or 99)<=3 -- R150: repaint every frame during the 3-2-1 so the row changes with the beep (not once it reads 0)
   local first=boostRows[1].Root.Position
   if m.Phone and m.WalletHorizontal then boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset+43)
   else boostTimer.Position=UDim2.fromOffset(first.X.Offset,first.Y.Offset-43)end
@@ -150,25 +181,38 @@ function H.Create(pg,player)
   if on~=boostWasActive then boostWasActive=on;task.defer(function()if not dead and updateBoosts then updateBoosts()end end)end
  end
  updateBoosts=function()
-  local values={H.Boosts(player)};hasBoosts=false
+  local lucky=H.LuckyHeld(player) -- R155: the pity's lucky pack in hand
+  local values={H.Boosts(player,lucky)};hasBoosts=false
   for i,row in ipairs(boostRows)do
    local active=values[i]>1;row.Root.Visible=active;hasBoosts=hasBoosts or active
+   if i==2 and active then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: drawn when the row first shows
    local text=H.Multiplier(values[i]);if row.Value.Text~=text then row.Value.Text=text end
    row.Root:SetAttribute('AccessibleLabel',row.Label..' '..text)
+   if i==2 then local want=lucky and C(255,214,64)or C(116,243,180);if row.Value.TextColor3~=want then row.Value.TextColor3=want end;row.Root:SetAttribute('LuckyPack',lucky or nil)end
    if i==1 then row.Root:SetAttribute('PointsPerSecond',100*values[i]);row.Root:SetAttribute('Breakdown',tostring(Balance.TrainingTiers[math.clamp(math.floor(tonumber(player:GetAttribute('TreadmillTier'))or 1),1,#Balance.TrainingTiers)])..' machine × '..tostring(player:GetAttribute('TreadmillMultiplier')or 1)..' trail × '..(player:GetAttribute('DoubleSpeedOwned')and'2' or'1')..' pass × '..SpeedBoost.PlayerFactor(player)..' boost')end
   end
   update()
  end
- for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute})do
+ for _,attribute in ipairs({'TreadmillTier','TreadmillMultiplier','ChestLuckMultiplier','DoubleSpeedOwned',SpeedBoost.Attribute,'PackPityNormal'})do -- (R155: + the pack pity's normal count)
   connections[#connections+1]=player:GetAttributeChangedSignal(attribute):Connect(updateBoosts)
  end
- connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 then elapsed=0;update()end end)
+ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)elapsed+=dt;if elapsed>=.25 or tickFast then elapsed=0;update()end end)
  connections[#connections+1]=pg:GetAttributeChangedSignal('SeedMenu'):Connect(function()root.Visible=pg:GetAttribute('SeedMenu')==nil end)
  local stopLayout
+ -- R155: the pack in hand (H.LuckyHeld)
+ local heldConns={}
+ local function watchHeld(c)
+  for _,x in ipairs(heldConns)do x:Disconnect()end;table.clear(heldConns)
+  local function tool(x)if x:IsA('Tool')then updateBoosts()end end
+  if c then heldConns[1]=c.ChildAdded:Connect(tool);heldConns[2]=c.ChildRemoved:Connect(tool)end
+ end
+ if player.CharacterAdded then connections[#connections+1]=player.CharacterAdded:Connect(function(c)watchHeld(c);updateBoosts()end)end
+ watchHeld(player.Character)
  local function cleanup()
   if dead then return end;dead=true
   if stopLayout then stopLayout()end
   for _,c in ipairs(connections)do c:Disconnect()end
+  for _,c in ipairs(heldConns)do c:Disconnect()end
  end
  connections[#connections+1]=gui.Destroying:Connect(cleanup)
  updateBoosts();stopLayout=Layout.Watch(gui,function()update()end)

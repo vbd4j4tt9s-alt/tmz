@@ -159,6 +159,17 @@ function L.Content(width,k,counts)
   local gw=math.floor((buyW-cg)*.4)
   f.Gem={X=buyX,Y=rowY,W=gw,H=button};f.Robux={X=buyX+gw+cg,Y=rowY,W=buyW-gw-cg,H=button}
  end
+ -- R155: under the buy row, the Mech pack's coat line ("Gold 4.5% / Diamond 0.5% coat") and the limited event's countdown: side by side (wide / medium), stacked (narrow).
+ -- Returns the row's bottom (the card's height follows it).
+ local noteH=round(clamp(20*k,15,24))
+ local function noteRow(y,stacked)
+  local w=inner-fp*2
+  if stacked then
+   f.Coat={X=fp,Y=y,W=w,H=noteH};f.Timer={X=fp,Y=y+noteH+2,W=w,H=noteH};return y+noteH*2+2
+  end
+  local cw=math.floor(w*.5)
+  f.Coat={X=fp,Y=y,W=cw,H=noteH};f.Timer={X=fp+cw+tg,Y=y,W=w-cw-tg,H=noteH};return y+noteH
+ end
  if mode=='Wide'then
   local previewW=round(inner*.30)
   local tilesW=inner-previewW-fp*3
@@ -168,7 +179,7 @@ function L.Content(width,k,counts)
   f.Tiles={};for i=1,6 do f.Tiles[i]={X=fp*2+previewW+(i-1)*(tw+tg),Y=midY,W=tw,H=th}end
   local rowY=midY+th+8
   buyRow(fp*2+previewW,rowY,tilesW,.46)
-  f.H=rowY+button+fp
+  f.H=noteRow(rowY+button+4,false)+fp
  elseif mode=='Medium'then
   local previewW=round(inner*.32)
   local tilesW=inner-previewW-fp*3
@@ -178,7 +189,7 @@ function L.Content(width,k,counts)
   f.Tiles={};for i=1,6 do local c=(i-1)%3;local r=math.floor((i-1)/3);f.Tiles[i]={X=fp*2+previewW+c*(tw+tg),Y=midY+r*(th+tg),W=tw,H=th}end
   local rowY=midY+th*2+tg+8
   buyRow(fp,rowY,inner-fp*2,.5)
-  f.H=rowY+button+fp
+  f.H=noteRow(rowY+button+4,false)+fp
  else
   local previewH=round(clamp(inner*.3,90,140))
   f.Preview={X=fp,Y=fp+titleH,W=inner-fp*2,H=previewH}
@@ -190,7 +201,7 @@ function L.Content(width,k,counts)
   f.Chips={};for i=1,3 do f.Chips[i]={X=fp+(i-1)*(cw+tg),Y=rowY,W=cw,H=button}end
   local buyY=rowY+button+tg;local gw=math.floor((inner-fp*2-tg)*.42)
   f.Gem={X=fp,Y=buyY,W=gw,H=button};f.Robux={X=fp+gw+tg,Y=buyY,W=inner-fp*2-gw-tg,H=button}
-  f.H=buyY+button+fp
+  f.H=noteRow(buyY+button+4,true)+fp
  end
  out.Featured=f
  out.Cards.Featured={X=pad,Y=y,W=inner,H=f.H};y+=f.H+gap

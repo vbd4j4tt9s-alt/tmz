@@ -11,8 +11,20 @@ T.PointCurve={{0,24},{500,26},{1500,28},{3000,31},{6000,35},{120000,55},{1500000
 T.MachineMultipliers={1,4,20,100,600,4000,30000}
 -- R112: displayed boot luck. PackOdds112 applies it per tier as luck^power (King full, Cosmic ^.40 ... Legendary ^.08).
 -- R112b: every boot x10 so Thunder Boots (x50M) see a King about 1 in 1,000 packs.
-T.BootLuck={50,500,20000,1000000,50000000}
-T.MaxLuck=50000000 -- the only luck cap; server, HUD and owner commands read it here.
+-- R155 (owner: "Nerf the boots by halfing all of their rates"): every boot's luck is halved (Sand x25, Frost x250, Lava x10K, Crystal x500K, Thunder x25M).
+T.BootLuck={25,250,10000,500000,25000000}
+T.MaxLuck=25000000 -- the boots' cap (owner test boots too; R155: was 50M, halved with the boots); server, HUD and owner commands read it here.
+-- R154 (owner: "the 2x luck is universal"): a luck pass (GamePassCatalog Luck: the 4 Leaf Clover = 2) multiplies the cap too, so its x2 always applies on top of the
+-- best boots: a clover owner's cap is MaxLuck x 2 (PlayerDataService). PassLuckCeiling = every luck pass at once; LuckCeiling = the highest luck any pack roll takes
+-- (Thunder Boots x the clover = x50M since R155, was x100M; PackOdds112 / PackOdds137 clamp to it, the HUD and the owner's odds command read it).
+do
+ local passes=1
+ for _,pass in ipairs(require(script.Parent.GamePassCatalog))do local luck=tonumber(pass.Luck)or 1;if luck>1 then passes*=luck end end
+ T.PassLuckCeiling=passes;T.LuckCeiling=T.MaxLuck*passes
+end
+-- R155 (owner: "a 1.5x luck boost at the 10th pack", "every 10th pack"): the pack pity's LUCKY pack (PackPity155) takes x1.5 on top of everything its roll takes,
+-- and for that roll alone every luck cap is x1.5 too: a lucky roll may reach LuckyLuckCeiling (x75M = Thunder Boots x the clover x1.5); no other roll can.
+T.LuckyPackBoost=1.5;T.LuckyLuckCeiling=T.LuckCeiling*T.LuckyPackBoost
 -- Early purchases now take a few normal harvests rather than hundreds.
 T.MachineCosts={0,250000,5000000,150000000,10000000000,500000000000,8000000000000}
 T.TrailCosts={MintTrail=200000,ArcTrail=4000000,SolarTrail=120000000,AuroraTrail=12000000000,NebulaTrail=800000000000,RoyalTrail=9000000000000}
@@ -21,7 +33,20 @@ T.FenceCosts={0,500000,15000000,1000000000,150000000000,4000000000000,9000000000
 require(script.Parent.EconomyBalance90).Apply(T)
 -- R104: independent index milestones; historical balances keep their original backpay.
 T.LegacyCompletionGems=T.CompletionGems
-T.HalfwayGems=10
-T.CompletionGems={[1]=20,[6]=20,[2]=20,[3]=20,[4]=20,[5]=20,[7]=20,[8]=100}
+-- R153 (owner: "index gem gain is halved"): the Index's gems are halved, whole gems, halves round up, at least 1: halfway 10 -> 5, completion 20 -> 10, Mech 100 -> 50, Verity 100 -> 50 (VerityCatalog).
+-- A pending R81 backpay (saved at its old amount) is halved by T.HalveGems when it is shown and claimed. Index seed cash is not gems and stays.
+function T.HalveGems(n)n=tonumber(n)or 0;if n<=0 then return 0 end;return math.max(1,math.floor(n/2+.5))end
+T.HalfwayGems=5
+T.CompletionGems={[1]=10,[6]=10,[2]=10,[3]=10,[4]=10,[5]=10,[7]=10,[8]=50}
+-- R147: the Verity seed (Index category 9): fruit value, first / repeat index cash and the category's completion Gems.
+-- (HalfwayGems is one number for every category, so it is not repeated here.)
+do
+ local V=require(script.Parent.VerityCatalog)
+ T.SeedValues[V.Id]=V.Value;T.IndexFirst[V.Id]=V.IndexFirst;T.IndexRepeat[V.Id]=V.IndexRepeat
+ T.CompletionGems[V.Stage]=V.CompletionGems
+end
+-- R148: first / repeat index cash of the roster change's seeds (Aloe, Sand Fruit, Fire Pepper, Moon Melon). The new ids are NOT added
+-- to T.SeedValues: the PlantCatalog loop over it asserts that a plant exists at that point (Roster149.ApplyPlants runs after it).
+require(script.Parent.Roster149).ApplyBalance(T)
 T.Version=91
 return T

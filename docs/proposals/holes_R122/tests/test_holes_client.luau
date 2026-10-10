@@ -2,6 +2,9 @@
 -- R122 holes, client side + dig sound variants under the Roblox mock. Real: TrackHoleClient, GardenShovel (hint
 -- passthrough), DigSoundVariants (Pick / Resolve / Detect / segment playback), DigSoundAnalyzer (Run on a mocked
 -- AudioPlayer + AudioAnalyzer, Report). Run from a folder holding roblox.luau, world.luau, rs_bundle.luau (see run.sh).
+-- R149: the dirt bursts start / land on the keyboard's key tops where the keyboard is drawn (KeyboardSurface149), at the floor elsewhere (3b).
+-- R153: the tip (section 2) shows when the shovel is pulled out, anywhere, the first 3 times of a session, and says the shovel removes plants too;
+-- the dig animation grows the replicated hole back to its configured (1.5x bigger) size and the dirt lands around the bigger rim (section 3).
 local W=require('./world');local R=W.R
 local V3,CF=R.Vector3.new,R.CFrame.new
 local fails,checks=0,0
@@ -56,6 +59,8 @@ local shovel=R.new('Tool');shovel.Name='Shovel';shovel:SetAttribute('GardenShove
 local function frames(n)for _=1,n do R.advance(1/30);Run.Heartbeat:Fire(1/30);Run.RenderStepped:Fire(1/30)end end
 local function click()UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1},false)end
 
+-- R124: the shovel tip goes through NoticeFeed83 (fades by itself); spy on it.
+local Feed=W.module('NoticeFeed83');local tips={};Feed.Plain=function(text,color,duration)tips[#tips+1]={Text=text,Duration=duration,At=R.clock}end
 -- Load the real client scripts -----------------------------------------------------------------------------------
 local clientScript=R.new('LocalScript');clientScript.Name='TrackHoleClient'
 local okLoad,err=pcall(W.load,'TrackHoleClient',clientScript)
@@ -85,36 +90,145 @@ check(#fired==4,'no request without the shovel equipped')
 shovel.Parent=char;me:SetAttribute('ChestChaseSeedCarrying',true);frames(10);click()
 check(#fired==4,'no request while carrying a pack');me:SetAttribute('ChestChaseSeedCarrying',false)
 
--- 2. Hint
-frames(10)
-local hint=pg:GetAttribute('ShovelHint')
-check(type(hint)=='string'and hint:find('dig a hole',1,true)and hint:find('(0/4)',1,true),'hint shown on the track: '..tostring(hint))
-for i=1,4 do local m=R.new('Model');m.Name='TrackHole_'..i;m:SetAttribute('OwnerUserId',7);m.Parent=holesFolder end
-frames(10);hint=pg:GetAttribute('ShovelHint')
-check(hint and hint:find('4/4',1,true)and hint:find('cover',1,true),'full hint tells how to cover: '..tostring(hint))
-root.CFrame=CF(0,3,-40);frames(10);check(pg:GetAttribute('ShovelHint')==nil,'hint cleared off the track')
+-- 2. Tip (R124, R153): one fading notice when the shovel is pulled out (garden or track), the first HintTimes pull-outs of a session; it says the shovel
+-- removes plants too. A pull-out while the last tip is still on screen shows nothing and is not counted. No permanent hint line.
+local HC=W.module('TrackHoleConfig')
+check(#tips==1 and tips[1].Text==HC.Hint and tips[1].Duration==HC.HintSeconds,'tip shown when the shovel is pulled out (on the track): '..tostring(tips[1]and tips[1].Text))
+check(HC.Hint:find('trap',1,true)~=nil and HC.Hint:find('remove',1,true)~=nil and HC.Hint:find('plant',1,true)~=nil,'the tip says dig holes to trap players AND tap a plant to remove it')
+check(utf8.len(HC.Hint)<=90 and HC.HintSeconds>=4 and HC.HintSeconds<=6 and HC.HintTimes==3,'short (<= 90 chars), 4 - 6 s on screen, 3 times per session: '..utf8.len(HC.Hint)..' chars')
+check(pg:GetAttribute('ShovelHint')==nil,'no permanent hint line')
+local function pull(wait)shovel.Parent=nil;frames(10);R.advance(wait or 9);shovel.Parent=char;frames(10)end
+pull(1);check(#tips==1,'pulling it out again while the tip is still on screen (1 s later) shows nothing')
+root.CFrame=CF(0,3,-40);frames(10)
+pull();check(#tips==2,'2nd pull-out (in the garden, 9 s later) shows the tip again: the quick one above was not counted')
+root.CFrame=CF(0,3,100);frames(10)
+pull();check(#tips==3,'3rd pull-out (on the track) shows it again')
+pull();check(#tips==3,'4th pull-out: not shown (3 per session)')
+R.advance(3600);pull();check(#tips==3,'...not an hour later either (per session, not per hour)')
+shovel.Parent=nil;frames(10);R.advance(31);frames(10);check(#tips==3,'no tip without the shovel')
+check(tips[2].Text==HC.Hint and tips[3].Text==HC.Hint and tips[3].Duration==HC.HintSeconds,'every shown tip is the same fading line')
+shovel.Parent=char;frames(10)
 if okGarden then
  local label=pg:FindFirstChild('GardenShovelUI')and pg.GardenShovelUI:FindFirstChild('ShovelFeedback')
- root.CFrame=CF(0,3,100);frames(10)
- check(label and label.Text==pg:GetAttribute('ShovelHint'),'GardenShovel shows the hint when idle')
- root.CFrame=CF(0,3,-40);frames(10);check(label and label.Text=='','hint gone in the garden (unchanged behaviour)')
+ frames(10);check(label and label.Text=='','shovel feedback line stays empty on the track')
 end
 
 -- 3. Effects: dig grows the replicated hole and plays a dig variant at the hole
 local model=R.new('Model');model.Name='TrackHole_9';model.Parent=holesFolder
-local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,3.4,3.4);pit.CFrame=CF(0,0,100);pit.Parent=model;model.PrimaryPart=pit
-local crumb=R.new('Part');crumb.Name='Crumb';crumb.CFrame=CF(2,0,100);crumb.Parent=model
+-- (the server's hole: pit Diameter across, rim a RimWidth wider all round, crumbs outside it)
+local pit=R.new('Part');pit.Name='Pit';pit.Size=V3(.08,HC.Diameter,HC.Diameter);pit.CFrame=CF(0,0,100);pit.Parent=model;model.PrimaryPart=pit
+local rimD=HC.Diameter+2*HC.RimWidth
+local rimPart=R.new('Part');rimPart.Name='Rim';rimPart.Size=V3(.04,rimD,rimD);rimPart.CFrame=CF(0,0,100);rimPart.Parent=model
+local crumb=R.new('Part');crumb.Name='Crumb';crumb.CFrame=CF(rimD/2+.5,0,100);crumb.Parent=model
 local before=#sounds
+-- the dig animation ("preview"): the pit and the rim open from a quarter to the configured size and stop exactly there; the crumbs go back to where they were
+local grew={}
+local Tween0=W.service('TweenService');local create0=Tween0.Create
+Tween0.Create=function(self,obj,info,props)if props.Size and(obj==pit or obj==rimPart)then grew[obj]={From=obj.Size,To=props.Size}end;return create0(self,obj,info,props)end
 holeRemote.OnClientEvent:Fire({Kind='Dig',Id=9,Position=V3(0,0,100),OwnerUserId=7})
+Tween0.Create=create0
+check(grew[pit]and near(grew[pit].To.Y,HC.Diameter)and near(grew[pit].To.Z,HC.Diameter)and near(grew[pit].From.Y,HC.Diameter*.25)
+ and grew[rimPart]and near(grew[rimPart].To.Y,rimD)and near(grew[rimPart].From.Z,rimD*.25),'dig animation: pit and rim open from 1/4 to exactly the configured size ('..HC.Diameter..' / '..rimD..')')
+-- R158b (owner: "add the dirt sound effect when making holes"): DIGGING a hole plays the planting 'Dig' sound (PlantingEffects.Sounds, rbxassetid://118769294546013 at
+-- Volume .5, Pitch .96 - 1.04) at the hole through LocalSfx, not the long dig recording; covering a hole and the trap thud are as before.
+local digDef;for _,d in ipairs(W.module('PlantingEffects').Sounds)do if d.Key=='Dig'then digDef=d end end
 local digSound=sounds[#sounds]
-check(#sounds==before+1 and digSound.SoundId==W.module('TrackHoleConfig').DigSound.Id and digSound.IsPlaying,'dig plays the dig recording')
-check(digSound.Parent and near(digSound.Parent.Position.Z,100)and digSound.SoundGroup~=nil,'positional at the hole, routed through AudioMixer')
-check(near(pit.Size.Y,3.4),'hole grows back to full size')
+check(digDef and digDef.Id:match('^rbxassetid://%d+$')~=nil,'the planting Dig sound is read from PlantingEffects.Sounds (the owner\'s 118769294546013 unless swapped there): '..tostring(digDef and digDef.Id))
+check(#sounds==before+1 and digDef and digSound.SoundId==digDef.Id and digSound.IsPlaying,'dig plays the planting Dig sound')
+check(digSound.SoundId~=W.module('TrackHoleConfig').DigSound.Id,'... and not the long dig recording any more')
+check(digSound.Parent and digSound.Parent.Name=='ChestChaseSfx'and near(digSound.Parent.Position.Z,100)and digSound.SoundGroup~=nil,'positional at the hole (a LocalSfx anchor part at it), routed through AudioMixer')
+check(digDef and near(digSound.Volume,digDef.Volume)and digSound.PlaybackSpeed>=digDef.Pitch[1]-1e-9 and digSound.PlaybackSpeed<=digDef.Pitch[2]+1e-9,'at the planting volume and a pitch inside the planting range ('..tostring(digSound.PlaybackSpeed)..')')
+do -- the pitch is random inside the range, 40 digs (spaced out so LocalSfx\'s duplicate guard and 12-voice cap do not hide any)
+ local lo,hi,minP,maxP=digDef.Pitch[1],digDef.Pitch[2],math.huge,0;local played=0
+ for i=1,40 do
+  R.advance(1);local n=#sounds;holeRemote.OnClientEvent:Fire({Kind='Dig',Id=9,Position=V3(0,0,100),OwnerUserId=7})
+  local sd=sounds[#sounds];if #sounds==n+1 and sd.SoundId==digDef.Id then played+=1;minP=math.min(minP,sd.PlaybackSpeed);maxP=math.max(maxP,sd.PlaybackSpeed)end
+ end
+ check(played==40 and minP>=lo-1e-9 and maxP<=hi+1e-9 and maxP-minP>.02,('40 digs: each plays the Dig sound, pitch between %.3f and %.3f (range %.2f - %.2f)'):format(minP,maxP,lo,hi))
+end
+before=#sounds
+check(near(pit.Size.Y,HC.Diameter)and near(pit.Size.Z,HC.Diameter)and near(pit.Size.X,.08)and near(rimPart.Size.Y,rimD),'hole grows back to full size (the drawn pit = Config.Diameter)')
 holeRemote.OnClientEvent:Fire({Kind='Cover',Id=9,Position=V3(0,0,100),OwnerUserId=7})
-check(#sounds==before+2 and sounds[#sounds].PlaybackSpeed<1,'cover uses the variant player, lower pitch')
+check(#sounds==before+1 and sounds[#sounds].PlaybackSpeed<1 and sounds[#sounds].SoundId==W.module('TrackHoleConfig').DigSound.Id,'cover still uses the variant player (the long dig recording), lower pitch')
 holeRemote.OnClientEvent:Fire({Kind='Trap',Id=9,Position=V3(0,0,100)})
 holeRemote.OnClientEvent:Fire('junk');holeRemote.OnClientEvent:Fire({Kind='Dig'})
 check(true,'junk fx payloads ignored')
+
+-- 3b. R149: the dirt bursts ride on the keyboard's key tops where the keyboard is drawn (the new keys stand 0.55 above the floor and the real
+-- floor is hidden, so dirt tossed from floor height would be under them); everywhere else they stay at the floor, exactly as before.
+do
+ local K=W.module('KeyboardTrack');local FL=K.Config.FloorTop;local top0=K.KeyTop(0)
+ local Tween=W.service('TweenService');local origCreate=Tween.Create
+ local starts,goals={}, {}
+ Tween.Create=function(self,obj,info,props)
+  if obj.Name=='HoleDirt'and props.CFrame then
+   if not starts[obj]then starts[obj]=obj.CFrame.Position;goals[obj]={}end
+   table.insert(goals[obj],props.CFrame.Position)
+  end
+  return origCreate(self,obj,info,props)
+ end
+ local function dirt(kind,pos)
+  for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+  starts,goals={}, {}
+  holeRemote.OnClientEvent:Fire({Kind=kind,Id=3,Position=pos,OwnerUserId=7})
+  local out={}
+  for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'and starts[d]then out[#out+1]={Start=starts[d],Peak=goals[d][1],Land=goals[d][2]}end end
+  return out
+ end
+ -- every chunk starts .2 above `base`, lands s * .4 (.072 .. .184) above it and is tossed up at least .5 above it
+ local function dirtAt(list,base)
+  local ok=#list>0
+  for _,d in ipairs(list)do
+   if not near(d.Start.Y,base+.2)or d.Land.Y<base+.072-1e-6 or d.Land.Y>base+.184+1e-6 or d.Peak.Y<base+.5 then ok=false end
+  end
+  return ok
+ end
+ local function lowest(list)local lo=math.huge;for _,d in ipairs(list)do lo=math.min(lo,d.Start.Y,d.Peak.Y,d.Land.Y)end;return lo end
+ local FLOOR=V3(0,FL,100)
+ local counts={Dig=8,Cover=6,Trap=10}
+ -- no keyboard (the folder KeyboardTrack.client builds is not there): the old burst at the floor
+ for _,kind in ipairs({'Dig','Cover','Trap'})do
+  local list=dirt(kind,FLOOR)
+  check(#list==counts[kind]and dirtAt(list,FL),kind..' without the keyboard: '..#list..' dirt chunks at the floor (start .2, landing .07 .. .18 above it)')
+ end
+ -- the keyboard drawn (its folder + the map's biome attributes: the covered rectangle is the one KeyboardTrack builds)
+ for k,v in pairs({BiomeStartZ_1=-100,BiomeEndZ_1=1000,BiomeTrackEndZ=1120})do map:SetAttribute(k,v)end
+ local kbFolder=R.new('Folder');kbFolder.Name='KeyboardTrackVisuals';kbFolder.Parent=W.workspace
+ for _,kind in ipairs({'Dig','Cover','Trap'})do
+  local list=dirt(kind,FLOOR)
+  check(#list==counts[kind]and lowest(list)>=top0-1e-6,kind..' on the keyboard: every chunk starts, peaks and lands at or above the resting key top ('..string.format('%.3f',lowest(list))..' >= '..string.format('%.3f',top0)..')')
+  check(dirtAt(list,top0),kind..' on the keyboard: the same burst, moved up by the key rise (start '..string.format('%.2f',top0+.2)..')')
+ end
+ do -- R153: the toss lands around the bigger hole: outside the pit, no more than 1.4 studs from its edge
+  local list=dirt('Dig',FLOOR);local lo,hi=math.huge,0
+  for _,d in ipairs(list)do local rr=math.sqrt((d.Land.X-FLOOR.X)^2+(d.Land.Z-FLOOR.Z)^2);lo=math.min(lo,rr);hi=math.max(hi,rr)end
+  check(#list>0 and lo>=HC.Diameter/2-1e-6 and hi<=HC.Diameter/2+1.4+1e-6,string.format('dirt lands %.2f .. %.2f studs from the centre (pit edge %.2f, within 1.4 of it)',lo,hi,HC.Diameter/2))
+ end
+ check(dirtAt(dirt('Dig',V3(100,FL,100)),FL),'beside the 180-wide keyboard (x = 100) the dirt stays at the floor')
+ check(dirtAt(dirt('Dig',V3(0,top0+1,100)),top0+1),'a surface already above the key tops is not lowered')
+ W.workspace.CurrentCamera.CFrame=CF(0,20,1000)
+ check(dirtAt(dirt('Dig',V3(0,FL,1050)),FL),'past the last key row (the arena) the dirt stays at the floor')
+ W.workspace.CurrentCamera.CFrame=CF(0,20,-30)
+ kbFolder:Destroy()
+ check(dirtAt(dirt('Dig',FLOOR),FL),'once the keyboard is gone the dirt is back at the floor')
+ for k in pairs({BiomeStartZ_1=1,BiomeEndZ_1=1,BiomeTrackEndZ=1})do map:SetAttribute(k,nil)end
+ for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+ Tween.Create=origCreate
+end
+
+-- 3c. R153 (owner: "the dirt piles float up into the sky"): dirt that outlives its toss (a tween or Debris that never finished: the mock's Debris here never takes anything) is removed by the
+-- client after 2 s, so no chunk is left hanging in the air; one that is still in its toss is not touched.
+do
+ for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then d:Destroy()end end
+ local function chunks()local n=0;for _,d in ipairs(W.workspace:GetChildren())do if d.Name=='HoleDirt'then n+=1 end end;return n end
+ holeRemote.OnClientEvent:Fire({Kind='Dig',Id=3,Position=V3(0,0,100),OwnerUserId=7})
+ local n0=chunks();frames(30)
+ local n1=chunks();frames(60)
+ local n2=chunks()
+ check(n0>=3 and n1==n0 and n2==0,('dirt tossed by a dig: %d chunks, still all there after 1 s (%d), none left after 3 s (%d)'):format(n0,n1,n2))
+ holeRemote.OnClientEvent:Fire({Kind='Trap',Id=3,Position=V3(0,0,100)});frames(90)
+ check(chunks()==0,'...the same after a trap')
+end
 
 -- 4. DigSoundVariants
 local DS=W.module('DigSoundVariants');local cfg=DS.Config

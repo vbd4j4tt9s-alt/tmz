@@ -1,0 +1,14 @@
+{
+ "note": "R156 Desert pyramid views for render_pyramid.mjs (pyramid.html). World studs: the pyramid's base centre is (-62.07, 4, 1005); the left wall's inner face X -89. section: parts whose path has 'match' are cut by the plane normal . x + constant >= 0 (the kept side) and drawn from both sides. ortho = [centre x, centre z, half width, half height], +Z up the image, -X to the right.",
+ "views": [
+  {"name": "overview", "pos": [2, 36, 930], "look": [-62, 12, 1005], "fov": 52, "shadowAt": [-62, 4, 1005], "shadowExtent": 120, "fogNear": 900, "fogFar": 2400},
+  {"name": "cut", "pos": [-47, 24, 950], "look": [-63, 9, 1005], "fov": 50, "shadowAt": [-62, 4, 1005], "shadowExtent": 90,
+   "section": {"match": "MythicLandmarks/Biome2_Landmark/", "normal": [0, 0, 1], "constant": -1005.001}, "fogNear": 900, "fogFar": 2400},
+  {"name": "pack", "pos": [-57.5, 11, 990.5], "look": [-62.07, 8.7, 1005], "fov": 34, "shadowAt": [-62, 4, 1005], "shadowExtent": 60,
+   "section": {"match": "MythicLandmarks/Biome2_Landmark/", "normal": [0, 0, 1], "constant": -1005.001}, "fogNear": 900, "fogFar": 2400},
+  {"name": "prompt", "pos": [-38, 12.5, 958], "look": [-60, 8, 1000], "fov": 58, "shadowAt": [-62, 4, 1005], "shadowExtent": 90, "fogNear": 900, "fogFar": 2400,
+   "avatars": [[-56, 4, 977.6, 3.6, 15867951]],
+   "prompts": [{"p": [-62.0675, 8.62, 1005], "key": "E", "action": "STEAL", "object": "", "hold": 0.62, "size": 0.085}]},
+  {"name": "plan", "ortho": [-60, 1005, 48, 27], "shadowAt": [-62, 4, 1005], "shadowExtent": 90}
+ ]
+}

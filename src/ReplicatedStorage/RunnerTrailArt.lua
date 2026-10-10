@@ -140,7 +140,9 @@ A.HeadColors={
  Dust={C(236,220,255),C(168,96,255),C(104,182,255),C(255,150,236),C(126,70,230)},Star=C(255,246,255),StarTint=C(214,180,255),
 }
 -- Cyclic palette sample (x wraps): used for the aurora halo's colour flow.
-function A.Cycle(colors,x)local n=#colors;local u=(x%1)*n;local i=math.floor(u)%n;return colors[i+1]:Lerp(colors[i%n+1],u-math.floor(u))end
+-- (R153: it blended a colour with ITSELF, colors[i % n + 1], so the Aurora halo held each colour and then snapped to the next every 2.2 s;
+-- it now flows into the next one. At a whole step, e.g. the build's i / n, it is exactly colors[i + 1] as before.)
+function A.Cycle(colors,x)local n=#colors;local u=(x%1)*n;local i=math.floor(u)%n;return colors[i+1]:Lerp(colors[(i+1)%n+1],u-math.floor(u))end
 local function hash(i,k)local x=math.sin(i*12.9898+k*78.233)*43758.5453;return x-math.floor(x)end
 -- Returns {Kind,Rings={{Y,Speed,Bob}},Parts={{Name,Size,Offset,Ring,Color,Material,Transparency,Reflectance,Shimmer}},
 -- Points={name=head-space Vector3},Orbits={{Key,Center,Radius,Speed,Phase,Lift}}} or nil. simple = low-quality version.

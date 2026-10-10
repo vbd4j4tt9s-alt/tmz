@@ -17,7 +17,7 @@ end
 local Theme=W.module('GardenTheme');local Borders=W.module('GardenCardMotion')
 check(Theme.Icon==nil and Theme.Badge==nil,'GardenTheme.Icon/Badge removed (no remaining callers)')
 check(W.B.PlantInspection:find('Theme.CardBorder(harvest,rarity)',1,true)~=nil,'plant inspection harvest panel uses the rarity border')
-check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,selected==8,rarity)',1,true)~=nil,'index cards use the rarity border')
+check(W.B.ChestIndex:find('Bright.Card(card,Theme.Rarity(rarity).Accent,stage==8,rarity)',1,true)~=nil,'index cards use the rarity border') -- (R148: stage==8, the Mech seeds, keep their limited card inside the LIMITED tab)
 
 -- 2. Each rarity gets its own, distinct border.
 local Players=W.service('Players');local player=R.new('Player');player.Name='Tester';player.Parent=Players;Players.LocalPlayer=player
@@ -105,6 +105,8 @@ for i=1,10 do local s=gui.Dock['Slot'..i]
 end
 check(slotsChecked==8,'all 8 rarity fruits are on the hotbar ('..slotsChecked..')')
 check(gui.Dock.Slot1:GetAttribute('BorderRarity')=='Common','shovel slot: plain Common border')
+-- (R155: the Bag lists only what is not on the hotbar: one more fruit fills the last free slot, then a second set of the 8 rarity fruits arrives and goes to the Bag)
+do local filler=F.fruit(W,bag,'MangoSeed',9,'None',999);for i,r in ipairs(ORDER)do local t=F.fruit(W,bag,ids[i],20+i,'None',1000+i);t:SetAttribute('Rarity',r)end;W.frames(10)end
 W.UIS.InputBegan:Fire({KeyCode=R.Enum.KeyCode.B,UserInputType=R.Enum.UserInputType.Keyboard},false);W.frames(30)
 local panel=gui.Inventory;check(panel.Visible,'inventory open')
 local seen={}

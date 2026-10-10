@@ -7,7 +7,7 @@
 --    room, rolls the pack, grants it with PlayerData:AddChest + ChestService:SyncTools (ChestService:Bank's path) and spends the roll in one non-yielding step, then
 --    returns the result for the client to animate. A full bag refuses and keeps the roll READY.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
-local Rules=require(RS:WaitForChild('TreadmillBonusRules'));local PackRules=require(RS:WaitForChild('SeedPackRules'))
+local Rules=require(RS:WaitForChild('TreadmillBonusRules'));local PackRules=require(RS:WaitForChild('SeedPackRules'));local Starter=require(RS:WaitForChild('StarterVerityRules158d')) -- R158d: the new-player gift's 2 rolls
 local S={};S.__index=S
 function S.new(config,data,base,chests,notes)
  local self=setmetatable({Config=config,Data=data,Base=base,Chests=chests,Notes=notes,State={},Ready={},LastRoll={},Random=Random.new()},S)
@@ -49,6 +49,9 @@ end
 -- Called once the profile is loaded (publishes the saved progress and the pool).
 function S:Setup(player)
  if not self.Data:IsLoaded(player)then return end
+ -- R158d: the new-player gift's bonus rolls that were not used yet (Premium.StarterRolls158d, 0 - 2) are ready again after a rejoin (ready rolls themselves live in the session only).
+ local okOwed,owed=pcall(function()return Starter.CleanRolls(self.Data:GetPremium(player)[Starter.RollsField])end)
+ if okOwed and owed>0 and self:GetReady(player)<owed then self.Ready[player]=Rules.ReadyCount(owed)end
  self:_state(player);self:_publish(player)
 end
 function S:Cleanup(player)
@@ -56,7 +59,7 @@ function S:Cleanup(player)
 end
 -- Public API (owner/test commands). All clamp to the normal rules and republish the attributes.
 -- :GrantReady(player,n) adds n READY rolls (cap 2, session only); :SetProgress(player,seconds) sets saved progress
--- (0..600); :Pool(player) -> {stage,...} for the best owned treadmill; :GetReady / :GetProgress read state.
+-- (0..Rules.IntervalSeconds); :Pool(player) -> {stage,...} for the best owned treadmill; :GetReady / :GetProgress read state.
 function S:GrantReady(player,n)
  if not self.Data:IsLoaded(player)then return false end
  self.Ready[player]=Rules.ReadyCount(self:GetReady(player)+(tonumber(n)or 1));self:_publish(player);return true,self:GetReady(player)
@@ -105,9 +108,15 @@ function S:Roll(player)
  if not pick then return {Error='Bonus packs are unavailable right now.',Ready=ready}end
  -- The existing grant path (what ChestService:Bank does for a stolen pack): AddChest never yields, so the roll,
  -- the grant and spending the roll happen in one step; the Tool is synced afterwards.
- local record,reason=self.Data:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=1,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion})
+ local size=PackRules.RollPackSize(self.Random:NextNumber()) -- R126: rolls a pack size like world packs
+ local record,reason=self.Data:AddChest(player,{Stage=pick.Stage,BagVariant=pick.Variant,PackSize=size,PackMutation='None',Weather='None',OddsVersion=PackRules.OddsVersion},{Luck=true}) -- R137: hidden size pity
  if not record then return {Error=reason or'PACK COULD NOT BE ADDED',Ready=ready}end
+ pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Bonus',record)end) -- R151: a roll that an owner "bonus" command made ready is a TEST pack (never announced)
  self.Ready[player]=ready-1
+ do -- R158d: a roll spent takes a starter roll first (the saved count goes down with it: it never comes back after a rejoin)
+  local premium=self.Data:GetPremium(player);local owed=Starter.CleanRolls(premium[Starter.RollsField])
+  if owed>0 then premium[Starter.RollsField]=owed-1>0 and owed-1 or nil;self.Data:MarkDirty(player)end
+ end
  if self.Data.QueueGardenSave then self.Data:QueueGardenSave(player)end
  self:_publish(player)
  if self.Chests then
@@ -115,7 +124,7 @@ function S:Roll(player)
   if not ok then warn('[R123] Bonus pack Tool appears on the next sync: '..tostring(err))end
  end
  local rarity=Rules.Tier(pick.Variant)
- return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=PackRules.DesignBiomes[pick.Stage],
-  Label=PackRules.PackLabel(pick.Stage,pick.Variant,1,'None'),Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
+ return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=pick.Variant==Rules.Void.Variant and Rules.Void.Label or PackRules.DesignBiomes[pick.Stage],
+  Label=PackRules.PackLabel(pick.Stage,pick.Variant,record.PackSize,'None'),Size=record.PackSize,Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
 end
 return S

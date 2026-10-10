@@ -1,0 +1,149 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Verity preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_verity.luau scene (the real MarketLayout market + the real VerityService model): Roblox parts as boxes /
+// balls / cylinders, SurfaceGui text on faces, neon as glowing unlit colour, her smiley Decals projected onto the ball (the stand-in
+// below is a drawn smiley: the real picture, rbxassetid://102712963740896, cannot be downloaded here), avatar stand-ins for scale.
+// A design preview, not a screenshot: no Roblox materials, fonts or Future lighting.
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+const W=1600,H=900;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+function textCanvas(gui){
+  const scale=Math.min(1,1400/Math.max(gui.canvas[0],gui.canvas[1]));
+  const cw=Math.max(64,Math.round(gui.canvas[0]*scale)),ch=Math.max(64,Math.round(gui.canvas[1]*scale));
+  const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');
+  for(const l of gui.lines){
+    const x=l.x*cw,y=l.y*ch,w=l.w*cw,h=l.h*ch;let size=h*.9;
+    g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;
+    while(size>6&&g.measureText(l.text).width>w*.98){size*=.94;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;}
+    g.textAlign='center';g.textBaseline='middle';
+    if(l.stroke){g.lineWidth=Math.max(2,size*.12);g.strokeStyle='rgba(10,30,45,.85)';g.strokeText(l.text,x+w/2,y+h/2);}
+    g.fillStyle=`rgb(${l.color[0]},${l.color[1]},${l.color[2]})`;g.fillText(l.text,x+w/2,y+h/2);
+  }
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+function grid(){
+  const cv=document.createElement('canvas');cv.width=cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#3e9f4a';g.fillRect(0,0,256,256);g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
+  g.fillStyle='rgba(0,0,0,.05)';g.fillRect(0,0,128,128);g.fillRect(128,128,128,128);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(100,100);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+// The smiley stand-in: a thin black line drawing on a transparent background (two eyes and a wide smile), like the owner's picture.
+function smiley(){
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  g.fillStyle='#111';g.beginPath();g.ellipse(196,196,15,29,0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(316,196,15,29,0,0,Math.PI*2);g.fill();
+  g.strokeStyle='#111';g.lineWidth=12;g.lineCap='round';g.beginPath();g.moveTo(96,300);g.quadraticCurveTo(256,420,416,300);g.stroke();
+  return g.getImageData(0,0,512,512);
+}
+const SMILEY=smiley();
+// A yellow ball with Decals: Roblox projects a face Decal straight onto the part along that face's axis (Front = -Z), so the
+// equirectangular texture is painted by looking each texel's direction up in the picture (front hemisphere = Front decal).
+function decalBall(color,decals){
+  const tw=1024,th=512;const cv=document.createElement('canvas');cv.width=tw;cv.height=th;const g=cv.getContext('2d');
+  const img=g.createImageData(tw,th);const front=decals.some(d=>d.face==='Front'),back=decals.some(d=>d.face==='Back');
+  for(let y=0;y<th;y++)for(let x=0;x<tw;x++){
+    const u=(x+.5)/tw,v=(y+.5)/th,phi=u*Math.PI*2,theta=v*Math.PI;
+    const px=-Math.cos(phi)*Math.sin(theta),py=Math.cos(theta),pz=Math.sin(phi)*Math.sin(theta);
+    let r=color[0],gg=color[1],b=color[2];
+    const useFront=front&&pz<0,useBack=back&&pz>0;
+    if(useFront||useBack){
+      const iu=useFront?.5+px*.5:.5-px*.5,iv=.5-py*.5;const sx=Math.min(511,Math.max(0,Math.floor(iu*512))),sy=Math.min(511,Math.max(0,Math.floor(iv*512)));
+      const a=SMILEY.data[(sy*512+sx)*4+3]/255;r=r*(1-a)+17*a;gg=gg*(1-a)+17*a;b=b*(1-a)+17*a;
+    }
+    const i=(y*tw+x)*4;img.data[i]=r;img.data[i+1]=gg;img.data[i+2]=b;img.data[i+3]=255;
+  }
+  g.putImageData(img,0,0);const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+function signSprite(sign){
+  // One studs-sized sign: the "!" row on top, a gap, the name, the event timer line (rows from VerityConfig.Sign).
+  const PX=22;const cw=Math.round(sign.w*PX),ch=Math.round(sign.h*PX);
+  const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');g.textAlign='center';g.textBaseline='middle';
+  const row=(r,text,color,fill,k)=>{const y0=r[0]*PX,y1=r[1]*PX,h=y1-y0;let size=h*k;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;
+    while(size>6&&g.measureText(text).width>cw*.98){size*=.94;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;}
+    g.lineWidth=Math.max(2,size*.12);g.strokeStyle='rgba(40,22,70,1)';g.strokeText(text,cw/2,(y0+y1)/2);g.fillStyle=fill;g.fillText(text,cw/2,(y0+y1)/2);};
+  row([sign.rows.mark[0]+1.6,sign.rows.mark[1]],sign.mark,'#fff','#fff',.95);
+  row(sign.rows.name,sign.name,`rgb(${sign.nameColor[0]},${sign.nameColor[1]},${sign.nameColor[2]})`,`rgb(${sign.nameColor[0]},${sign.nameColor[1]},${sign.nameColor[2]})`,.95);
+  row(sign.rows.timer,sign.timer,'#ffec96','#ffec96',.95);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false,toneMapped:false}));s.position.set(...sign.p);s.scale.set(sign.w,sign.h,1);return s;
+}
+// A Roblox-sized avatar (about 5 studs tall) for scale.
+function person(x,y,z,shirt){
+  const grp=new THREE.Group();const m=c=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
+  const legs=new THREE.Mesh(new THREE.BoxGeometry(2,2,1),m(0x3b5aa8));legs.position.set(0,1,0);
+  const torso=new THREE.Mesh(new THREE.BoxGeometry(2,2,1),m(shirt));torso.position.set(0,3,0);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.65,16,12),m(0xf1c27d));head.position.set(0,4.55,0);
+  for(const o of[legs,torso,head]){o.castShadow=true;grp.add(o)}
+  grp.position.set(x,y,z);return grp;
+}
+window.build=function(scene,mode){
+  const s=new THREE.Scene();const dusk=mode==='dusk';
+  s.background=new THREE.Color(dusk?0x2b3557:0x9fd3f2);s.fog=new THREE.Fog(s.background,260,640);
+  s.add(new THREE.AmbientLight(dusk?0x8090b0:0xbfc8d8,dusk?.35:.75));
+  s.add(new THREE.HemisphereLight(dusk?0x6070a0:0xeaf6ff,dusk?0x203020:0x5f8f55,dusk?.55:1.15));
+  const sun=new THREE.DirectionalLight(dusk?0xffa070:0xfff2dd,dusk?.55:2.4);
+  const c=scene.center;sun.position.set(c[0]+60,c[1]+(dusk?25:90),c[2]+30);sun.target.position.set(c[0],c[1],c[2]);
+  sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);Object.assign(sun.shadow.camera,{left:-95,right:95,top:95,bottom:-95,near:1,far:320});sun.shadow.bias=-.0004;
+  s.add(sun,sun.target);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({map:grid(),roughness:.95}));
+  ground.rotation.x=-Math.PI/2;ground.position.set(c[0],c[1]-.02,c[2]);ground.receiveShadow=true;s.add(ground);
+  const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(.5,64,40),cyl=new THREE.CylinderGeometry(.5,.5,1,48);cyl.rotateZ(-Math.PI/2);
+  const wedge=(()=>{const g=new THREE.BufferGeometry();const P=[];const tri=(a,b,c)=>P.push(...a,...b,...c);
+    const A=[-.5,-.5,-.5],B=[-.5,-.5,.5],C=[-.5,.5,.5],D=[.5,-.5,-.5],E=[.5,-.5,.5],F=[.5,.5,.5];
+    tri(A,C,B);tri(D,E,F);tri(A,B,E);tri(A,E,D);tri(B,C,F);tri(B,F,E);tri(A,D,F);tri(A,F,C);
+    g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.computeVertexNormals();return g})();
+  for(const p of scene.parts){
+    if(p.name==='HumanoidRootPart'||p.name==='Baseplate')continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const visible=p.t<.995;
+    if(visible){
+      let geo=box,sx=p.size[0],sy=p.size[1],sz=p.size[2];
+      if(p.shape==='Ball'){geo=sphere}else if(p.shape==='Cylinder'){geo=cyl;const d=Math.min(sy,sz);sy=d;sz=d}else if(p.shape==='Wedge'){geo=wedge}
+      let mat;
+      if(p.shape==='Ball'&&p.decals&&p.decals.length)mat=new THREE.MeshStandardMaterial({map:decalBall(p.color,p.decals),roughness:.35,metalness:0});
+      else if(p.material==='Neon'){const k=dusk?2.4:1.6;mat=new THREE.MeshBasicMaterial({color:col(p.color).multiplyScalar(k),transparent:p.t>0,opacity:1-p.t,depthWrite:p.t<.5,toneMapped:false});}
+      else if(p.material==='Glass'){mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.05,metalness:0,transparent:true,opacity:Math.max(.18,1-p.t),depthWrite:false});}
+      else mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:.72,metalness:0,transparent:p.t>0,opacity:1-p.t,side:p.shape==='Wedge'?THREE.DoubleSide:THREE.FrontSide});
+      const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+      mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(sx,sy,sz));
+      mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';s.add(mesh);
+    }
+    for(const gui of p.guis){
+      const sx=p.size[0],sy=p.size[1],sz=p.size[2];let w,h,local=new THREE.Matrix4();
+      const off=.03;
+      switch(gui.face){
+        case'Front':w=sx;h=sy;local.makeRotationY(Math.PI).setPosition(0,0,-sz/2-off);break;
+        case'Back':w=sx;h=sy;local.makeTranslation(0,0,sz/2+off);break;
+        case'Right':w=sz;h=sy;local.makeRotationY(Math.PI/2).setPosition(sx/2+off,0,0);break;
+        case'Left':w=sz;h=sy;local.makeRotationY(-Math.PI/2).setPosition(-sx/2-off,0,0);break;
+        default:w=sx;h=sz;local.makeRotationX(-Math.PI/2).setPosition(0,sy/2+off,0);
+      }
+      const plane=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:textCanvas(gui),transparent:true,toneMapped:false,depthWrite:false}));
+      plane.matrixAutoUpdate=false;plane.matrix.copy(m).multiply(local);plane.renderOrder=2;s.add(plane);
+    }
+  }
+  for(const sign of scene.signs||[])s.add(signSprite(sign));
+  for(const pr of scene.people||[])s.add(person(pr[0],pr[1],pr[2],pr[3]||0xd1495b));
+  if(dusk)for(const l of scene.lights){const pl=new THREE.PointLight(col(l.color),40,l.range*2.2,1.6);pl.position.set(...l.p);s.add(pl);}
+  return s;
+};
+window.shoot=function(scene,view,mode){
+  const s=window.build(scene,mode);
+  const cam=new THREE.PerspectiveCamera(view.fov||50,W/H,.5,2000);
+  cam.position.set(...view.cam);cam.lookAt(...view.at);
+  const comp=new EffectComposer(renderer);comp.addPass(new RenderPass(s,cam));
+  comp.addPass(new UnrealBloomPass(new THREE.Vector2(W,H),mode==='dusk'?.9:.3,.45,.85));comp.addPass(new OutputPass());
+  comp.render();return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

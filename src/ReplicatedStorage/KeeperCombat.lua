@@ -14,6 +14,16 @@ function M.InReach(stage,keeperPosition,targetPosition,padding)
  local s=M.Get(stage);local delta=targetPosition-keeperPosition
  return Vector3.new(delta.X,0,delta.Z).Magnitude<=s.Reach+(padding or 0)and math.abs(delta.Y)<=s.Height
 end
+-- R128 (owner): a keeper starts its swing only when close (TriggerShare of its reach, from its centre), and a swing
+-- that started close lands at the impact frame while the target is still inside that strike range (+HitPadding);
+-- body overlap still counts too. A keeper beside a player no longer whiffs the same animation over and over; running
+-- out of range during the windup still dodges it. Reach itself (visual reach, pursuit, alarm, dash) is unchanged.
+M.TriggerShare=.6;M.HitPadding=2
+function M.StrikeReach(stage)return M.Get(stage).Reach*M.TriggerShare end
+function M.InStrike(stage,keeperPosition,targetPosition,padding)
+ local s=M.Get(stage);local delta=targetPosition-keeperPosition
+ return Vector3.new(delta.X,0,delta.Z).Magnitude<=s.Reach*M.TriggerShare+(padding or 0)and math.abs(delta.Y)<=s.Height
+end
 function M.HoldAfterHit(stage,now,started,lastHit)
  return type(started)=='number'and type(lastHit)=='number'and lastHit>=started
   and now<started+M.Get(stage).Windup+M.Recovery

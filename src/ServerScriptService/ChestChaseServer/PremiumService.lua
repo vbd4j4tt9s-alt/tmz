@@ -5,6 +5,12 @@ local Gifts=require(RS.PassGiftCatalog);local Routing=require(script.Parent.Prem
 -- R123: the R121 gift products and 10-minute boost were removed (GiftProducts / SpeedBoost deleted).
 local Service={};Service.__index=Service
 local MAX_RECEIPTS=20000
+-- R148: the "✅ Purchased: ...!" notice + PurchaseDone event. A missing or broken module only means no celebration; a purchase never depends on it.
+local function announcer(data)
+ local okay,made=pcall(function()return require(script.Parent.PurchaseAnnouncer).new(data)end)
+ if okay then return made end
+ warn('[R148] purchase feedback is unavailable: '..tostring(made));return nil
+end
 local function receiptSpace(state)
  local count=0;for _ in pairs(state.Receipts)do count+=1;if count>=MAX_RECEIPTS then return false end end;return true
 end
@@ -31,28 +37,53 @@ function Service:LoadProduct(id,publish,retryDelay)
 end
 function Service.new(data,chests,passes)
  local remote=Instance.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=RS:WaitForChild('ChestChaseRemotes')
- local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
+ local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Unannounced={},Announcer=announcer(data),Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
  remote.OnServerInvoke=function(p,action,value)
-  if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Please wait.'}end
-  if not data:IsLoaded(p)then return {Success=false,Message='YOUR DATA IS LOADING'}end
+  if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Wait a sec!'}end
+  if not data:IsLoaded(p)then return {Success=false,Message='HOLD ON, YOUR DATA IS LOADING!'}end
   if action=='Tutorial'then
    self.Last[p]=self.Last[p]or{};local now=os.clock()
    if now-(self.Last[p].Tutorial or-10)<.2 then return {Success=false}end;self.Last[p].Tutorial=now
    if value~='State'and not data:TutorialAction(p,value)then return {Success=false}end
    data:PublishTutorial(p)
+   -- R138: finishing the tutorial (the last slides) earns the free 2x-luck Forest pack, once per account.
+   if(value=='TreadmillInfo'or value=='Skip')and p:GetAttribute('TutorialDone')==true then
+    local gift=data:GrantStarterPack(p)
+    if gift then
+     pcall(function()chests:SyncTools(p)end)
+     if data.Notifications then data.Notifications:Show(p,require(RS.BeginnerGuide).StarterPack.Notice,Color3.fromRGB(150,255,110),5)end
+    end
+   end
    return require(script.Parent.TutorialTargets).State(data,chests,p)
+  end
+  -- R140: the DAILY panel: value 'State', 'ClaimLogin' or {Quest=index}. Claims need a profile that can save.
+  if action=='Daily'then
+   self.Last[p]=self.Last[p]or{};local now=os.clock()
+   if now-(self.Last[p].Daily or-10)<.3 then return {Success=false,Message='TRY AGAIN IN A SEC!'}end;self.Last[p].Daily=now
+   if value=='State'then return data:DailyState(p)end
+   if not data.CanSave[p]then local state=data:DailyState(p);state.Success=false;state.Message='NO REWARDS UNTIL YOUR DATA CAN SAVE';return state end
+   local okay,message
+   if value=='ClaimLogin'then
+    okay,message=data:ClaimDailyLogin(p)
+    if okay then pcall(function()chests:SyncTools(p)end)end -- day 7 (R153: the Void pack) and a quest pack land in the hotbar
+   elseif value=='ClaimBonus'then okay,message=data:ClaimDailyBonus(p) -- R153: the all-done 2 Gems
+   elseif type(value)=='table'then
+    okay,message=data:ClaimDailyQuest(p,value.Quest)
+    if okay then pcall(function()chests:SyncTools(p)end)end -- R153: a quest gives a pack (it lands in the hotbar)
+   else okay,message=false,'TRY AGAIN!'end
+   local state=data:DailyState(p);state.Success=okay==true;state.Message=message;return state
   end
   if action=='SettingsState'or action=='SetSetting'then
    local config=require(RS.SettingsConfig);local state=data:GetPremium(p);state.Settings=config.Read(state.Settings)
    if action=='SettingsState'then return {Success=true,Settings=state.Settings}end
-   if type(value)~='table'or not config.Valid(value.Key,value.Value)then return {Success=false,Message='Invalid setting.'}end
+   if type(value)~='table'or not config.Valid(value.Key,value.Value)then return {Success=false,Message='That setting didn\'t work.'}end
    self.Last[p]=self.Last[p]or{};local now=os.clock()
-   if now-(self.Last[p].Settings or-10)<.12 then return {Success=false,Message='Please try again.'}end
+   if now-(self.Last[p].Settings or-10)<.12 then return {Success=false,Message='Try again in a sec!'}end
    self.Last[p].Settings=now;state.Settings[value.Key]=value.Value;data:MarkDirty(p);data:QueueGardenSave(p)
    return {Success=true}
   end
   local now=os.clock();local key=action=='State'and'State'or'Action';self.Last[p]=self.Last[p]or{}
-  if now-(self.Last[p][key]or-10)<(key=='State'and .35 or .65)then return {Success=false,Message='TRY AGAIN IN A MOMENT'}end
+  if now-(self.Last[p][key]or-10)<(key=='State'and .35 or .65)then return {Success=false,Message='TRY AGAIN IN A SEC!'}end
   self.Last[p][key]=now
   if action=='State'then
    data:RefreshBiomeRewards(p)
@@ -62,40 +93,53 @@ function Service.new(data,chests,passes)
    end
    return self:State(p)
   end
-  if not data.CanSave[p]then return {Success=false,Message='PURCHASES ARE UNAVAILABLE UNTIL YOUR DATA CAN SAVE'}end
+  if not data.CanSave[p]then return {Success=false,Message='NO PURCHASES UNTIL YOUR DATA CAN SAVE'}end
   if(action=='RobuxBundle'or action=='RobuxGift'or action=='RobuxPack')and not receiptSpace(data:GetPremium(p))then
-   local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES ARE UNAVAILABLE FOR THIS SAVE';return state
+   local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES AREN\'T ON FOR THIS SAVE';return state
   end
-  local okay,message
+  local okay,message,extra
   if action=='ClaimSeed'then okay,message=data:ClaimIndexSeed(p,value)
   elseif action=='ClaimBiome'then okay,message=data:ClaimIndexBiome(p,value)
   elseif action=='ClaimBiomeHalf'then okay,message=data:ClaimIndexBiomeHalf(p,value)
   elseif action=='Convert'then okay,message=data:ConvertGems(p,value)
-  elseif action=='BuyPack'then okay,message=data:BuyMechPack(p,value);if okay then chests:SyncTools(p)end
+  elseif action=='BuyPack'then okay,message,extra=data:BuyMechPack(p,value);if okay then chests:SyncTools(p)end
   elseif action=='BuyBundle'then okay,message=data:BuyPremiumBundle(p,value)
   elseif action=='RobuxBundle'then
    local row=Pricing.Find(value);local info=row and self.Products[row.Key];local id=row and Pricing.ProductId(row)or 0
    local route,routed=Routing.Resolve(id)
    if row and route=='Bundle'and routed==row.Key and info and info.IsForSale~=false and data:CanReceiveBundle(p,row.Key)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
-   else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
   elseif action=='GiftPass'then
-   if type(value)=='table'then okay,message=self.Gifts:Send(p,value.Key,value.RecipientId,value.Payment)else okay=false;message='Choose a gift.'end
+   if type(value)=='table'then okay,message=self.Gifts:Send(p,value.Key,value.RecipientId,value.Payment)else okay=false;message='Pick a gift first!'end
   elseif action=='RobuxGift'then
    local pass=type(value)=='string'and Gifts.Pass(value);local info=pass and self.GiftProducts[value];local id=pass and Gifts.ProductId(value)or 0
    local route,routed=Routing.Resolve(id);local credits=data:GetPremium(p).GiftCredits
    if pass and route=='Gift'and routed==value and info and info.IsForSale~=false and(credits[value]or 0)<Gifts.MaxCredits then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
-   else okay=false;message='THIS GIFT PURCHASE IS UNAVAILABLE'end
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   else okay=false;message='CAN\'T GIFT THIS RIGHT NOW'end
   elseif action=='BuyPerk'then okay,message=data:BuyGemPerk(p,value);if okay then task.spawn(function()passes:Refresh(p)end)end
   elseif action=='RobuxPack'then
    local offer=Catalog.Offer(value);local count=offer and offer.Count
    local entry=count and self:State(p).PackOffers[tostring(count)]
    local id=Catalog.ProductId(value);local route,routed=Routing.Resolve(id)
-   if entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
-    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=okay and'Complete the Roblox purchase prompt.'or'Purchase could not open.'
-   else okay=false;message='THIS PURCHASE IS UNAVAILABLE'end
-  else okay=false;message='UNKNOWN ACTION'end
+   -- R155: the limited event is over: no new Mech purchase starts (no prompt). A receipt of a prompt opened BEFORE the end is still granted (ProcessReceipt never asks the sale).
+   if offer and Catalog.EventOver()then okay=false;message=Catalog.Event.Refused
+   elseif entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
+    okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   elseif offer and entry and entry.BagFull then okay=false;message=Catalog.BagFullNotice(count) -- R157: a full Bag is told plainly (no prompt); R157b review: with the real count for more than one pack
+   else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
+  else okay=false;message='TRY AGAIN!'end
+  -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
+  -- (R152: the "Gems / Cash on the way." lines stay: the coins fly to the counter and claim themselves, nothing to collect).
+  if okay==true then
+   if action=='BuyPack'then if self:Announce(p,'Pack',value,extra)then message=nil end
+   elseif action=='BuyBundle'then
+    local row=Pricing.Find(type(value)=='table'and value.Key or value)
+    if row and self:Announce(p,'Bundle',row.Key)and row.Kind=='Speed'then message=nil end
+   elseif action=='BuyPerk'then if self:Announce(p,'Pass',value)then message=nil end
+   elseif action=='Convert'then self:Announce(p,'Gems',value)end
+  end
   local state=self:State(p);state.Success=okay==true;state.Message=message;return state
  end
  Market.ProcessReceipt=function(receipt)return self:ProcessReceipt(receipt)end
@@ -136,10 +180,14 @@ function Service:State(player)
  for _,offer in ipairs(Catalog.Offers)do
   local count=offer.Count;local info=(self.PackProducts or{})[count]
   local route,key=Routing.Resolve(Catalog.ProductId(count))
-  local allowed=saveReady and Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true and self.Data:CanReceiveMechPacks(player,count)
+  -- R157: BagFull = the ONLY thing in the way is the Bag (200 cap): the sale is on, the data is ready, paid random items are allowed, yet the packs would not fit.
+  -- Nothing may start (GemAvailable / RobuxAvailable stay false); the shop reads "Bag full" instead of "Unavailable". Off sale / event over never set it.
+  local ready=saveReady and Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true
+  local fits,why=false,nil;if ready then fits,why=self.Data:CanReceiveMechPacks(player,count)end
+  local allowed=ready and fits==true
   offers[tostring(count)]={Count=count,GemPrice=offer.GemPrice,GemAvailable=allowed,
    RobuxAvailable=allowed and robuxReady and route=='Mech'and key==count and info~=nil and info.IsForSale~=false,
-   RobuxPrice=info and info.PriceInRobux}
+   RobuxPrice=info and info.PriceInRobux,BagFull=ready and not allowed and why==Catalog.BagFullNotice(count)or nil}
  end
  for _,row in ipairs(Pricing.Bundles)do
   local info=(self.Products or{})[row.Key];local route,key=Routing.Resolve(Pricing.ProductId(row));local quote=self.Data:BundleQuote(player,row.Key)
@@ -160,12 +208,15 @@ function Service:ProcessReceipt(receipt)
  local player=Players:GetPlayerByUserId(receipt.PlayerId)
  if not player or not self.Data:IsLoaded(player)or not self.Data.CanSave[player]or self.Busy[player]then return later end
  self.Busy[player]=true
+ -- R148: receipts granted in memory whose buyer has not been told yet (the save may fail and the retry finishes the job).
+ -- An entry is made once, when the grant happens, and removed when it is announced, so a duplicate never announces twice.
+ local owed=self.Unannounced[player];if not owed then owed={};self.Unannounced[player]=owed end
  local okay,decision=pcall(function()
   local state=self.Data:GetPremium(player)
   if not state.Receipts[receipt.PurchaseId]then
    if not receiptSpace(state)then return later end
    local granted
-   if mech then granted=self.Data:GrantMechPacks(player,true,key)
+   if mech then granted=self.Data:GrantMechPacks(player,true,key,true) -- R155: a paid receipt is never refused for the 200 cap (InventoryCap155)
    elseif bundle then granted=self.Data:GrantPremiumBundle(player,bundle)
    else
     if(state.GiftCredits[key]or 0)>=Gifts.MaxCredits then return later end
@@ -174,6 +225,7 @@ function Service:ProcessReceipt(receipt)
    if not granted then return later end
    -- Pack and receipt enter the same profile transaction. Never acknowledge before a successful save.
    state.Receipts[receipt.PurchaseId]=true;self.Data:MarkDirty(player);fresh=true
+   owed[receipt.PurchaseId]=mech and{'Pack',key,granted}or bundle and{'Bundle',bundle}or{'Gift',key} -- (R155: a Mech grant's records tell the notice which packs came coated)
   end
   self.Data:WaitForSave(player,5)
   if not self.Data:Save(player,'PremiumProductReceipt',true)then return later end
@@ -182,10 +234,19 @@ function Service:ProcessReceipt(receipt)
   return Enum.ProductPurchaseDecision.PurchaseGranted
  end)
  self.Busy[player]=nil
- return okay and decision or later
+ local result=okay and decision or later
+ if result==Enum.ProductPurchaseDecision.PurchaseGranted then
+  local item=owed[receipt.PurchaseId]
+  if item then owed[receipt.PurchaseId]=nil;self:Announce(player,item[1],item[2],item[3])end
+ end
+ return result
+end
+-- R148: true when the buyer was sent PurchaseDone (and the notice).
+function Service:Announce(player,kind,arg,extra)
+ return self.Announcer~=nil and self.Announcer:Announce(player,kind,arg,extra)==true
 end
 function Service:Notify(player,message)
  local n=self.Data.Notifications;if n and player.Parent then pcall(n.Show,n,player,message,nil,4)end
 end
-function Service:Cleanup(player)self.Last[player]=nil;self.Gifts:Cleanup(player)end
+function Service:Cleanup(player)self.Last[player]=nil;self.Unannounced[player]=nil;self.Gifts:Cleanup(player)end
 return Service

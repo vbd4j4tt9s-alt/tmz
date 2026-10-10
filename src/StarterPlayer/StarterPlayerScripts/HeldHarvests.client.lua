@@ -1,9 +1,10 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local H=require(RS:WaitForChild('HarvestPresentation'));local Rig=require(RS:WaitForChild('HeldHarvestRig'));local Visuals=require(RS:WaitForChild('PlantVisuals'))
 local Catalog=require(RS:WaitForChild('PlantCatalog'));local retry=setmetatable({},{__mode='k'})
 local function equipped(tool)return tool.Parent and Players:GetPlayerFromCharacter(tool.Parent)~=nil end
 local Planner=require(RS:WaitForChild('PlantDetailPlanner'))
-local player=Players.LocalPlayer;local states={};local selected={};local job;local scanClock=1;local motionClock=0
+local player=Players.LocalPlayer;local states={};local selected={};local job;local scanClock=1
 local function dispose(tool)
  local s=states[tool];if s then if s.Rig then Rig.Destroy(s.Rig)end;states[tool]=nil end
 end
@@ -40,9 +41,12 @@ local function scan()
  if job and not selected[job.Tool]then cancel()end
  if Run:IsStudio()then player:SetAttribute('HeldHarvestModels',count);player:SetAttribute('HeldHarvestBudget',cost)end
 end
-local connection=Run.Heartbeat:Connect(function(dt)
+-- R153 (owner: "fix all jittery type effects"): one RenderStepped step a frame. A held fruit's own motion (the jaw, the bells, the idle sway: its
+-- joints' Transform, applied in PreSimulation below) and its effects follow the hand every rendered frame; the joints used to change at 20 Hz.
+-- Bounded by the selection: 6 held fruits (900 parts), effects for the 3 nearest within 90 studs.
+local connection=Run.RenderStepped:Connect(function(dt)
  for tool in pairs(states)do if not equipped(tool)then dispose(tool)end end
- scanClock+=dt;motionClock+=dt;if scanClock>=.25 then scanClock=0;scan()end
+ scanClock+=dt;if scanClock>=.25 then scanClock=0;scan()end
  if job and(not equipped(job.Tool)or not selected[job.Tool])then cancel()end
  if not job then
   for tool,e in pairs(selected)do if not states[tool]and equipped(tool)and os.clock()>=(retry[tool]or 0) then
@@ -56,18 +60,24 @@ local connection=Run.Heartbeat:Connect(function(dt)
   end end
  end
  if job then
-  job.Parts=16;job.Deadline=os.clock()+.001;local okay,why=coroutine.resume(job.Thread)
+  local own=job.Tool.Parent==player.Character;job.Parts=own and 64 or 16;job.Deadline=os.clock()+(own and .003 or .001);local okay,why=coroutine.resume(job.Thread)
   if not okay then retry[job.Tool]=os.clock()+5;warn('[V149] Held fruit: '..tostring(why));cancel()
   elseif coroutine.status(job.Thread)=='dead'then job=nil end
  end
- if motionClock>=.05 then
-  motionClock=0;local now=workspace:GetServerTimeNow();local fx=0
-  debug.profilebegin('Held fruit animation')
-  for tool,state in pairs(states)do local e=selected[tool];if e and state.Rig then
-   local effects=e.Distance<90 and fx<3;if effects then fx+=1 end;Rig.Step(state.Rig,now,effects,effects and e.Distance<32)
-  end end
-  debug.profileend()
- end
+ local now=workspace:GetServerTimeNow();local fx=0
+ debug.profilebegin('Held fruit animation')
+ for tool,state in pairs(states)do local e=selected[tool];if e and state.Rig and equipped(tool)then
+  local effects=e.Distance<90 and fx<3;if effects then fx+=1 end;Rig.Step(state.Rig,now,effects,effects and e.Distance<32)
+ end end
+ debug.profileend()
 end)
+-- R153 (owner: "i need to put in inputs twice to equip something"): the fruit you just took out used to show up to a second later (a scan every 0.25 s, then
+-- 16 parts a frame), so a second press put it away again. Your own new fruit is scanned at once and built 4x faster; everyone else's is unchanged.
+local ownLink
+local function own(character)
+ if ownLink then ownLink:Disconnect();ownLink=nil end
+ if character then ownLink=character.ChildAdded:Connect(function(c)if c:IsA('Tool')and c:GetAttribute('HarvestItemTool')then scanClock=1 end end)end
+end
+local ownAdded=player.CharacterAdded:Connect(own);own(player.Character)
 local jointConnection=Run.PreSimulation:Connect(function()for tool,s in pairs(states)do if equipped(tool)and s.Rig then Rig.Apply(s.Rig)end end end)
-script.Destroying:Connect(function()connection:Disconnect();jointConnection:Disconnect();cancel();for tool in pairs(states)do dispose(tool)end end)
+script.Destroying:Connect(function()connection:Disconnect();jointConnection:Disconnect();ownAdded:Disconnect();own(nil);cancel();for tool in pairs(states)do dispose(tool)end end)

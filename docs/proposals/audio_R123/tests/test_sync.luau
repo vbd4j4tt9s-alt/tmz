@@ -56,10 +56,29 @@ local pitch=math.clamp(2.8/W.module('RarityRevealSequence').SeedAt(7),.75,2)
 A.Begin(7,0);check(whoosh.IsPlaying and near(whoosh.TimePosition,.44,1e-4),'on-time reveal: whoosh from its trimmed start')
 A.Begin(7,.3);check(whoosh.IsPlaying and near(whoosh.TimePosition,.44+.3*pitch,1e-4),'late reveal: whoosh skips the elapsed build (x pitch)')
 A.Begin(7,2.6);check(not whoosh.IsPlaying,'reveal already past the burst: no whoosh')
-A.Begin(4,.1);check(chime.IsPlaying,'opener chime plays within the grace')
-A.Begin(4,.6);check(not chime.IsPlaying,'stale opener chime is dropped (burst ring already gone)')
-A.Begin(4);check(chime.IsPlaying,'old call shape (no elapsed) unchanged')
+-- R138: Common..Rare sound when the seed pops out (Burst), not at Begin; each tier differs; a late cue is dropped.
+local pop,note,note2,spark=SS:FindFirstChild('Reveal_Pop'),SS:FindFirstChild('Reveal_Note'),SS:FindFirstChild('Reveal_Note2'),SS:FindFirstChild('Reveal_Spark')
+A.Begin(3,.1);check(not chime.IsPlaying and not pop.IsPlaying and not note.IsPlaying,'low tiers: nothing at the start any more')
+A.Stop();A.Burst(1,.1);check(pop.IsPlaying and not note.IsPlaying and not spark.IsPlaying,'Common: a pop')
+A.Stop();A.Burst(2,.1);check(pop.IsPlaying and not note.IsPlaying,'Uncommon: a pop...');R.advance(.1);check(note.IsPlaying and note.PlaybackSpeed>pop.PlaybackSpeed,'...then a rising note')
+A.Stop();A.Burst(3,.1);check(spark.IsPlaying and note.IsPlaying and not pop.IsPlaying,'Rare: a sparkle and a note...');R.advance(.1);check(note2.IsPlaying and note2.PlaybackSpeed>note.PlaybackSpeed,'...then a higher note')
+A.Stop();A.Burst(2,.8);R.advance(.2);check(not pop.IsPlaying and not note.IsPlaying,'a low-tier cue reaching this client late is dropped')
+A.Stop();A.Burst(3);check(spark.IsPlaying,'old call shape (no time) still plays')
+-- R136: Legendary / Mythic get a whoosh during their charge-up (it joins late like Secret+), then chimes and an impact.
+local impact=SS:FindFirstChild('Reveal_Impact')
+A.Begin(4,0);check(whoosh.IsPlaying and not chime.IsPlaying,'Legendary: whoosh on the charge-up')
+A.Begin(5,.2);check(whoosh.IsPlaying and near(whoosh.TimePosition,.44+.2*A.CuePitch[5],1e-4),'Mythic joined late: whoosh skips the elapsed build')
+A.Begin(4,.69);check(not whoosh.IsPlaying,'Legendary reveal already at its burst: no whoosh')
+A.Begin(5,0);A.Step(5,.5);check(chime.IsPlaying,'Mythic: a rising chime half way through the charge-up')
+A.Burst(5);check(not whoosh.IsPlaying and impact.IsPlaying and chime.IsPlaying,'Mythic burst: impact + chime, whoosh cut')
 A.Burst(7);check(not whoosh.IsPlaying,'burst still cuts the whoosh')
+-- R138 (owner: Secret / Cosmic / King more audible): louder build, beats and burst; King adds a low impact.
+local royal=SS:FindFirstChild('Reveal_Royal')
+A.Begin(7,0);check(whoosh.IsPlaying and whoosh.Volume>=.2,'Cosmic: the build is louder ('..whoosh.Volume..', was .09)')
+A.Step(7,1.0);check(chime.IsPlaying and chime.Volume>=.12,'Cosmic: louder beats ('..chime.Volume..', was .04)')
+A.Begin(6,0);A.Burst(6);check(impact.IsPlaying and impact.Volume>=.28,'Secret: louder burst ('..impact.Volume..', was .12)')
+A.Stop();A.Burst(8);check(impact.IsPlaying and impact.Volume>=.3 and royal.IsPlaying and royal.Volume>=.3 and spark.IsPlaying,'King: louder impact and fanfare plus a low hit')
+A.Stop();A.Begin(4,0);check(whoosh.IsPlaying and whoosh.Volume<.1,'Legendary keeps its R136 volume')
 
 -- 3. TrackRefreshSky: each countdown beep and the wall number change on the same frame ------------------------------
 local paints={}
@@ -105,6 +124,49 @@ local notice=R.Instance.new('RemoteEvent');notice.Name='Notice83';notice.Parent=
 run('NotificationClient83')
 local rare=SS:FindFirstChild('Notice_RarePack')
 check(rare~=nil and preloaded[rare],'rare-pack cue exists and is preloaded before the first notice')
+-- R153 (owner: "the 1st one is the new rarity notifier sound"): the rare-pack notice plays the owner's file (it replaced 118818986767152), once per
+-- notice, when its line appears; same volume as the other notice cues, same (Interface) group, SoundTiming's default lead-in (the file is unmeasured).
+do
+ local Feed=W.module('NoticeFeed83');local Mixer=W.module('AudioMixer');local Timing=W.module('SoundTiming')
+ local NEW,OLD='rbxassetid://80907337289683','rbxassetid://118818986767152'
+ check(rare.SoundId==NEW,'rare-pack cue is the owner\'s new notifier sound ('..tostring(rare.SoundId)..')')
+ local stale=0;for _,s in ipairs(sounds)do if s.SoundId==OLD then stale+=1 end end
+ check(stale==0,'no sound in the game still carries the old rare-pack id ('..stale..')')
+ local weatherCue=SS:FindFirstChild('Notice_WeatherAdopted')
+ check(rare.Volume==.34 and rare.Volume==weatherCue.Volume and rare.SoundGroup==Mixer.Group('Interface') and rare.PlaybackSpeed==1 and not rare.Looped,'the cue keeps the notice cues\' volume (.34), group (Interface) and plays unpitched')
+ local gui=pg:FindFirstChild('ChestChaseNotices83')
+ local function lines()local n=0;for _,d in ipairs(gui:GetDescendants())do if d.Name=='Announcement'then n+=1 end end;return n end
+ local function msg(id,text,stage)return {Text=text or'Mythic Pack',Biome='Storm Peaks',SpawnId=id,Stage=stage or 7,Tier='Mythic',Size=1,Mutation='None',Color=R.Color3.new(1,0,.8)}end
+ local function settle(sec)for _=1,math.floor(sec*60)do frame()end end
+ local start=rare.Plays or 0
+ -- one spawn: one line, one play, on the frame its line appears
+ R.advance(1);Feed.Pack(msg('r153:a'))
+ local atLine=nil;for _=1,60 do frame();if lines()>0 then atLine=rare.Plays or 0;break end end
+ check(atLine==start+1 and rare.PlayedAt==R.clock,'one rare-pack notice: its line and its sound appear on the same frame, one play (got '..tostring(atLine and atLine-start)..')')
+ check(rare.TimePosition==Timing.Offset(rare),'it starts at SoundTiming\'s lead-in for the file (unmeasured: 0; Start_80907337289683 tunes it)')
+ settle(.5);check((rare.Plays or 0)==start+1,'and it does not play again while the line is up')
+ -- the same spawn announced again (a repeated packet) shows nothing and plays nothing
+ Feed.Pack(msg('r153:a'));settle(.6)
+ check((rare.Plays or 0)==start+1 and lines()==1,'the same spawn id again: no second line, no second sound')
+ settle(6)
+ check(lines()==0,'the line is gone after its time')
+ -- three packs of one kind in one burst are ONE line ("3 Mythic Packs") and one sound
+ local before=rare.Plays or 0
+ Feed.Pack(msg('r153:b1'));Feed.Pack(msg('r153:b2'));Feed.Pack(msg('r153:b3'));settle(.8)
+ check(lines()==1 and (rare.Plays or 0)==before+1,'three packs of the same tier and stage in one burst: one line, one sound ('..lines()..' lines, '..((rare.Plays or 0)-before)..' plays)')
+ settle(6)
+ -- two different notices: two sounds, one after the other (one cue at a time), never together
+ before=rare.Plays or 0
+ Feed.Pack(msg('r153:c1','Legendary Pack',4));Feed.Pack(msg('r153:c2','Mythic Pack',7));settle(.6)
+ check(lines()==1 and (rare.Plays or 0)==before+1,'two different notices in one burst: the second waits for the first one\'s cue (1 line, 1 sound at first)')
+ settle(3.4)
+ check(lines()==2 and (rare.Plays or 0)==before+2,'...and then shows with its own sound: one sound per notice ('..lines()..' lines, '..((rare.Plays or 0)-before)..' plays)')
+ settle(8)
+ -- a notice that is not valid makes no sound
+ before=rare.Plays or 0
+ Feed.Pack({Text='Mythic Pack',Biome='Storm Peaks',Stage=7});Feed.Pack(msg('r153:bad',nil,9));settle(.8)
+ check(lines()==0 and (rare.Plays or 0)==before,'a malformed rare-pack notice (no spawn id, a stage out of range) shows nothing and plays nothing')
+end
 
 -- 6. TrackHoleClient: trap thud preloaded; dirt follows FastMode ----------------------------------------------------
 local hole=R.Instance.new('RemoteEvent');hole.Name='TrackHole';hole.Parent=remotes

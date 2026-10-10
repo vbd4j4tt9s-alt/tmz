@@ -1058,8 +1058,214 @@ local function treadmillFlairR117(k)
     end
     return made
 end
-function Art.BuildTreadmillV131(base,tier)
+-- R151 treadmill polish (owner: "works we can implement the treadmill polishes"; approved proposal docs/proposals/R151/treadmills.md, config in
+-- ReplicatedStorage.TreadmillLook151). A dressing pass that only ADDS small things onto the finished machine, whose parts all keep their size, place
+-- and colour: a moving textured belt (Texture layers on the "Track surface", scrolled by TreadmillFx; images from TreadmillBeltArt151), two edge
+-- light flows (Beams with a moving texture, mid / top), neon trim lines, studs on the bumpers, two small corner accents at the entry end with one
+-- subtle particle each, a capped entry glow / deck underglow, and a "+N/step" label above the front. The per-part "flow" belt pieces (moved one
+-- by one every frame) are retired; the chevrons stay. Everything is anchored, never collides, never answers raycasts or touches; every light,
+-- particle and beam starts disabled and is turned on near the camera by TreadmillFx (R117 roles). Without TreadmillLook151 (or if the pass fails)
+-- the machine is built exactly as before.
+local function treadmillLookR151()
+    if Art.TreadmillLook~=nil then return Art.TreadmillLook or nil end
+    local ok,look=pcall(function()
+        local module=game:GetService('ReplicatedStorage'):FindFirstChild('TreadmillLook151')
+        return module and require(module)or false
+    end)
+    Art.TreadmillLook=ok and look or false
+    return Art.TreadmillLook or nil
+end
+-- "+N/step": the machine's own gain per training step (Config: points per second x interval x the level's machine multiplier).
+local function stepLabelR151(look,level)
+    local ok,text=pcall(function()
+        local config=require(script.Parent.Config)
+        local tier=config.TreadmillTiers[level]
+        return look.LabelText(look.StepGain(config.TrainingPointsPerSecond,config.TrainingInterval,tier and tier.Multiplier))
+    end)
+    return ok and text or nil
+end
+-- Axis-aligned bounds in the machine's own space.
+local function originBoundsR151(origin,v)
+    local cf=origin:ToObjectSpace(v.CFrame);local s=v.Size
+    local r={cf.RightVector,cf.UpVector,-cf.LookVector};local e={0,0,0}
+    for i,axis in ipairs({'X','Y','Z'})do e[i]=(math.abs(r[1][axis])*s.X+math.abs(r[2][axis])*s.Y+math.abs(r[3][axis])*s.Z)/2 end
+    local c=cf.Position
+    return{c.X-e[1],c.Y-e[2],c.Z-e[3]},{c.X+e[1],c.Y+e[2],c.Z+e[3]}
+end
+local function treadmillDressR151(k)
+    local m,origin,theme,surface,look=k.m,k.origin,k.theme,k.surface,k.look
+    local biome,grade=look.BiomeOf(k.skin),look.GradeOf(k.level)
+    local B,G=look.Biomes[biome],look.Grades[grade]
+    assert(B and G,'no look for '..tostring(biome)..' / '..tostring(grade))
+    local dm=Instance.new('Model');dm.Name='TreadmillDress151'
+    dm:SetAttribute('DressVersion',151);dm:SetAttribute('DressLevel',k.level);dm:SetAttribute('DressGrade',grade);dm:SetAttribute('DressBiome',biome)
+    local made={dm} -- everything this pass makes (removed again if it fails half way)
+    local function own(v)v:SetAttribute('TreadmillDress151',true);made[#made+1]=v;return v end
+    local function P(name,size,frame,color,material,class)
+        local v=part(dm,name,size,origin*frame,color,material,class);v.CastShadow=false;return v
+    end
+    local function stud(name,x,y,z,d,h,color,material)
+        local s=P(name,V(h,d,d),CF(x,y,z)*CFrame.Angles(0,0,math.pi/2),color,material);s.Shape=Enum.PartType.Cylinder;return s
+    end
+    local function ball(name,size,frame,color,material)local b=P(name,size,frame,color,material);b.Shape=Enum.PartType.Ball;return b end
+    local function pulse(v,amp,speed,phase)
+        v:SetAttribute('TreadmillPulse',amp);v:SetAttribute('TreadmillPulseSpeed',speed);v:SetAttribute('TreadmillPulsePhase',phase or 0)
+        v:SetAttribute('TreadmillPulseBase',v.Transparency);return v
+    end
+    local ok,why=pcall(function()
+        -- 1. The belt: texture layers (images painted by the client), and the edge light flows.
+        for i,layer in ipairs(look.Layers(biome,grade))do
+            local t=own(Instance.new('Texture'));t.Name=layer.Name;t.Face=Enum.NormalId.Top;t.Texture=''
+            t.Color3=layer.Color;t.Transparency=layer.Transparency;t.StudsPerTileU=layer.U;t.StudsPerTileV=layer.V
+            t.OffsetStudsU=0;t.OffsetStudsV=0;t.ZIndex=i
+            t:SetAttribute('BeltImage',layer.Image);t:SetAttribute('TreadmillScroll',layer.Rate);t.Parent=surface
+        end
+        if G.EdgeBeams and B.Beam then
+            for side=-1,1,2 do
+                local a0=own(Instance.new('Attachment'));a0.Name='Edge flow back';a0.Position=V(side*4.42,.1,7.5);a0.Parent=surface
+                local a1=own(Instance.new('Attachment'));a1.Name='Edge flow front';a1.Position=V(side*4.42,.1,-7.5);a1.Parent=surface
+                local b=own(Instance.new('Beam'));b.Name='Edge light flow';b.Enabled=false;b.Attachment0=a0;b.Attachment1=a1
+                b.FaceCamera=true;b.Segments=1;b.Width0=.32;b.Width1=.32;b.Color=ColorSequence.new(B.Beam[1]);b.LightEmission=1;b.LightInfluence=0
+                b.Texture='rbxasset://textures/particles/'..B.Beam[2]..'_main.dds';b.TextureMode=Enum.TextureMode.Static;b.TextureLength=2.2
+                b.TextureSpeed=1.2
+                b.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.12,.25),NumberSequenceKeypoint.new(.88,.25),NumberSequenceKeypoint.new(1,1)})
+                b:SetAttribute('TreadmillFx','Ribbon');b:SetAttribute('TreadmillFxQuality',2);b.Parent=surface
+            end
+        end
+        -- 2. Neon trims: a rim line round the chassis (every level), a glow line along each soft bumper (mid / top); top levels pulse.
+        local rim=B.Neon
+        for side=-1,1,2 do
+            local r=P('Rim glow line',V(.08,.18,16.6),CF(side*6.24,-.38,0),rim,Enum.Material.Neon)
+            local e=P('Rim glow line',V(9.4,.18,.08),CF(0,-.38,side*9.88),rim,Enum.Material.Neon)
+            if G.Pulse then pulse(r,.25,1.2,side);pulse(e,.25,1.2,side+1)end
+            if G.BumperLines then P('Bumper glow line',V(.07,.12,13.6),CF(side*6.015,.22,0),rim,Enum.Material.Neon)end
+        end
+        -- 3. Studs along the top of both bumpers, skipping any spot where a rail, pillar or root already stands.
+        local blockers={}
+        for _,v in ipairs(m:GetDescendants())do
+            if v:IsA('BasePart')and not v:IsDescendantOf(dm)and not v.Name:find('Soft side bumper',1,true)and v.Transparency<1 then
+                local lo,hi=originBoundsR151(origin,v);if hi[2]>.55 and lo[2]<.9 and hi[1]>5 then blockers[#blockers+1]={lo,hi}end
+            end
+        end
+        local studColor=theme.Trim:Lerp(Color3.new(1,1,1),.18)
+        local n=math.floor(14.4/G.StudPitch+.5)
+        for side=-1,1,2 do
+            for j=0,n do
+                local z=-7.2+j*14.4/n;local x=side*5.55;local free=true
+                for _,b in ipairs(blockers)do
+                    if x+.3>b[1][1]and x-.3<b[2][1]and z+.3>b[1][3]and z-.3<b[2][3]then free=false;break end
+                end
+                if free then stud('Bumper stud',x,.72,z,.5,.22,studColor)end
+            end
+        end
+        -- 4. Corner accents at the entry end (the runner steps on at +Z), 3 - 4 studs tall. Lava / Storm already have pylons there: studded plinths.
+        local ink,trim=theme.Ink,theme.Trim
+        local function plinth(x,z,size,height)
+            local top=-.76+height
+            P('Accent plinth',V(size,height,size),CF(x,-.76+height/2,z),ink,Enum.Material.Slate)
+            P('Accent plinth glow band',V(size+.06,.08,size+.06),CF(x,top-.09,z),rim,Enum.Material.Neon)
+            local o=size/2-.3
+            for _,dx in ipairs({-o,o})do for _,dz in ipairs({-o,o})do stud('Plinth stud',x+dx,top+.05,z+dz,.34,.14,ink:Lerp(Color3.new(1,1,1),.12),Enum.Material.Slate)end end
+            return top
+        end
+        if B.Accent=='Plinth'then
+            for side=-1,1,2 do plinth(side*6.1,8.64,1.7,.55)end
+        else
+            for side=-1,1,2 do
+                local x,z=side*6.95,9.05
+                local top=plinth(x,z,1.3,.6)
+                local lamp
+                if B.Accent=='Lantern'then
+                    local post=P('Lantern post',V(2.4,.42,.42),CF(x,top+1.2,z)*CFrame.Angles(0,0,math.pi/2),theme.Body,Enum.Material.Wood);post.Shape=Enum.PartType.Cylinder
+                    P('Lantern post arm',V(.16,.16,.9),CF(x,top+2.3,z-.32),ink,Enum.Material.Wood)
+                    P('Lantern cap',V(.66,.14,.66),CF(x,top+2.47,z),ink,Enum.Material.Wood)
+                    lamp=P('Lantern glow',V(.46,.56,.46),CF(x,top+2.12,z),B.Lamp,Enum.Material.Neon)
+                    P('Lantern base',V(.6,.12,.6),CF(x,top+1.78,z),ink,Enum.Material.Wood)
+                elseif B.Accent=='Torch'then
+                    local post=P('Bamboo torch',V(2.5,.36,.36),CF(x,top+1.25,z)*CFrame.Angles(0,0,math.pi/2),theme.Body,Enum.Material.Wood);post.Shape=Enum.PartType.Cylinder
+                    for _,y in ipairs({.7,1.6})do stud('Bamboo band',x,top+y,z,.44,.12,trim,Enum.Material.Wood)end
+                    stud('Torch bowl',x,top+2.62,z,.78,.28,ink,Enum.Material.Wood)
+                    lamp=ball('Torch flame',V(.5,.78,.5),CF(x,top+3.05,z),B.Lamp,Enum.Material.Neon)
+                elseif B.Accent=='Brazier'then
+                    P('Brazier column',V(.78,1.7,.78),CF(x,top+.85,z),theme.Body,theme.Material)
+                    P('Brazier collar',V(1.0,.2,1.0),CF(x,top+1.8,z),trim,Enum.Material.Metal)
+                    stud('Brazier bowl',x,top+2.07,z,1.12,.34,RGB(232,186,92),Enum.Material.Metal)
+                    lamp=ball('Brazier flame',V(.62,.82,.62),CF(x,top+2.55,z),B.Lamp,Enum.Material.Neon)
+                elseif B.Accent=='Frost'then
+                    P('Frost lamp column',V(.56,1.9,.56),CF(x,top+.95,z),theme.Body,Enum.Material.Ice).Transparency=.2
+                    P('Frost lamp snow cap',V(.84,.18,.84),CF(x,top+1.99,z),RGB(245,252,255),Enum.Material.Snow)
+                    lamp=ball('Frost crystal',V(.62,.9,.62),CF(x,top+2.55,z),B.Lamp,Enum.Material.Neon)
+                elseif B.Accent=='Prism'then
+                    P('Prism lamp column',V(.56,1.9,.56),CF(x,top+.95,z),theme.Body,Enum.Material.Glass).Transparency=.15
+                    P('Prism lamp collar',V(.84,.16,.84),CF(x,top+1.98,z),trim,Enum.Material.Metal)
+                    lamp=P('Prism shard',V(.46,1.1,.46),CF(x,top+2.62,z)*CFrame.Angles(0,math.pi/4,0),B.Lamp,Enum.Material.Neon)
+                    P('Prism shard small',V(.28,.62,.28),CF(x-side*.32,top+2.3,z+.1)*CFrame.Angles(0,math.pi/4,side*.45),RGB(255,180,245),Enum.Material.Neon)
+                end
+                if lamp then
+                    if G.Pulse then pulse(lamp,.2,1.6,side)end
+                    local a=own(Instance.new('Attachment'));a.Name='Accent mote';a.Parent=lamp
+                    local torch=B.Accent=='Torch'
+                    local e=own(Instance.new('ParticleEmitter'));e.Name='Accent motes';e.Enabled=false
+                    e.Texture='rbxasset://textures/particles/'..B.Mote[2]..'_main.dds';e.Color=ColorSequence.new(B.Mote[1])
+                    e.Rate=torch and 3 or 1.5;e.Lifetime=NumberRange.new(1.2,2.2);e.Speed=NumberRange.new(.3,.9);e.SpreadAngle=Vector2.new(60,60)
+                    e.Acceleration=V(0,B.Accent=='Frost'and-.2 or .4,0);e.Drag=.8;e.LightEmission=.8;e.LightInfluence=.1
+                    e.Rotation=NumberRange.new(0,360);e.RotSpeed=NumberRange.new(-30,30)
+                    local s=torch and .14 or .18
+                    e.Size=NumberSequence.new({NumberSequenceKeypoint.new(0,s*.4),NumberSequenceKeypoint.new(.35,s),NumberSequenceKeypoint.new(1,s*.1)})
+                    e.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,1),NumberSequenceKeypoint.new(.15,.15),NumberSequenceKeypoint.new(1,1)})
+                    e:SetAttribute('TreadmillFx','Ambient');e:SetAttribute('TreadmillFxQuality',2);e:SetAttribute('TreadmillFxRate',e.Rate);e:SetAttribute('TreadmillFxBurst',0)
+                    e.Parent=a
+                end
+            end
+        end
+        -- 5. Real light, within the grade's cap for the whole machine: an entry glow between the accents, a deck underglow (mid / top).
+        local existing,hasUnder=0,false
+        for _,v in ipairs(m:GetDescendants())do
+            if v:IsA('PointLight')or v:IsA('SpotLight')or v:IsA('SurfaceLight')then existing+=1;if v.Name:find('nderglow',1,true)then hasUnder=true end end
+        end
+        local room=G.Cap-existing
+        local function light(name,pos,color,brightness,range,quality)
+            if room<=0 then return end
+            local a=own(Instance.new('Attachment'));a.Name=name;a.Position=pos;a.Parent=surface
+            local l=own(Instance.new('PointLight'));l.Name=name;l.Enabled=false;l.Shadows=false;l.Color=color;l.Brightness=brightness;l.Range=range
+            l:SetAttribute('TreadmillFx','Light');l:SetAttribute('TreadmillFxQuality',quality);l:SetAttribute('TreadmillFxBrightness',brightness)
+            l:SetAttribute('TreadmillFlicker',false);l.Parent=a;room-=1
+        end
+        if B.Accent~='Plinth'then light('Entry glow',V(0,1.6,9.2),B.Lamp,1,14,2)end
+        if G.Underglow and not hasUnder then light('Deck underglow',V(0,-.75,0),B.Neon,1.1,15,3)end
+        -- 6. "+N/step" just above the existing front (no new structure): a BillboardGui on the tier plaque, hidden for its owner while training.
+        local plaque=m:FindFirstChild('Tier plaque')
+        if plaque and k.label then
+            local top=-math.huge
+            for _,v in ipairs(m:GetDescendants())do
+                if v:IsA('BasePart')and not v:IsDescendantOf(dm)and v.Transparency<.9 and not v:GetAttribute('TreadmillSpin')then
+                    local lo,hi=originBoundsR151(origin,v);if hi[3]<-4 or v.Name:find('Storm cloud',1,true)then top=math.max(top,hi[2])end
+                end
+            end
+            local a=own(Instance.new('Attachment'));a.Name='Step label anchor'
+            a.Position=plaque.CFrame:PointToObjectSpace((origin*CF(0,top+look.LabelLift,origin:PointToObjectSpace(plaque.Position).Z)).Position);a.Parent=plaque
+            local g=own(Instance.new('BillboardGui'));g.Name='StepLabel';g.Size=UDim2.fromScale(8,2);g.LightInfluence=0;g.MaxDistance=look.LabelMaxDistance
+            g.AlwaysOnTop=false;g:SetAttribute('HideWhileOwnerTrains',true);g.Parent=a
+            local t=Instance.new('TextLabel');t.Name='Gain';t.BackgroundTransparency=1;t.Size=UDim2.fromScale(1,1);t.TextScaled=true
+            t.Font=Enum.Font.FredokaOne;t.Text=k.label;t.TextColor3=theme.Glow;t.TextStrokeColor3=theme.Ink;t.TextStrokeTransparency=0;t.Parent=g
+            local s=Instance.new('UIStroke');s.Color=theme.Ink:Lerp(Color3.new(0,0,0),.35);s.Thickness=3;s.Parent=t
+            dm:SetAttribute('StepLabel',k.label)
+        end
+        -- 7. Retire the per-part flow pieces of the belt (the textures replace them; the chevrons stay).
+        local retired=0
+        for _,v in ipairs(m:GetChildren())do
+            if v:IsA('BasePart')and v:GetAttribute('TrackMotion')=='Flow'then v:Destroy();retired+=1 end
+        end
+        dm:SetAttribute('RetiredFlowParts',retired)
+        dm.Parent=m
+    end)
+    if not ok then for _,v in ipairs(made)do pcall(function()v:Destroy()end)end;error(why,0)end
+    return dm
+end
+-- R151: level (optional) = the machine level for the grade and the "+N/step" label; tier = the skin (biome). They are the same unless a skin is chosen.
+function Art.BuildTreadmillV131(base,tier,level)
     tier=math.clamp(math.floor(tonumber(tier)or 1),1,7)
+    level=math.clamp(math.floor(tonumber(level)or tier),1,7)
     local theme=treadmillThemes[tier]
     local pad=assert(base:FindFirstChild('Pad'),'Treadmill base needs Pad')
     local belt=base:FindFirstChild('Treadmill')
@@ -1171,7 +1377,9 @@ function Art.BuildTreadmillV131(base,tier)
     local beltSize=V(9.4,.4,13.2*lengthScale)
     local trackColors={RGB(37,50,66),RGB(34,67,57),RGB(218,166,91),RGB(146,228,250),RGB(244,75,28),RGB(127,133,215),RGB(29,48,100)}
     local trackMaterials={Enum.Material.SmoothPlastic,Enum.Material.SmoothPlastic,Enum.Material.Sand,Enum.Material.Ice,Enum.Material.Neon,Enum.Material.Glass,Enum.Material.Metal}
-    local underlay=p('Track underlay',V(9.2,.12,12.8),CF(0,.065,0),tier==4 and RGB(43,134,193)or tier==6 and RGB(91,68,160)or theme.Ink)
+    -- R149 (z-fighting): the underlay ends where the surface starts (its top was .005 inside the surface, so the two shared a
+    -- flickering strip down both long sides).
+    local underlay=p('Track underlay',V(9.2,.12,12.8),CF(0,.06,0),tier==4 and RGB(43,134,193)or tier==6 and RGB(91,68,160)or theme.Ink)
     local surface=p('Track surface',V(9.2,.12,12.8),CF(0,.18,0),trackColors[tier],trackMaterials[tier])
     surface.Transparency=(tier==4 and .42)or(tier==6 and .35)or 0
     surface.Reflectance=(tier==4 or tier==6)and .12 or 0
@@ -1250,7 +1458,8 @@ function Art.BuildTreadmillV131(base,tier)
                 local frame=CF(side*(1.35+(i%3)*.98),.263,0)*CFrame.Angles(0,side*(.2+(i%2)*.35),0)
                 local current=flow('Molten current',V(.35+(i%2)*.34,.035,1.55),frame,i%2==0 and RGB(255,197,55)or RGB(255,125,24),Enum.Material.Neon,phase,1.12,.10,true)
                 current.Shape=Enum.PartType.Ball
-                local crust=flow('Floating basalt flake',V(.65,.045,.8),CF(side*(2+(i%3)*.8),.28,0)*CFrame.Angles(0,i*.7,0),RGB(66,43,55),Enum.Material.Basalt,(phase+.07)%1,.9,.05)
+                -- R149: .25 (was .28: its top was .005 under the passing chevrons' top and flickered through them)
+                local crust=flow('Floating basalt flake',V(.65,.045,.8),CF(side*(2+(i%3)*.8),.25,0)*CFrame.Angles(0,i*.7,0),RGB(66,43,55),Enum.Material.Basalt,(phase+.07)%1,.9,.05)
             end
         end
     elseif tier==6 then
@@ -1270,7 +1479,8 @@ function Art.BuildTreadmillV131(base,tier)
             for i=1,3 do
                 local phase=(i-.5)/3
                 local x=side*(2.05+(i%2)*.9)
-                local points={V(x,.28,.72),V(x-side*.40,.28,.17),V(x+side*.24,.28,.17),V(x-side*.14,.28,-.75)}
+                -- R149: .262 (was .28: .006 under the passing chevrons' top)
+                local points={V(x,.262,.72),V(x-side*.40,.262,.17),V(x+side*.24,.262,.17),V(x-side*.14,.262,-.75)}
                 for j=1,3 do
                     local bolt=flatLine('Travelling lightning',points[j],points[j+1],.16,theme.Glow,Enum.Material.Neon)
                     motion(bolt,'Flow',phase,origin:ToObjectSpace(bolt.CFrame),1.8,.06,true)
@@ -1360,7 +1570,8 @@ function Art.BuildTreadmillV131(base,tier)
             local x=side*6.15
             for j=1,3 do
                 local height=2.4+j*.6;local z=5-j*3.05
-                local fin=p('Tall glacier fin',V(1.45,height,3.15),CF(x,height/2+.4,z),j%2==0 and theme.Trim or theme.Body,Enum.Material.Ice,'WedgePart')
+                -- R149: 3.0 long (was 3.15: x1.2 that overlapped the next fin by .12, sharing a flickering patch of their undersides)
+                local fin=p('Tall glacier fin',V(1.45,height,3.0),CF(x,height/2+.4,z),j%2==0 and theme.Trim or theme.Body,Enum.Material.Ice,'WedgePart')
                 fin.Transparency=.38;fin.Reflectance=.12
                 rod('Glacier fin glint',V(x+side*.73,.57,z-1.5),V(x+side*.73,height+.38,z+1.5),.13,theme.Glow,Enum.Material.Neon)
             end
@@ -1419,13 +1630,18 @@ function Art.BuildTreadmillV131(base,tier)
             p('Stormline angled cap',V(2.05,.6,1.85),CF(x,5.7,-6.5),theme.Trim,Enum.Material.Metal,'WedgePart')
             for j=1,3 do p('Cooling vent',V(.65,.16,.10),CF(x+side*.2,1.45+j*.55,-5.49),theme.Ink,Enum.Material.Metal)end
         end
-        p('Stormline console bridge',V(10.4,2.7,1.2),CF(0,4.15,-6.3),theme.Body,Enum.Material.Metal)
+        p('Stormline console bridge',V(10.4,2.7,1.25),CF(0,4.15,-6.3),theme.Body,Enum.Material.Metal) -- R149: 1.25 deep (its back was .015 off the power housings')
         local bolt={V(1.15,7.45,-6.3),V(-.7,6.2,-6.3),V(.65,6.2,-6.3),V(-1.1,5.3,-6.3)}
         railPath('Giant front lightning crest',bolt,.55,theme.Trim,Enum.Material.Neon)
     end
     treadmillFlairR117({m=m,origin=origin,tier=tier,theme=theme,surface=surface,face=face,p=p,rawp=rawp,sphere=sphere,
         rod=rod,railPath=railPath,frontDisc=frontDisc,longer=longer})
     m:SetAttribute('TreadmillFxVersion',117);m:SetAttribute('TreadmillTierName',theme.Name)
+    local look=treadmillLookR151()
+    if look then
+        local ok,why=pcall(treadmillDressR151,{m=m,origin=origin,skin=tier,level=level,theme=theme,surface=surface,look=look,label=stepLabelR151(look,level)})
+        if not ok then warn('[R151] Treadmill dressing skipped (the machine is built as before): '..tostring(why))end
+    end
     -- R117: small ornaments never cast shadows (cheaper, and they only speckle the deck).
     for _,v in ipairs(m:GetDescendants())do
         if v:IsA('BasePart')and math.max(v.Size.X,v.Size.Y,v.Size.Z)<2 then v.CastShadow=false end

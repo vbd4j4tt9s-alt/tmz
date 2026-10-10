@@ -277,7 +277,7 @@ end
 function EconomyService:_teleport(player, stationName)
 	if player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive") then return end
 	if self.Chase:IsPlayerBusy(player) then
-		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5)
+		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5, "Denied")
 		return
 	end
 	local now = os.clock()
@@ -533,7 +533,7 @@ function EconomyService:_sellHarvest(player, harvestId)
 	if not success then return {Success = false, Message = result} end
 	self.PlayerData:QueueGardenSave(player)
  self.Chests:SyncTools(player)
- local state=self:_buildState(player, string.format("SOLD FOR $%d — HOVER OVER CASH TO COLLECT", result))
+ local state=self:_buildState(player, string.format("SOLD FOR $%d CASH", result))
  state.SaleAmount=result -- Proceeds stay in PendingSales until each cash icon is claimed.
  return state
 end

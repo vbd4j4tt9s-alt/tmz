@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Input=game:GetService('UserInputService');local Run=game:GetService('RunService');local Http=game:GetService('HttpService');local CAS=game:GetService('ContextActionService')
 local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui');local remote=RS:WaitForChild('ChestChaseRemotes'):WaitForChild('GardenInteract');local Catalog=require(RS:WaitForChild('PlantCatalog'))
 local Picker=require(RS:WaitForChild('PlantShovelPicker'));local picker,releasePicker=Picker.Acquire(workspace:WaitForChild('ChestChaseMap'))
@@ -11,6 +12,13 @@ local function button(name,x,color)
  local b=Instance.new('TextButton');b.Text=name;b.Position=UDim2.new(x,12,1,-58);b.Size=UDim2.new(.5,-24,0,42);b.BackgroundColor3=color;b.TextSize=16;b.Font=Enum.Font.FredokaOne;b.Parent=box;return b
 end
 local remove=button('Remove',0,Color3.fromRGB(248,135,109));local cancel=button('Keep plant',.5,Color3.fromRGB(162,219,165))
+-- R150: the dialog opens / closes through SeedMenu = 'Shovel' (ButtonFeedback plays MenuClick / MenuClose), so its two buttons are silent on their
+-- own; a removed plant is heard as the planting Dig layer at the plant, a refused removal as Denied.
+remove:SetAttribute('ButtonSound',false);cancel:SetAttribute('ButtonSound',false)
+local Sfx=require(RS:WaitForChild('LocalSfx'));local digCue
+for _,def in ipairs(require(RS:WaitForChild('PlantingEffects')).Sounds)do if def.Key=='Dig'and def.Id~=''then digCue=def end end
+if digCue then Sfx.Preload({digCue.Id})end
+local Audio=require(RS:WaitForChild('InteractionAudio'))
 local feedback=Instance.new('TextLabel');feedback.Name='ShovelFeedback';feedback.BackgroundTransparency=1;feedback.Size=UDim2.new(.9,0,0,46);feedback.AnchorPoint=Vector2.new(.5,1);feedback.Position=UDim2.new(.5,0,1,-122);feedback.TextColor3=Color3.fromRGB(255,236,218);feedback.TextStrokeTransparency=.3;feedback.Font=Enum.Font.FredokaOne;feedback.TextSize=16;feedback.TextWrapped=true;feedback.Text='';feedback.Parent=gui
 local target,pending;local busy=false;local elapsed=0;local feedbackUntil=0;local conns={}
 local function connect(signal,fn)table.insert(conns,signal:Connect(fn))end
@@ -54,16 +62,21 @@ local function aim(position,center)
   if item:GetAttribute('GardenPlantV141')then return valid(item)and item or nil end;item=item.Parent
  end
 end
+local function revealPress()local ok,taken=pcall(function()return require(game:GetService('ReplicatedStorage').RarePullRules).ClaimPress()end);return ok and taken==true end -- R153: a press that skips / closes a pull reveal's card is not the tool's
 local function prompt(position,center)
- if busy then return end;local model=aim(position,center);if not model then return end
+ if busy or not equipped()or revealPress()then return end;local model=aim(position,center);if not model then return end
  pending=model;box.Visible=true;pg:SetAttribute('SeedMenu','Shovel');selectionView:Clear()
- local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and its unpicked fruit. The seed is not returned.'
+ local def=Catalog[model:GetAttribute('SeedId')];title.Text='Remove '..(def.Name or def.HarvestName)..'?\nThis removes the plant and any fruit still on it. You won\'t get the seed back.'
 end
 connect(remove.Activated,function()
  local model=pending;if busy or not equipped()or not valid(model)then close();return end
  local payload={RequestId=Http:GenerateGUID(false),Character=player.Character,CropId=model:GetAttribute('CropId')};busy=true;close()
+ local spot=model:GetPivot().Position
  local okay,result=pcall(function()return remote:InvokeServer('Remove',payload)end);busy=false
- feedback.Text=okay and type(result)=='table'and result.Message or'Could not remove the plant. Try again.';feedbackUntil=os.clock()+3
+ if okay and type(result)=='table'and result.Success==true then
+  if digCue then Sfx.Play(digCue.Id,spot,digCue.Volume)end
+ else Audio.Play('Denied')end
+ feedback.Text=okay and type(result)=='table'and result.Message or'Couldn\'t remove the plant. Try again!';feedbackUntil=os.clock()+3
 end)
 connect(cancel.Activated,close)
 connect(Input.InputBegan,function(input,processed)

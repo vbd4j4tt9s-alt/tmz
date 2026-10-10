@@ -48,7 +48,9 @@ local line=new('Part');line.Size=R.Vector3.new(180,.24,1);line.CFrame=R.CFrame.n
 local wall=Bar.Build(line,-100,new('Folder'))
 local a,b,c,d,e,f=ext(wall);local ca,cb,cc,cd,ce=ext(cur[1])
 print(('NEW wall: X %.0f..%.0f, Y %.2f..%.2f, Z %.0f..%.0f; cover front Z %.0f'):format(a,b,c,d,e,f,ce))
-check(a<=ca and b>=cb and d>=cd,'wall face covers the cover cross-section above ground')
+-- R153: the wall is the rook gate's opening (between the shafts, under the keys), no longer the cover's whole cross-section: the rest of the cover's front face
+-- (x +-94, up to Y 55) lies behind the gate (gatehouse above 44, tower shafts, haunches) or is the dark strip over the panel. It still stands in front of it.
+check(a>=-94 and b<=94 and c<=4.12 and d<=44,'wall inside the cover cross-section, under the gatehouse edge')
 check(e<ce,'wall front face in front of the cover front (no z-fight)')
 check(e<=-99.275 and f>=-100,'wall still straddles the track start line')
 print(('blackout checks %d, fails %d'):format(checks,fails))

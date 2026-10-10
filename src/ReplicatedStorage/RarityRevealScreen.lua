@@ -36,10 +36,13 @@ function R.Create(gui)
  local pulse=circle(stage,'Shockwave',.01,C(234,231,255));pulse.Root.Visible=false;pulse.Root.ZIndex=24
  local flash=frame(gui,'Reveal white',UDim2.fromScale(1,1),UDim2.fromScale(.5,.5),C(255,255,255),40);flash.Visible=false
  local api={Root=root,Flash=flash,Rings=rings,Crown=crown,Star=star,Secret=secret,Shards=shards,Halos=halos}
- function api:Hide()root.Visible=false;flash.Visible=false end
+ -- (R152 perf: the screen and its flash are hidden every frame while no big reveal runs: only this writes them, so a change only)
+ local shown={}
+ local function vis(o,v)if shown[o]~=v then shown[o]=v;o.Visible=v end;return v end
+ function api:Hide()vis(root,false);vis(flash,false)end
  function api:Step(rank,t,reduced)
-  local s=Sequence.Sample(rank,t,reduced);root.Visible=rank>=6 and not s.Done
-  if not root.Visible then flash.Visible=false;return s end
+  local s=Sequence.Sample(rank,t,reduced)
+  if not vis(root,rank>=6 and not s.Done)then vis(flash,false);return s end
   root.BackgroundColor3=C(0,0,0);root.BackgroundTransparency=1-s.Cover
   local color=rank==8 and C(255,211,98)or rank==7 and C(162,175,255)or C(191,236,255)
   star.Visible=rank==7 and s.CoreVisible;crown.Visible=rank==8 and s.CoreVisible;secret.Visible=rank==6 and s.CoreVisible
@@ -78,7 +81,7 @@ function R.Create(gui)
    end
   end
   pulse.Root.Visible=s.Burst;local diameter=.12+s.BurstProgress*(reduced and .3 or 1.55);pulse.Root.Size=UDim2.fromScale(diameter,diameter);pulse.Stroke.Color=color;pulse.Stroke.Transparency=.1+s.BurstProgress*.9
-  flash.Visible=s.Flash>0;flash.BackgroundTransparency=1-s.Flash
+  vis(flash,s.Flash>0);flash.BackgroundTransparency=1-s.Flash
   return s
  end
  return api

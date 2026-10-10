@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#1b2033}
+#sheet{display:inline-block;padding:16px 18px;background:#fff}
+h1{font-size:22px;margin:0 0 4px} .sub{font-size:13px;color:#555;margin-bottom:10px;max-width:1900px}
+.grid{display:grid;gap:8px} .cell{position:relative;border-radius:8px;overflow:hidden}
+.cell img{display:block} .lab{position:absolute;left:8px;top:6px;font-size:15px;font-weight:bold;background:rgba(255,255,255,.85);padding:1px 7px;border-radius:4px}
+.note{position:absolute;left:8px;bottom:6px;font-size:12px;color:#223;background:rgba(255,255,255,.85);padding:1px 6px;border-radius:4px}
+.rowlab{writing-mode:vertical-rl;transform:rotate(180deg);font-weight:bold;font-size:15px;text-align:center;align-self:center}
+</style></head><body><div id="sheet"></div>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {ConvexGeometry} from 'three/addons/geometries/ConvexGeometry.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+const q=new URLSearchParams(location.search);
+const job=await (await fetch(q.get('job'))).json();
+const data=await (await fetch('/scene.json')).json();
+const sheet=document.getElementById('sheet');
+sheet.innerHTML=`<h1>${job.title}</h1><div class="sub">${job.subtitle}</div>`;
+const grid=document.createElement('div');grid.className='grid';
+grid.style.gridTemplateColumns=`28px repeat(${job.cols},${job.cellW}px)`;sheet.appendChild(grid);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(1);renderer.setSize(job.cellW,job.cellH);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;
+const pm=new THREE.PMREMGenerator(renderer);const envTex=pm.fromScene(new RoomEnvironment(),0.04).texture;
+const GEO={Block:new THREE.BoxGeometry(1,1,1),Ball:new THREE.SphereGeometry(.5,32,20),Cylinder:new THREE.CylinderGeometry(.5,.5,1,32).rotateZ(Math.PI/2),Round:new RoundedBoxGeometry(1,1,1,3,.18)};
+function lin(c){return new THREE.Color().setRGB(c[0],c[1],c[2],THREE.SRGBColorSpace);}
+function matFor(it){
+ const c=lin(it.c);
+ if(it.mat==='Neon')return new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:1.4,roughness:.4,transparent:it.t>0,opacity:1-it.t});
+ if(it.mat==='Glass')return new THREE.MeshPhysicalMaterial({color:c,roughness:.06,metalness:.1,clearcoat:1,clearcoatRoughness:.05,transparent:true,opacity:Math.max(.7,1-it.t-.1),envMap:envTex,envMapIntensity:1.6,emissive:c,emissiveIntensity:.18});
+ if(it.mat==='Metal')return new THREE.MeshStandardMaterial({color:c,roughness:.30-it.refl*.3,metalness:.92,envMap:envTex,envMapIntensity:1.0});
+ if(it.mat==='Ice')return new THREE.MeshStandardMaterial({color:c,roughness:.08,metalness:.1,transparent:true,opacity:1-it.t,emissive:c,emissiveIntensity:.15});
+ return new THREE.MeshStandardMaterial({color:c,roughness:.6,metalness:0});}
+function place(mesh,m,s){const M=new THREE.Matrix4().set(m[3]*s[0],m[4]*s[1],m[5]*s[2],m[0], m[6]*s[0],m[7]*s[1],m[8]*s[2],m[1], m[9]*s[0],m[10]*s[1],m[11]*s[2],m[2], 0,0,0,1);
+ mesh.matrixAutoUpdate=false;mesh.matrix.copy(M);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;}
+// The tail mesh has Bounds only (x -0.65..3.86, y -0.07..2.32, z 11.5..22): an approximate tapering tube leaning toward +X.
+function tail(frame,fur){
+ const pts=[[0,1.45,11.5],[.45,1.45,13.2],[1.3,1.35,16],[2.4,1.2,19],[3.25,1.05,21.9]].map(p=>new THREE.Vector3(...p));
+ const curve=new THREE.CatmullRomCurve3(pts);const N=24,SEG=14,pos=[],idx=[];const fr=curve.computeFrenetFrames(N,false);
+ for(let i=0;i<=N;i++){const t=i/N,p=curve.getPoint(t),r=.78-.5*t;
+  for(let j=0;j<SEG;j++){const a=j/SEG*Math.PI*2,c=Math.cos(a),s=Math.sin(a);
+   const n=fr.normals[i],b=fr.binormals[i];pos.push(p.x+(n.x*c+b.x*s)*r*1.15,p.y+(n.y*c+b.y*s)*r*1.15,p.z+(n.z*c+b.z*s)*r*1.15);}}
+ for(let i=0;i<N;i++)for(let j=0;j<SEG;j++){const a=i*SEG+j,b=i*SEG+(j+1)%SEG,c=(i+1)*SEG+j,d=(i+1)*SEG+(j+1)%SEG;idx.push(a,b,c,b,d,c);}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeVertexNormals();
+ const m=new THREE.Mesh(g,fur);const m4=new THREE.Matrix4().set(frame[3],frame[4],frame[5],frame[0],frame[6],frame[7],frame[8],frame[1],frame[9],frame[10],frame[11],frame[2],0,0,0,1);
+ m.matrixAutoUpdate=false;m.matrix.copy(m4);m.castShadow=m.receiveShadow=true;return m;}
+function build(scene,which){const g=new THREE.Group();
+ const fur=new THREE.MeshStandardMaterial({color:lin([.93,.95,.98]),roughness:.85,metalness:0});
+ for(const [grp,pts] of Object.entries(scene.hull)){
+  const geo=new ConvexGeometry(pts.map(p=>new THREE.Vector3(...p)));
+  const m=new THREE.Mesh(geo,fur);m.castShadow=m.receiveShadow=true;g.add(m);}
+ g.add(tail(scene.tail,fur));
+ for(const b of scene.boxes){const m=new THREE.Mesh(GEO.Round,matFor({c:b.c,mat:b.glow?'Neon':'Plastic',t:0}));g.add(place(m,b.m,b.s));}
+ for(const it of scene.items){if(it.gear&&which!=='after')continue;
+  const m=new THREE.Mesh(GEO[it.sh],matFor(it));place(m,it.m,it.s);if(it.mat==='Neon'||it.mat==='Glass')m.castShadow=false;g.add(m);}
+ return g;}
+const rows={};for(const c of job.cells){(rows[c.row]??=[]).push(c);}
+for(const [row,cells] of Object.entries(rows)){
+ const rl=document.createElement('div');rl.className='rowlab';rl.textContent=row;rl.style.color=row.startsWith('AFTER')?'#0b6b2e':'#8a1d1d';grid.appendChild(rl);
+ for(const c of cells){
+  const sc=data.scenes.find(s=>s.pose===c.pose);
+  const scene=new THREE.Scene();scene.background=new THREE.Color(c.bg||'#dfe9f4');
+  scene.add(new THREE.HemisphereLight(0xf4f7ff,0x6c6458,1.0));
+  const key=new THREE.DirectionalLight(0xfff4e6,2.4);key.position.set(c.light?c.light[0]:-30,c.light?c.light[1]:60,c.light?c.light[2]:-40);key.castShadow=true;
+  key.shadow.mapSize.set(2048,2048);const sc2=key.shadow.camera;sc2.left=-40;sc2.right=40;sc2.top=40;sc2.bottom=-40;sc2.near=1;sc2.far=200;key.shadow.bias=-.0004;key.shadow.radius=3;
+  scene.add(key);scene.add(key.target);
+  const rim=new THREE.DirectionalLight(0xcfe0ff,.9);rim.position.set(40,25,50);scene.add(rim);
+  const ground=new THREE.Mesh(new THREE.CircleGeometry(c.R*1.8,64).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:new THREE.Color(c.ground||'#e6eef7'),roughness:1}));
+  ground.position.y=-4.02;ground.receiveShadow=true;scene.add(ground);
+  scene.add(build(sc,c.which));
+  const cam=new THREE.PerspectiveCamera(c.fov||30,job.cellW/job.cellH,.5,500);
+  const d=new THREE.Vector3(...c.dir).normalize();const ctr=new THREE.Vector3(...c.center);
+  const dist=c.R/Math.sin(THREE.MathUtils.degToRad((c.fov||30)/2))*(c.zoom||1);
+  cam.position.copy(ctr).addScaledVector(d,dist);cam.lookAt(ctr);
+  renderer.render(scene,cam);
+  const cell=document.createElement('div');cell.className='cell';const img=document.createElement('img');img.src=renderer.domElement.toDataURL();cell.appendChild(img);
+  cell.insertAdjacentHTML('beforeend',`<div class="lab" style="color:${c.which==='after'?'#0b6b2e':'#8a1d1d'}">${c.label}</div><div class="note">${c.note||''}</div>`);
+  grid.appendChild(cell);
+  scene.traverse(o=>{if(o.material&&o.material.dispose)o.material.dispose();if(o.geometry&&o.geometry.dispose&&!Object.values(GEO).includes(o.geometry))o.geometry.dispose();});
+ }}
+await new Promise(r=>setTimeout(r,50));window.__done=true;
+</script></body></html>

@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R83: distance-limited local animation and a shared small effect budget.
 -- R122: Void Pack motion/effects via VoidPackFx (budgeted); arrival sound + lights-out via VeiledArrivalFx.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService');local Tags=game:GetService('CollectionService')
@@ -7,11 +8,17 @@ local Feed=require(RS.NoticeFeed83);local Copy=require(RS.NoticeCopy83)
 local PackFx=require(RS:WaitForChild('VoidPackFx'));local Arrival=require(RS:WaitForChild('VeiledArrivalFx'))
 -- R123: client-only spectral lunge (Art.ClientFrames) and a small impact accent; the server pose is unchanged.
 local KFx=require(RS:WaitForChild('KeeperFx'));local Combat=require(RS:WaitForChild('KeeperCombat'))
+-- R153 (owner: "fix all jittery type effects"): The Darkened is posed on a smoothed root (KeeperMotion, as BeastAnimation does for the other keepers:
+-- the server's anchored root arrives in packet steps, so its body stepped while it chased; the keeper signs are pinned at the spawn point, so no anchor follows it);
+-- the Void packs that wear effects (the nearest 1 / 2 / 4 by tier, within 160 studs) are posed and stepped every frame (were 30 Hz, 15 low).
+local Motion=require(RS:WaitForChild('KeeperMotion'));local Dash=require(RS:WaitForChild('KeeperRecoveryDash'))
 local keepers,bags={},{};local connections={};local alive=true
 local function watch(signal,fn)connections[#connections+1]=signal:Connect(fn)end
 local function keeper(model)if model:IsA('Model')then keepers[model]={At=-100}end end
 for _,m in ipairs(Tags:GetTagged('VeiledKeeper81'))do keeper(m)end
-watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)keepers[m]=nil end)
+local Fx152 -- (R152: KeeperFx152, required with the first new-model Darkened)
+watch(Tags:GetInstanceAddedSignal('VeiledKeeper81'),keeper);watch(Tags:GetInstanceRemovedSignal('VeiledKeeper81'),function(m)local r=keepers[m];if r and r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil end)
+-- R149 (owner: the Verity pack is just pure yellow with her face, "that's the only design needed"): only the Void pack has local motion and fx; the Verity pack (R147 / R148 gave it gold sparkles and a light here) has none.
 local function track(bag)if bag:GetAttribute('BagVariant')=='EclipseReliquary'and not bags[bag]then bags[bag]={}end end
 local function remove(bag)local r=bags[bag];if r and r.Capture then PackFx.Clear(r.Capture)end;bags[bag]=nil end
 for _,bag in ipairs(Tags:GetTagged('BiomeSeedPackVisual'))do track(bag)end
@@ -32,22 +39,57 @@ local elapsed=0;local parts,frames={},{}
 watch(Run.RenderStepped,function(dt)
  elapsed+=dt;local tier=Fx.Get();local mode=Players.LocalPlayer:GetAttribute('StudioPlantEffects');if mode=='low'then tier=1 end;local interval=tier==1 and 1/15 or 1/30;local effectTick=elapsed>=interval;if effectTick then elapsed=0 end
  local camera=workspace.CurrentCamera;if not camera then return end;local now=workspace:GetServerTimeNow();local origin=camera.CFrame.Position
+ table.clear(parts);table.clear(frames)
  for m,r in pairs(keepers)do
-  local root=m.PrimaryPart;if not m.Parent or not root then keepers[m]=nil;continue end
+  local root=m.PrimaryPart;if not m.Parent or not root then if r.Fx152 then Fx152.Destroy(r.Fx152)end;keepers[m]=nil;continue end
   local distance=(root.Position-origin).Magnitude;local period=distance<350 and 0 or distance<900 and .15 or 1
+  -- R152: the baked Darkened's two faces (its glowing line): Asleep while it sleeps (GUARDING / SLEEPING), Chase otherwise.
+  local state=m:GetAttribute('GuardianBehavior')or'GUARDING';local asleep=state=='GUARDING'or state=='SLEEPING'
+  -- R153: the smoothed root (KeeperMotion: predicts between packets, absorbs each packet's error), every frame; the speed is the server's
+  -- KeeperTravelSpeed or what this client measured over 0.1 s.
+  local raw=root.CFrame;local visual=Dash.VisualFrame(m,now,raw)
+  if not r.Motion then r.Motion=Motion.new(raw,asleep and 0 or 1);r.Last=raw.Position;r.SampleTime,r.SampleTravel,r.Observed=0,0,0 end
+  local delta=raw.Position-r.Last;r.Last=raw.Position;local travel=Vector3.new(delta.X,0,delta.Z).Magnitude
+  r.SampleTime+=dt;r.SampleTravel+=travel<40 and travel or 0
+  if r.SampleTime>=.1 then r.Observed=r.SampleTravel/r.SampleTime;r.SampleTime,r.SampleTravel=0,0 end
+  local speed=m:GetAttribute('KeeperTravelSpeed');if type(speed)~='number'or speed~=speed then speed=r.Observed end
+  local motion=Motion.Update(r.Motion,visual,speed,asleep,state=='ALERTED'or state=='ATTACKING',dt,7,state=='CHASING'or state=='DASHING',visual~=raw)
+  if r.FaceAsleep~=asleep and m:GetAttribute('KeeperMeshVariant')=='R152'then
+   r.FaceAsleep=asleep
+   for _,p in ipairs(m:GetChildren())do local face=p:GetAttribute('KeeperFaceState');if face and p:IsA('BasePart')then p.LocalTransparencyModifier=(face=='Asleep')~=asleep and 1 or 0 end end
+  end
+  -- R152: its void wisps at the cloak hem, hands and feet (KeeperFx152), by state and graphics tier
+  if r.Fx152==nil and m:GetAttribute('KeeperMeshVariant')=='R152'then
+   local mod=not Fx152 and RS:FindFirstChild('KeeperFx152');if mod then Fx152=require(mod)end
+   r.Fx152=Fx152 and Fx152.new(m,0)or false
+  end
+  if r.Fx152 then local c=r.Fx152Ctx or{};r.Fx152Ctx=c;c.Now=now;c.Asleep=asleep;c.Chasing=not asleep;c.Striking=false;c.Distance=distance;c.Tier=tier;Fx152.Step(r.Fx152,c)end
   -- R112-style lead: a late-seen attack plays its wind-up from where this client first saw it.
   local attackAt=m:GetAttribute('KeeperAttackAt');if attackAt~=r.AttackAt then r.AttackAt=attackAt;r.Seen=now end
   local striking=type(attackAt)=='number'and now>=attackAt and now-attackAt<Combat.Get(7).Windup+Combat.Recovery
-  if striking or now-r.At>=period then r.At=now;Art.Apply(m,now,Art.ClientFrames(m,now,r.Seen and r.Seen-(attackAt or now)))end
+  if striking or now-r.At>=period then r.At=now;Art.Apply(m,now,Art.ClientFrames(m,now,r.Seen and r.Seen-(attackAt or now),motion.Frame))end
   local impact=type(attackAt)=='number'and attackAt+Combat.Get(7).Windup
   if impact and now>=impact and r.ImpactFor~=attackAt then
    r.ImpactFor=attackAt;if now-impact<.2 and distance<KFx.DustDistance then KFx.Accent('Spectral',root.CFrame*CFrame.new(0,-4,-6),root.CFrame,Fx.Get()==1)end
   end
  end
- if not effectTick then return end
+ -- R128 (owner): a carried Void Pack's rings and debris follow it every frame (they trailed behind at 30 Hz).
+ -- R153: so does every pack wearing effects (the nearest 1 / 2 / 4 by tier within 160 studs: there it spins), its pose, glow and debris every
+ -- frame; the rest (a slow hover far away) keep the tick below.
+ if not effectTick then
+  local reducedNow=Gui.ReducedMotionEnabled==true
+  for bag,r in pairs(bags)do local c=r.Capture
+   if c and c.Fx and c.Root.Parent then
+    local frame=c.Root.CFrame
+    if r.Posed then frame=PackFx.Pose(c,now,parts,frames,not reducedNow)end
+    PackFx.Pulse(c,now,reducedNow);PackFx.Step(c,now,frame,tier,reducedNow,r.Lit,parts,frames)
+   end
+  end
+  if #parts>0 then workspace:BulkMoveTo(parts,frames,Enum.BulkMoveMode.FireCFrameChanged)end
+  return
+ end
  local reduced=Gui.ReducedMotionEnabled==true
  local B=PackFx.Budget
- table.clear(parts);table.clear(frames)
  local near={}
  for bag,r in pairs(bags)do
   if not bag.Parent then remove(bag);continue end
@@ -59,15 +101,18 @@ watch(Run.RenderStepped,function(dt)
   if c.Fx and(not visible or distance>=B.EffectDistance)then PackFx.Clear(c)end
   if not visible then continue end
   local frame=c.Root.CFrame
-  if bag:GetAttribute('WorldPack')and bag.Name~='OpeningBag'and c.Anchored and distance<B.MotionDistance then
+  r.Posed=bag:GetAttribute('WorldPack')and bag.Name~='OpeningBag'and c.Anchored and distance<B.MotionDistance
+  if r.Posed then
    frame=PackFx.Pose(c,now,parts,frames,not reduced and distance<B.SpinDistance)
   end
-  if distance<B.EffectDistance then table.insert(near,{Capture=c,Distance=distance,Frame=frame})end
+  r.Carried=not bag:GetAttribute('WorldPack')or bag.Name=='OpeningBag'
+  if distance<B.EffectDistance then table.insert(near,{Capture=c,Distance=distance,Frame=frame,Record=r})end
  end
  table.sort(near,function(a,b)return a.Distance<b.Distance end)
  local budget=mode=='off'and 0 or B.Bags[tier]or 1
  for i,item in ipairs(near)do
   local c=item.Capture
+  item.Record.Lit=i<=B.Lights
   if i>budget then if c.Fx then PackFx.Clear(c)end;continue end
   if c.Fx and c.Fx.Tier~=tier then PackFx.Clear(c)end
   if not c.Fx then PackFx.Create(c,tier)end
@@ -78,6 +123,7 @@ watch(Run.RenderStepped,function(dt)
 end)
 script.Destroying:Connect(function()
  alive=false;for _,c in ipairs(connections)do c:Disconnect()end
- for _,r in pairs(bags)do if r.Capture then PackFx.Clear(r.Capture)end end;table.clear(bags);table.clear(keepers)
+ for _,r in pairs(bags)do if r.Capture then PackFx.Clear(r.Capture)end end;table.clear(bags)
+ for m,r in pairs(keepers)do if r.Fx152 then Fx152.Destroy(r.Fx152)end end;table.clear(keepers)
  Arrival.Stop()
 end)

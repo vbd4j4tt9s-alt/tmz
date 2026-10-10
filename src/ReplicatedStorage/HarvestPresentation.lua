@@ -8,7 +8,7 @@ local Effects=require(RS:WaitForChild('PlantEffects'))
 local Maw=require(RS:WaitForChild('ObsidianMawMotion'))
 local Bells=require(RS:WaitForChild('FrostbellMotion'))
 local Batch=require(RS:WaitForChild('PlantAnimationBatch'))
-local H={};local entries={};local connection;local elapsed=0
+local H={};local entries={};local connection
 function H.Build(item,options)
  local id=item.SeedId;local def=Catalog[id];if not def then return nil end
  local saved=item.VisualCrop or item
@@ -81,10 +81,10 @@ function H.Visible(viewport)
  end
  return true
 end
-function H.Update(t)
- local models,cost=0,0
+function H.Update(t,maxModels)
+ local models,cost=0,0;maxModels=maxModels or 8
  for _,e in ipairs(entries)do
-  if H.Visible(e.Viewport)and models<8 and cost+e.Cost<=1000 then
+  if H.Visible(e.Viewport)and models<maxModels and cost+e.Cost<=1000 then
    models+=1;cost+=e.Cost;H.Step(e.State,t)
   elseif e.State.Started then H.Stop(e.State)end
  end
@@ -98,13 +98,15 @@ function H.Register(viewport,model,crop,index)
   if closed then return end;closed=true
   if cleanupConnection then cleanupConnection:Disconnect()end
   local at=table.find(entries,e);if at then table.remove(entries,at)end;H.Destroy(e.State)
-  if #entries==0 and connection then connection:Disconnect();connection=nil;elapsed=0 end
+  if #entries==0 and connection then connection:Disconnect();connection=nil end
  end
  cleanupConnection=viewport.Destroying:Connect(cleanup)
  if not connection then
-  connection=RunService.Heartbeat:Connect(function(dt)
-   elapsed+=dt;if elapsed<1/20 then return end;elapsed=0
-   debug.profilebegin('Harvest animations');H.Update(workspace:GetServerTimeNow());debug.profileend()
+  -- R153 (owner: "fix all jittery type effects"): the previews' fruit motion and weather effects every rendered frame in RenderStepped (20 Hz before);
+  -- 8 models / 1000 parts as before, 4 models on phones and below (tier 2 / 1: a preview redraws whenever it moves).
+  connection=RunService.RenderStepped:Connect(function()
+   local ok,tier=pcall(function()return require(RS.ClientFxBudget).Get()end)
+   debug.profilebegin('Harvest animations');H.Update(workspace:GetServerTimeNow(),ok and type(tier)=='number'and tier<3 and 4 or 8);debug.profileend()
   end)
  end
  return cleanup

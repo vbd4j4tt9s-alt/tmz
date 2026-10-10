@@ -1,0 +1,173 @@
+{
+ "note": "R151 studded trees (run_base_area_built_preview.sh -> base_area_built_studded.png). Scenes: trees = STAND-IN tree models in ReplicatedStorage.HubTreeTemplates151 (not the owner's), built = no models (the part-built studded trees). pos / look in world studs.",
+ "views": [
+  {
+   "name": "s_oaks",
+   "title": "Welcome lawn: oaks, a blossom, poplars",
+   "fov": 55,
+   "pos": [
+    -52,
+    9,
+    -168
+   ],
+   "look": [
+    -82,
+    11,
+    -212
+   ],
+   "shadowAt": [
+    -80,
+    4,
+    -205
+   ],
+   "shadowExtent": 70
+  },
+  {
+   "name": "s_blossoms",
+   "title": "Blossoms (pink, white) by the avenue",
+   "fov": 60,
+   "pos": [
+    0,
+    8,
+    -158
+   ],
+   "look": [
+    0,
+    12,
+    -196
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -190
+   ],
+   "shadowExtent": 60
+  },
+  {
+   "name": "s_fruit",
+   "title": "Leafy trees (just leaves)",
+   "fov": 58,
+   "pos": [
+    44,
+    9,
+    -200
+   ],
+   "look": [
+    76,
+    11,
+    -244
+   ],
+   "shadowAt": [
+    72,
+    4,
+    -238
+   ],
+   "shadowExtent": 60
+  },
+  {
+   "name": "s_close",
+   "title": "From above: the studs",
+   "fov": 48,
+   "pos": [
+    76,
+    34,
+    -210
+   ],
+   "look": [
+    95,
+    16,
+    -186
+   ],
+   "shadowAt": [
+    95,
+    4,
+    -186
+   ],
+   "shadowExtent": 40
+  },
+  {
+   "name": "s_avenue",
+   "title": "Down the avenue",
+   "fov": 62,
+   "pos": [
+    -4,
+    13,
+    -168
+   ],
+   "look": [
+    0,
+    10,
+    -272
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -230
+   ],
+   "shadowExtent": 120
+  },
+  {
+   "name": "p_desert",
+   "title": "Desert: studded palms, cacti",
+   "fov": 60,
+   "pos": [
+    150,
+    10,
+    -270
+   ],
+   "look": [
+    250,
+    9,
+    -268
+   ],
+   "shadowAt": [
+    230,
+    4,
+    -269
+   ],
+   "shadowExtent": 100
+  },
+  {
+   "name": "p_lava",
+   "title": "Lava: studded amber ember trees",
+   "fov": 60,
+   "pos": [
+    -150,
+    10,
+    -268
+   ],
+   "look": [
+    -250,
+    8,
+    -270
+   ],
+   "shadowAt": [
+    -230,
+    4,
+    -269
+   ],
+   "shadowExtent": 100
+  },
+  {
+   "name": "p_snow",
+   "title": "Snow lane: studded pines",
+   "fov": 58,
+   "pos": [
+    0,
+    9,
+    -428
+   ],
+   "look": [
+    0,
+    12,
+    -540
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -500
+   ],
+   "shadowExtent": 100
+  }
+ ]
+}

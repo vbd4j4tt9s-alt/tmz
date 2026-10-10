@@ -232,7 +232,7 @@ return function(Legacy)
             self:_returnPackToOrigin(run.Chest)
         end
         -- R123: TrackHoleService shows its own 'fell in a hole' toast.
-        if not(hit and hit.Cause=='Hole')then self.Notifications:Show(run.Player,hit and hit.Cause=='Bat'and 'SMACK! PACK DROPPED'or hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3) end
+        if not(hit and(hit.Cause=='Hole'or hit.Cause=='Bat'))then self.Notifications:Show(run.Player,hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3) end -- R158 (owner): a bat hit shows no notice
         -- Drop timers are handled in the shared heartbeat, with no stale delayed reset.
     end
 
@@ -327,7 +327,7 @@ return function(Legacy)
         if not hit then return false end
         self.HitSerial+=1
         self.HitRemote:FireAllClients({Id=self.HitSerial,At=workspace:GetServerTimeNow(),Position=root.Position,
-            VictimUserId=player.UserId,Direction=direction,Cause='Bat'})
+            VictimUserId=player.UserId,AttackerUserId=attacker.UserId,Direction=direction,Cause='Bat'}) -- R158 review: AttackerUserId (only the hitter's own hit is skipped on its screen)
         if run then self:Finish(false,true,run,{Cause='Bat',ImpactApplied=true})end
         return true
     end
@@ -358,7 +358,7 @@ return function(Legacy)
         if run.Attack or run.Finishing or self.KeeperTargets[run.KeeperKey]~=run or self.Map.Refreshing then return false end
         local keeper=run.Chaser;local character,humanoid,root=self:_validCharacter(run.Player)
         if not keeper or not keeper.PrimaryPart or character~=run.Character or root.Anchored or not self.Ragdoll:CanHit(run.Player)then return false end
-        if self:_crossedBoundary(root.Position)or not Combat.InReach(run.Stage,keeper.PrimaryPart.Position,root.Position)then return false end
+        if self:_crossedBoundary(root.Position)or not Combat.InStrike(run.Stage,keeper.PrimaryPart.Position,root.Position)then return false end -- R128: start close
         self.AttackSerial=(self.AttackSerial or 0)+1
         local now=os.clock();local spec=Combat.Get(run.Stage)
         run.Attack={Serial=self.AttackSerial,Keeper=keeper,Token=run.GuardianLeaseToken,ImpactAt=now+spec.Windup}
@@ -404,7 +404,9 @@ return function(Legacy)
         -- Track the thief through the brief windup; never teleport or freeze the player.
         if not Contact.Touching(run.Chaser,character)then self:_moveKeeperToward(run,deltaTime,0)end
         if os.clock()<attack.ImpactAt then return end
-        if Contact.Touching(run.Chaser,character)and self.Ragdoll:CanHit(run.Player)then
+        -- R128: a swing started close lands if the thief is still in strike range (or the bodies touch).
+        local inStrike=run.Chaser.PrimaryPart and Combat.InStrike(run.Stage,run.Chaser.PrimaryPart.Position,root.Position,Combat.HitPadding)
+        if(inStrike or Contact.Touching(run.Chaser,character))and self.Ragdoll:CanHit(run.Player)then
             run.KeeperImpactCommitted=true
             self:Finish(false,true,run)
         else
@@ -513,26 +515,58 @@ return function(Legacy)
         chaser:SetAttribute("GuardianBehavior", "CHASING")
         self:_setGuardianNoticeVisual(chaser, false)
         self:_publishRunEffects(run, distance, deltaTime)
-        if os.clock()>=run.CatchEnabledAt and Combat.InReach(run.Stage,core.Position,root.Position)and self:_beginKeeperAttack(run)then return end
+        if os.clock()>=run.CatchEnabledAt and Combat.InStrike(run.Stage,core.Position,root.Position)and self:_beginKeeperAttack(run)then return end
         self:_moveKeeperToward(run,deltaTime,0)
         -- At extreme speeds the entire contact range can be crossed in one server step.
         -- Start the existing windup after movement too; impact still requires real body overlap.
-        if os.clock()>=run.CatchEnabledAt and Combat.InReach(run.Stage,chaser.PrimaryPart.Position,root.Position)then
+        if os.clock()>=run.CatchEnabledAt and Combat.InStrike(run.Stage,chaser.PrimaryPart.Position,root.Position)then
             self:_beginKeeperAttack(run)
         end
     end
 
+    -- R130 (performance): an idle keeper at home used to be fully re-prepared 4 times a second (every part's
+    -- transparency / collision / four attributes rewritten, a visibility scan and a re-pivot). Once prepared it now only
+    -- gets the cheap checks: back home if it moved, idle attributes written only when different. It is fully
+    -- re-prepared when its parts change, after it was used for a chase or replaced, and every 5 s as a safety net.
+    Service.IdleRefreshSeconds=5
+    local function setIf(model,key,value)if model:GetAttribute(key)~=value then model:SetAttribute(key,value)end end
+    local function atHome(model,frame)
+        local at=((model:GetAttribute("GardenerArtVersion")==91 or model:GetAttribute("KeeperClientAnimated")==true)and model.PrimaryPart and model.PrimaryPart.CFrame)or model:GetPivot()
+        return(at.Position-frame.Position).Magnitude<1e-3 and at.LookVector:Dot(frame.LookVector)>.99999 and at.UpVector:Dot(frame.UpVector)>.99999
+    end
+    function Service:_forgetIdleKeeper(stage)
+        local idle=self.IdleKeepers and self.IdleKeepers[stage];if not idle then return end
+        for _,c in ipairs(idle.Connections)do c:Disconnect()end;self.IdleKeepers[stage]=nil
+    end
     function Service:_maintainGuardians()
+        self.IdleKeepers=self.IdleKeepers or {}
+        local now=os.clock()
         for stage=1,self.Config.StageCount do
             -- A live target owns recovery; maintenance must not replace or recenter it.
-            if not self.KeeperTargets[stage] and not self.ReturningGuardians[stage] then
-                local guardian = self:_ensurePersistentGuardian(stage)
+            if self.KeeperTargets[stage] or self.ReturningGuardians[stage] then
+                self:_forgetIdleKeeper(stage) -- used for a chase: fully re-prepared when it is idle again
+            else
+                local idle=self.IdleKeepers[stage];local current=self.Map.GuardiansByStage and self.Map.GuardiansByStage[stage]
+                local guardian
+                if idle and not idle.Dirty and now<idle.Next and idle.Model==current and current.Parent and current.PrimaryPart then
+                    guardian=current
+                else
+                    self:_forgetIdleKeeper(stage)
+                    guardian = self:_ensurePersistentGuardian(stage)
+                    if guardian then
+                        local record={Model=guardian,Next=now+Service.IdleRefreshSeconds,Dirty=false}
+                        local function dirty()record.Dirty=true end
+                        record.Connections={guardian.DescendantAdded:Connect(dirty),guardian.DescendantRemoving:Connect(dirty),guardian.AncestryChanged:Connect(dirty)}
+                        self.IdleKeepers[stage]=record
+                    end
+                end
                 if guardian then
-                    pivotKeeper(guardian, self:_getGuardianHomeCFrame(stage))
-                    guardian:SetAttribute("GuardianBehavior", "GUARDING")
-                    guardian:SetAttribute("KeeperTravelSpeed",0)
-                    guardian:SetAttribute("GuardianLeaseToken", 0)
-                    guardian:SetAttribute("TargetUserId", 0)
+                    local home=self:_getGuardianHomeCFrame(stage)
+                    if not atHome(guardian,home)then pivotKeeper(guardian, home)end
+                    setIf(guardian,"GuardianBehavior", "GUARDING")
+                    setIf(guardian,"KeeperTravelSpeed",0)
+                    setIf(guardian,"GuardianLeaseToken", 0)
+                    setIf(guardian,"TargetUserId", 0)
                 end
             end
         end

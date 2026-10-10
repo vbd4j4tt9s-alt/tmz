@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- V092: one continuous, visual-only route from the volcano outlet into its pool.
 local Run=game:GetService('RunService')
 -- V134: cache world-space flow nodes only after the expanded layout is ready.
@@ -8,6 +9,10 @@ if map then
  if not map:GetAttribute('RoutesExpandedV134')then warn('[V134] Lava flow waiting for a valid route layout.');return end
 end
 local routes={};local pending={};local elapsed=0
+-- R158 (owner: "remove the lava flow and pond"): the Lava biome has no streams or pools any more. This script only serves them, so it does nothing at all (no per-frame step) until a
+-- route or pool shows up, and lets go of the frame step again when the last one is gone.
+local stepConn,step
+local function wake()if not stepConn and step then stepConn=Run.RenderStepped:Connect(step)end end
 -- Bounded local motion, 20 Hz, only nearby pools. No server frame replication.
 local pools={}
 local function registerPool(m)
@@ -15,6 +20,7 @@ local function registerPool(m)
  local center=m:GetAttribute('PoolCenter');local radii=m:GetAttribute('PoolRadii')
  if typeof(center)~='Vector3'or typeof(radii)~='Vector3'then return end
  pools[m]={Center=center,Radii=radii,Crust={},Surface={},Currents={}}
+ wake()
 end
 local function addMagma(v)
  if v:IsA('Model')then registerPool(v)end
@@ -68,29 +74,36 @@ local function register(m)
  end
  -- R121: the route version tag is read once here instead of twice per glow per tick.
  routes[m]={Nodes=nodes,Lengths=lengths,Total=total,Speed=m:GetAttribute('FlowSpeed')or 7,Glows={},V128=m:GetAttribute('LavaRouteV128')and true or false}
+ wake()
  for _,p in ipairs(m:GetChildren())do if p:IsA('BasePart') and type(p:GetAttribute('FlowPhase'))=='number'then routes[m].Glows[p]=p:GetAttribute('FlowPhase')end end
 end
 local function add(v)
  addMagma(v)
- if v:IsA('Model') and (v:GetAttribute('LavaRouteV092')or v:GetAttribute('LavaRouteV128'))then pending[v]=true
+ if v:IsA('Model') and (v:GetAttribute('LavaRouteV092')or v:GetAttribute('LavaRouteV128'))then pending[v]=true;wake()
  elseif v:IsA('BasePart') and type(v:GetAttribute('FlowPhase'))=='number' and v.Parent then
   register(v.Parent);local route=routes[v.Parent];if route then route.Glows[v]=v:GetAttribute('FlowPhase')end
  end
 end
-for _,v in ipairs(workspace:GetDescendants())do add(v)end
-workspace.DescendantAdded:Connect(add)
-Run.RenderStepped:Connect(function(dt)
- elapsed+=dt;if elapsed<.05 then return end;elapsed=0
- for m in pairs(pending)do register(m);pending[m]=nil end
+-- R153 perf (lag audit D10): lava routes and pools are map scenery (ChestChaseMap): only the map is listened to, not every instance the client adds
+-- to the workspace itself (pack openings, effects, the keyboard); a place without the map folder is listened to whole, as before.
+local lavaRoot=workspace:FindFirstChild('ChestChaseMap')or workspace
+for _,v in ipairs(lavaRoot:GetDescendants())do add(v)end
+lavaRoot.DescendantAdded:Connect(add)
+-- R153 (owner: "fix all jittery type effects"): the glows that flow down a route within 160 studs move every frame (they slid in 20 Hz steps,
+-- about a third of a stud each); farther routes (to 350) and the pools' slow crust drift, surface pulse and currents keep the 20 Hz tick.
+step=function(dt)
+ if next(routes)==nil and next(pools)==nil and next(pending)==nil then if stepConn then stepConn:Disconnect();stepConn=nil end;return end
+ elapsed+=dt;local tick=elapsed>=.05;if tick then elapsed=0 end
+ if tick then for m in pairs(pending)do register(m);pending[m]=nil end end
  local camera=workspace.CurrentCamera;if not camera then return end
  local t=workspace:GetServerTimeNow()
- animateMagma(t,camera.CFrame.Position)
+ if tick then animateMagma(t,camera.CFrame.Position)else table.clear(magmaParts);table.clear(magmaFrames)end
  for model,route in pairs(routes)do
   if not model:IsDescendantOf(workspace)then routes[model]=nil
   else
    local nearest=math.huge
    for _,node in ipairs(route.Nodes)do nearest=math.min(nearest,(camera.CFrame.Position-node).Magnitude)end
-   if nearest<350 then
+   if nearest<350 and(tick or nearest<160)then
     for p,phase in pairs(route.Glows)do
      if p.Parent~=model then route.Glows[p]=nil
      else
@@ -113,4 +126,5 @@ Run.RenderStepped:Connect(function(dt)
   end
  end
  if #magmaParts>0 then workspace:BulkMoveTo(magmaParts,magmaFrames,Enum.BulkMoveMode.FireCFrameChanged)end
-end)
+end
+if next(routes)~=nil or next(pools)~=nil or next(pending)~=nil then wake()end -- (what the first scan above found)

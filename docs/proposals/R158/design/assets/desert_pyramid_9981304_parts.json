@@ -1,0 +1,3248 @@
+[
+ {
+  "ref": 0,
+  "parent": -1,
+  "ClassName": "Model",
+  "Name": "Pyramid"
+ },
+ {
+  "ref": 1,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   7.200000286102295,
+   126.0
+  ],
+  "CFrame": {
+   "pos": [
+    10.763664245605469,
+    8.799999237060547,
+    1555.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 2,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   122.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    13.0,
+    1556.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 3,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   124.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    14.200000762939453,
+    1557.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 4,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   120.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    16.600000381469727,
+    1559.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 5,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   122.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    15.399999618530273,
+    1558.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 6,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   140.0,
+   1.2000000476837158,
+   128.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    4.599998474121094,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    -1,
+    0,
+    1,
+    0,
+    1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 7,
+  "parent": 6,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 8,
+  "parent": 6,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 9,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   98.0,
+   1.2000000476837158,
+   86.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    37.0000114440918,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 10,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   60.0,
+   1.2000000476837158,
+   48.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    59.800025939941406,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 11,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   7.200000286102295,
+   138.0
+  ],
+  "CFrame": {
+   "pos": [
+    74.76366424560547,
+    8.799999237060547,
+    1623.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 12,
+  "parent": 11,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 13,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   136.0
+  ],
+  "CFrame": {
+   "pos": [
+    73.76366424560547,
+    13.0,
+    1623.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 14,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   132.0
+  ],
+  "CFrame": {
+   "pos": [
+    72.76366424560547,
+    14.200000762939453,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 15,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   132.0
+  ],
+  "CFrame": {
+   "pos": [
+    71.76366424560547,
+    15.399999618530273,
+    1625.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 16,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   130.0
+  ],
+  "CFrame": {
+   "pos": [
+    70.76366424560547,
+    16.600000381469727,
+    1625.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 17,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   130.0,
+   1.2000000476837158,
+   118.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    17.80000114440918,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 18,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   128.0,
+   1.2000000476837158,
+   116.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    19.000001907348633,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 19,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   126.0,
+   1.2000000476837158,
+   114.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    20.200002670288086,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 20,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   124.0,
+   1.2000000476837158,
+   112.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    21.40000343322754,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 21,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   122.0,
+   1.2000000476837158,
+   110.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    22.600004196166992,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 22,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   108.0,
+   1.2000000476837158,
+   120.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    23.800004959106445,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 23,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   118.0,
+   1.2000000476837158,
+   106.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    25.0000057220459,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 24,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   116.0,
+   1.2000000476837158,
+   104.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    26.20000648498535,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 25,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   114.0,
+   1.2000000476837158,
+   102.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    27.400007247924805,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 26,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   112.0,
+   1.2000000476837158,
+   100.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    28.600008010864258,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 27,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   110.0,
+   1.2000000476837158,
+   98.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    29.80000877380371,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 28,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   108.0,
+   1.2000000476837158,
+   96.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    31.000009536743164,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 29,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   106.0,
+   1.2000000476837158,
+   94.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    32.20001220703125,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 30,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   104.0,
+   1.2000000476837158,
+   92.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    33.40000915527344,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 31,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   102.0,
+   1.2000000476837158,
+   90.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    34.60000991821289,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 32,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   100.0,
+   1.2000000476837158,
+   88.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    35.800010681152344,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 33,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   84.0,
+   1.2000000476837158,
+   96.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    38.20001220703125,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 34,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   82.0,
+   1.2000000476837158,
+   94.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    39.4000129699707,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 35,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   80.0,
+   1.2000000476837158,
+   92.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    40.600013732910156,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 36,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   78.0,
+   1.2000000476837158,
+   90.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    41.80001449584961,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 37,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   76.0,
+   1.2000000476837158,
+   88.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    43.00001525878906,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 38,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   74.0,
+   1.2000000476837158,
+   86.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    44.200016021728516,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 39,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   84.0,
+   1.2000000476837158,
+   72.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    45.40001678466797,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 40,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   82.0,
+   1.2000000476837158,
+   70.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    46.60001754760742,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 41,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   80.0,
+   1.2000000476837158,
+   68.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    47.800018310546875,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 42,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   78.0,
+   1.2000000476837158,
+   66.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    49.00001907348633,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 43,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   76.0,
+   1.2000000476837158,
+   64.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    50.20001983642578,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 44,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   74.0,
+   1.2000000476837158,
+   62.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    51.400020599365234,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 45,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   72.0,
+   1.2000000476837158,
+   60.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    52.60002136230469,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 46,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   70.0,
+   1.2000000476837158,
+   58.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    53.80002212524414,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 47,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   68.0,
+   1.2000000476837158,
+   56.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    55.000022888183594,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 48,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   66.0,
+   1.2000000476837158,
+   54.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    56.20002365112305,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 49,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   64.0,
+   1.2000000476837158,
+   52.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    57.4000244140625,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 50,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   62.0,
+   1.2000000476837158,
+   50.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    58.60002517700195,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 51,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   58.0,
+   1.2000000476837158,
+   46.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    61.00002670288086,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 52,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   56.0,
+   1.2000000476837158,
+   44.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    62.20002746582031,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 53,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   54.0,
+   1.2000000476837158,
+   42.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    63.400028228759766,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 54,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   52.0,
+   1.2000000476837158,
+   40.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    64.60002136230469,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 55,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   50.0,
+   1.2000000476837158,
+   38.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    65.80001831054688,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 56,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   48.0,
+   1.2000000476837158,
+   36.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    67.00001525878906,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 57,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   46.0,
+   1.2000000476837158,
+   34.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    68.20001220703125,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 58,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   44.0,
+   1.2000000476837158,
+   32.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    69.40000915527344,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 59,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   42.0,
+   1.2000000476837158,
+   30.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    70.60000610351562,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 60,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   40.0,
+   1.2000000476837158,
+   28.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    71.80000305175781,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 61,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   38.0,
+   1.2000000476837158,
+   26.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    73.0,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 62,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   36.0,
+   1.2000000476837158,
+   24.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    74.19999694824219,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 63,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   34.0,
+   1.2000000476837158,
+   22.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    75.39999389648438,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 64,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   32.0,
+   1.2000000476837158,
+   20.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    76.59999084472656,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 65,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   30.0,
+   1.2000000476837158,
+   18.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    77.79998779296875,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 66,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   28.0,
+   1.2000000476837158,
+   16.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    78.99998474121094,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 67,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   26.0,
+   1.2000000476837158,
+   14.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    80.19998168945312,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 68,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   24.0,
+   1.2000000476837158,
+   12.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    81.39997863769531,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 69,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   22.0,
+   1.2000000476837158,
+   10.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    82.5999755859375,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 70,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   20.0,
+   1.2000000476837158,
+   8.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    83.79997253417969,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 71,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   18.0,
+   1.2000000476837158,
+   6.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    84.99996948242188,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 72,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   16.0,
+   1.2000000476837158,
+   4.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    86.19996643066406,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 73,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   14.0,
+   1.2000000476837158,
+   2.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    87.39996337890625,
+    1624.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 74,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   6.0,
+   66.0
+  ],
+  "CFrame": {
+   "pos": [
+    -51.23633575439453,
+    8.19999885559082,
+    1589.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 75,
+  "parent": 74,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 76,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   6.0,
+   62.0
+  ],
+  "CFrame": {
+   "pos": [
+    -51.23633575439453,
+    8.19999885559082,
+    1661.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 77,
+  "parent": 76,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 78,
+  "parent": 76,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 79,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   136.0
+  ],
+  "CFrame": {
+   "pos": [
+    -51.23633575439453,
+    11.79999828338623,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 80,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   138.0
+  ],
+  "CFrame": {
+   "pos": [
+    -50.23633575439453,
+    13.0,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 81,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   134.0
+  ],
+  "CFrame": {
+   "pos": [
+    -49.23633575439453,
+    14.200000762939453,
+    1625.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 82,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   130.0
+  ],
+  "CFrame": {
+   "pos": [
+    -48.23633575439453,
+    15.399999618530273,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 83,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   118.0
+  ],
+  "CFrame": {
+   "pos": [
+    10.763664245605469,
+    16.600000381469727,
+    1689.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 84,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   128.0
+  ],
+  "CFrame": {
+   "pos": [
+    -47.23633575439453,
+    16.600000381469727,
+    1624.906494140625
+   ],
+   "rot": [
+    -1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    -1
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 85,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   7.200000286102295,
+   128.0
+  ],
+  "CFrame": {
+   "pos": [
+    11.763664245605469,
+    8.799999237060547,
+    1693.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 86,
+  "parent": 85,
+  "ClassName": "Snap",
+  "Name": "Snap"
+ },
+ {
+  "ref": 87,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   124.0
+  ],
+  "CFrame": {
+   "pos": [
+    12.763664245605469,
+    13.0,
+    1692.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 88,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   122.0
+  ],
+  "CFrame": {
+   "pos": [
+    12.763664245605469,
+    14.200000762939453,
+    1691.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ },
+ {
+  "ref": 89,
+  "parent": 0,
+  "ClassName": "Part",
+  "Name": "Smooth Block Model",
+  "size": [
+   2.0,
+   1.2000000476837158,
+   120.0
+  ],
+  "CFrame": {
+   "pos": [
+    10.763664245605469,
+    15.399999618530273,
+    1690.906494140625
+   ],
+   "rot": [
+    0,
+    0,
+    1,
+    0,
+    1,
+    0,
+    -1,
+    0,
+    0
+   ]
+  },
+  "Color3uint8": [
+   215,
+   197,
+   154
+  ],
+  "Material": 816,
+  "shape": 1,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true
+ }
+]

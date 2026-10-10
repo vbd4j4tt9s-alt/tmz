@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Players=game:GetService('Players');local connections={};local records={}
 local function clear(p)local r=records[p];if r then for _,c in ipairs(r)do c:Disconnect()end;records[p]=nil end end
 local function bind(p,character)

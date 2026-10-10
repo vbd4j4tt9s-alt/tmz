@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R47: one bounded cosmetic scheduler for local and nearby players.
 -- R111: boot prints/bursts/idle aura for every boot tier; per-runner detail from distance and screen position,
 -- pool sizes from the shared client quality (ClientFxBudget, Effects quality setting, graphics level, Reduced Motion).
@@ -10,7 +11,7 @@ local Styles=require(RS:WaitForChild('RunnerTrailStyles'))
 local Effects=require(RS:WaitForChild('RunnerTrailEffects'))
 local Fx=require(RS:WaitForChild('ClientFxBudget'))
 local localPlayer=Players.LocalPlayer
-local fx=Effects.new();local records={};local elapsed,scan,ticks=0,0,0;local chosen={}
+local fx=Effects.new();local records={};local scan=0;local chosen={}
 local params=RaycastParams.new();params.FilterType=Enum.RaycastFilterType.Exclude;params.RespectCanCollide=true
 local function release(player)
  local r=records[player];if r then fx:Release(r);records[player]=nil end
@@ -49,16 +50,14 @@ local function selectRunners()
  for player in pairs(records)do if not wanted[player]then release(player)end end
 end
 local removal=Players.PlayerRemoving:Connect(release)
-local heartbeat=RunService.Heartbeat:Connect(function(dt)
- elapsed+=dt;scan+=dt
- if elapsed<Rules.Interval then return end
- local step=elapsed;elapsed=0;local now=os.clock();ticks+=1
+-- R153 (owner: "fix all jittery type effects"): every chosen runner (8 at most, within Rules.Range) is stepped every rendered frame in RenderStepped
+-- (was Rules.Interval, 20 Hz, and every other tick for far runners on the low budget): the ground ribbons' anchors, the idle aura's orbiting
+-- shards, the coil glow and the prints' fades moved in steps. The ground under each sole is still found at most every Rules.Interval
+-- (RunnerTrailEffects keeps the hit and slides the ribbon along it), so the raycasts per second are what they were.
+local render=RunService.RenderStepped:Connect(function(dt)
+ scan+=dt;local now=os.clock()
  if scan>=.20 then scan=0;selectRunners()end
- for _,r in ipairs(chosen)do if fx.Records[r]then
-  -- On the low budget, far runners (ribbons only) update every other tick.
-  r.Pending=(r.Pending or 0)+step
-  if r.Detail>1 or fx.Budget.Tier>1 or ticks%2==0 then fx:Step(r,r.Pending,now,params,r.Detail);r.Pending=0 end
- end end
+ for _,r in ipairs(chosen)do if fx.Records[r]then fx:Step(r,dt,now,params,r.Detail)end end
  fx:StepMarks(now)
 end)
-script.Destroying:Connect(function()heartbeat:Disconnect();removal:Disconnect();fx:Destroy()end)
+script.Destroying:Connect(function()render:Disconnect();removal:Disconnect();fx:Destroy()end)

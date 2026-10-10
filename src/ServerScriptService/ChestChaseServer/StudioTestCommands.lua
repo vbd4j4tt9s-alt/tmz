@@ -98,6 +98,7 @@ function Commands.Normalize(text)
  return '/test '..phrase
 end
 
+local GrantsItems={seed=true,seeds=true,pack=true,plant=true,plants=true,rarepacks=true,packset=true,eclipse=true,void=true,verity=true}
 local function executeFor(ctx,player,text,requester)
  if not player or player.Parent~=Players or not ctx.Data:IsLoaded(player)then return false,'Wait for your player data to load.'end
  text=Commands.Normalize(text);if not text then return false,'Invalid command.'end
@@ -105,6 +106,8 @@ local function executeFor(ctx,player,text,requester)
  if a[1]~='/test'and a[1]~='/cctest'then return false,'Type help in the F4 command box.'end
  table.remove(a,1);local action=(table.remove(a,1)or'help'):lower()
  if action=='points'then action='speed'elseif action=='tp'then action='biome'end
+ -- R151: whatever an owner command just gave this player (packs, seeds, plants) is not counted for the hub's BEST PULL / BIGGEST FRUIT boards for the rest of this session.
+ if GrantsItems[action]then local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,player)end end
  if UpdateCommands.Actions[action]then return UpdateCommands.Execute(ctx,player,action,a)end
  local function exact(min,max)return #a>=min and #a<=(max or min)end
  if action=='help'then
@@ -118,6 +121,15 @@ local function executeFor(ctx,player,text,requester)
   return true,table.concat(lines,'\n')
  elseif action=='perf'then
   player:SetAttribute('StudioTestPerf',not player:GetAttribute('StudioTestPerf'));return true,'Performance display toggled.'
+ elseif action=='hotbar'then -- R153: the hotbar log on this player's screen + what the server did with their packs
+  local on=not player:GetAttribute('HotbarLog');player:SetAttribute('HotbarLog',on)
+  local chests=ctx.Chests;local log=chests and chests.HoldLog and chests.HoldLog[player];local op=chests and chests.Openings and chests.Openings[player]
+  local c=player.Character;local held=c and c:FindFirstChildOfClass('Tool')
+  return true,table.concat({'Hotbar log '..(on and'ON: each press, what it did and anything the server moved shows top-left (select it to copy) and in the F9 console.'or'OFF.'),
+   'Server sees in the hand: '..(held and held.Name or'nothing')..' | pack held: '..(type(op)=='table'and op.Tool and((op.Committed and'revealing 'or'')..op.Tool.Name)or'none'),
+   'Packs the server held late or sent back (newest last): '..(log and #log>0 and table.concat(log,' | ')or'none'),
+   -- R155: what this player holds (the 200 cap) and what they threw away (each discard is also an Output line "[R155 Discard] ...")
+   'Items held: '..tostring(ctx.Data.HeldItemCount and ctx.Data:HeldItemCount(player)or'?')..'/'..tostring(ctx.Data.HeldItemCap and ctx.Data:HeldItemCap()or'?')..' | thrown away (newest last): '..(ctx.Data.DiscardLog and ctx.Data.DiscardLog[player]and #ctx.Data.DiscardLog[player]>0 and table.concat(ctx.Data.DiscardLog[player],' | ')or'none')},'\n')
  elseif action=='effects'then
   if not exact(1)or(a[1]~='normal'and a[1]~='low'and a[1]~='off')then return false,'Use /test effects normal, low or off.'end
   player:SetAttribute('StudioPlantEffects',a[1]);return true,'Plant effects: '..a[1]
@@ -135,6 +147,20 @@ local function executeFor(ctx,player,text,requester)
   if not exact(1)or a[1]~='all'then return false,'Use /test '..action..' all (everyone currently in this server).'end
   if not ctx.ServerClearer then ctx.ServerClearer=ServerClear.new(ctx)end
   return ctx.ServerClearer:Request(requester,action=='clearinventory'and 'inventory'or 'garden')
+ end
+ if action=='fruithour'then
+  -- R132: /test fruithour [fruit] [1.5-3] makes a fruit the Fruit of the Hour for 10 minutes; off returns to the clock.
+  local Hour=require(RS:WaitForChild('FruitOfHour'));local now=workspace:GetServerTimeNow()
+  if #a==1 and key(a[1])=='off'then Hour.SetTest(nil);return true,'Fruit of the Hour follows the clock again: '..(Hour.At(now).Name or'?')..'.'end
+  local m=3;if #a>0 and tonumber(a[#a])then m=number(table.remove(a),3,Hour.Min,Hour.Max);if not m then return false,'The bonus must be 1.5 to 3.'end end
+  local id
+  if #a==0 then local list=Hour.Candidates();id=list[math.random(1,#list)]
+  else
+   for _,spec in ipairs(choose(table.concat(a,' '),false))do if table.find(Hour.Candidates(),spec.id)then id=spec.id end end
+   if not id then return false,'Unknown fruit. Try /test fruithour apple 3 (catalog all lists them).'end
+  end
+  Hour.SetTest(id,m,now,600)
+  return true,('Fruit of the Hour for 10 minutes: %s sells ×%.1f. /test fruithour off ends it.'):format(Hour.Name(id),m)
  end
  -- Mutations wait until normal game transactions are finished.
  if ctx.Chase:IsPlayerBusy(player)or player:GetAttribute('ChestChaseRunActive')or player:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish your chase before using this test command.'end
@@ -162,8 +188,10 @@ local function executeFor(ctx,player,text,requester)
   local point=Vector3.new(x,at.Position.Y,z+15)
   return teleport(ctx,player,CFrame.lookAt(point,point+Vector3.new(0,0,1)))
  elseif action=='rarepacks'then
-  if not exact(0,1)then return false,'Use /test rarepacks [rarity].'end
-  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester)
+  if not exact(0,2)then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local coat=a[2]~=nil and mutation(a[2])or nil -- R155: an optional coat word, so a TEST Mech pack (rarepacks mech gold) can be seen Gold / Diamond without 20 purchases (a bought pack rolls its own)
+  if a[2]~=nil and not coat then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester,coat)
   if okay then ctx.Chests:SyncTools(player)end
   return okay,message
  elseif action=='seed'or action=='seeds'or action=='pack'then
@@ -176,7 +204,7 @@ local function executeFor(ctx,player,text,requester)
   local selected=choose(a[1],many or isPack)
   if #selected==0 or(isPack and not biomeIDs[key(a[1])])then return false,'Unknown seed/biome. Use /test catalog.'end
   if isPack then selected={selected[1]}end
-  local records=data:GetChestRecords(player);if #records+#selected*count>config.MaxSavedChests then return false,'Inventory full. Clear some seeds or packs first.'end
+  local records=data:GetChestRecords(player);if #records+#selected*count>config.MaxSavedChests or not data:RoomFor(player,#selected*count)then return false,'Inventory full (200 items max). Clear some seeds or packs first.'end -- R155: the cap
   local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
   for _,spec in ipairs(selected)do
    local seed=config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
@@ -185,7 +213,8 @@ local function executeFor(ctx,player,text,requester)
     table.insert(pending,{Id=HttpService:GenerateGUID(false),Kind=isPack and'Pack'or'Seed',ChestNumber=serial,ChestName=seed.Name,
      Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
      SeedScale=isPack and Packs.NewSeedScale(spec.stage,variant,size)or Packs.SanitizeSeedScale(size),
-     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat})
+     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat,TestGrant=true,
+     PackShape=isPack and require(RS:WaitForChild('PackShapes151')).Roll(variant) or nil}) -- R151: a /test pack is a TEST pack (never announced); it rolls its chip-bag shape like any pack
    end
   end
   player:SetAttribute('ChestInventorySerial',serial)
@@ -201,7 +230,7 @@ local function executeFor(ctx,player,text,requester)
    local definition=Catalog[spec.id];local spot
    spot=Layout.Find(config,garden,spec.id,math.min(size,3),ctx.Chests.GardenPlots and ctx.Chests.GardenPlots[base.Index])
    if not spot then break end
-   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
+   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat,TestGrant=true},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
    crop.PlantScale=size;local slot=tostring(spot[1]);garden.Plots[slot]=garden.Plots[slot]or{};table.insert(garden.Plots[slot],crop);count+=1
   end
   if count>0 then changed(ctx,player,false)end
@@ -233,7 +262,7 @@ local function executeFor(ctx,player,text,requester)
  elseif action=='sellall'then
   local items=table.clone(data.Gardens[player].Harvests);local count,total=0,0
   for _,item in ipairs(items)do local ok,value=data:SellHarvest(player,item.Id);if ok then count+=1;total+=value end end
-  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. Hover over the floating cash to collect.'
+  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. The cash flies to your balance.'
  elseif action=='cash'then
   local value=number(a[2],nil,0,require(RS.EconomyBalance90).MaxCash,true)
   if not exact(2)or not value or(a[1]~='set'and a[1]~='add')then return false,'Use /test cash set <amount> or /test cash add <amount>.'end

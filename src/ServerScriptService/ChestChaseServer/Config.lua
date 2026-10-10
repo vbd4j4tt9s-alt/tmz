@@ -109,7 +109,10 @@ Config.TreadmillTiers = {
  {Biome="Storm",Stage=7,Name="Thunder Runner",Cost=140000,Multiplier=10},
 }
 
-Config.TrainingInterval = 1 / 6
+-- R151 (owner: "adjust the steps per second on top of the treadmill to multples of 5"): one training step every 1/5 s (was 1/6). The points
+-- per second are unchanged (TrainingPointsPerSecond x the machine multiplier); each step is now 100 x 1/5 = 20 x the multiplier, a whole
+-- multiple of 5 at every level (+20, +80, +400, +2K, +12K, +80K, +600K): what the treadmill's "+N/step" label shows is the real award.
+Config.TrainingInterval = 1 / 5
 Config.TrainingPointsPerSecond = 50
 Config.TreadmillAnimationSpeed = 2.5
 Config.TreadmillRunAnimationR15 = "rbxassetid://507767714"
@@ -137,6 +140,9 @@ Config.GuardianFarSpeedMultiplier = 1.08
 Config.GuardianSpeedResponse = 4 -- response rate/sec; smooth, frame-independent
 Config.DroppedChestDuration = 5
 Config.DroppedChestClaimGrace = 0.35
+-- R125 (owner): hold E to steal. World seed packs and Void Packs need a 1 s hold; a dropped pack (5 s window) 0.5 s.
+Config.StealHoldSeconds = 1
+Config.DroppedStealHoldSeconds = 0.5
 Config.DroppedChestGuardianRestartDistance = 24
 Config.GuardianFlingProtectionTime = 1.25
 Config.GuardianNoticeDelay = 0.5
@@ -291,14 +297,18 @@ function Config.GetWalkSpeed(speedStat)
  return require(game:GetService('ReplicatedStorage').Progression81).Speed(speedStat)
 end
 
+local function ownerTestSpeed(player)return require(script.Parent.OwnerTestState82).GetSpeed(player)end -- (a named function: this runs on every walk speed lookup, no closure per call)
 function Config.GetPlayerWalkSpeed(player,speedStat)
     -- Server-private owner overrides leave saved training points unchanged.
-    local temporary=require(script.Parent.OwnerTestState82).GetSpeed(player)
-    if temporary then return temporary end
+    -- R153: a broken owner test module can never break walking: a failure means "no test override" (the real speed below)
+    local okTest,temporary=pcall(ownerTestSpeed,player)
+    if okTest and temporary then return temporary end
     local override=player and player:GetAttribute('StudioMovementSpeedOverride')
     if game:GetService('RunService'):IsStudio()and type(override)=='number'and override==override and math.abs(override)<math.huge then
         return math.clamp(override,Config.BaseWalkSpeed,500)
     end
+    -- R148: walk speed depends on speed points only. The friend boost (R140) now speeds up the speed GAIN from
+    -- training instead (BaseService:GetFriendGainMultiplier), never how fast the player runs.
     return Config.GetWalkSpeed(speedStat)
 end
 
@@ -450,8 +460,9 @@ function Config.Validate()
 		assert(totalChance == 100, string.format("Stage %d reward chances must total 100", stage))
 
 		local seedCatalog = Config.SeedCatalogByStage[stage]
-		assert(type(seedCatalog) == "table" and #seedCatalog == 8,
-			string.format("Stage %d must define exactly eight seeds", stage))
+		-- R148: Desert (stage 2) also holds the Aloe and the Sand Fruit in its save slots 9 and 10.
+		assert(type(seedCatalog) == "table" and (#seedCatalog == 8 or (stage == 2 and #seedCatalog == 10)),
+			string.format("Stage %d must define exactly eight seeds (Desert ten)", stage))
 		for _, seed in ipairs(seedCatalog) do
 			assert(type(seed.Id) == "string" and seed.Id ~= "", "Seed Id cannot be empty")
 			assert(not seenSeedIds[seed.Id] or (Config.StageSeedPools and Config.StageSeedPools[stage] and seedCatalog == Config.SeedCatalogByStage[Config.StageSeedPools[stage]]), "Duplicate seed Id: " .. seed.Id)
@@ -713,6 +724,8 @@ for stage,launch in ipairs(Knockback.Keeper)do
  Config.GuardianSettingsByStage[stage].FlingVertical=launch[2]
 end
 Config.BiomeNames[8]='Mech';Config.BiomeRank[8]=8
+-- R147: the Verity seed's own Index category (stage 9). Not a map biome (StageCount stays 7), like Mech.
+Config.BiomeNames[9]='Verity';Config.BiomeRank[9]=9
 local validateBase=Config.Validate
 function Config.Validate()
  validateBase()
@@ -726,10 +739,17 @@ function Config.Validate()
   assert(plant and plant.Mech and plant.FruitCount==#plant.Sockets and plant.Value>0,'Invalid mech plant')
  end
  assert(math.abs(total-100)<.000001,'Limited seed chances must total 100%')
+ -- R147: stage 9 holds exactly the Verity seed, and its plant keeps the Verity flag and the per-fruit cap.
+ local verity=require(game:GetService('ReplicatedStorage').VerityCatalog)
+ assert(#Config.SeedCatalogByStage[verity.Stage]==1 and Config.SeedCatalogByStage[verity.Stage][1].Id==verity.Id,'Invalid Verity seed category')
+ local vplant=Config.GardenPlants[verity.Id]
+ assert(vplant and vplant.Verity==true and vplant.FruitCount==#vplant.Sockets and vplant.Value>0 and vplant.Value<=require(game:GetService('ReplicatedStorage').GrowthPace125).MaxValue,'Invalid Verity plant')
 end
 -- R67 tuning does not migrate or reset saved points, crops, wallets or ownership.
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
-Config.Version='V150 R123';Config.ProfileVersion=20;Config.SpeedMilestones=balance.SpeedMilestones
+-- R148: ProfileVersion 22 (the roster change: pack OddsVersion 149 is unknown to an older server, which would re-save such a pack as
+-- a legacy-odds pack for good); a version-22 save is refused by an older server, which leaves it unchanged.
+Config.Version='V150 R158e';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end

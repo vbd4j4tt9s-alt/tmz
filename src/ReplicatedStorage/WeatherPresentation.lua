@@ -1,4 +1,5 @@
 -- R78: denser near-camera weather with a bounded live-particle envelope.
+-- R149: Profile() is no longer used (the global rain / snow is WeatherWorld149's world-fixed tiles); CloudInterval still is (StormWeather).
 local W={}
 function W.Profile(kind,tier,mobile)
  tier=math.clamp(math.floor(tonumber(tier)or 1),1,3)

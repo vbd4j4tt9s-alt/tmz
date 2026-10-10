@@ -1,8 +1,9 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R53: one selected plant; the pointer chooses its individual ripe fruit.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Input=game:GetService('UserInputService');local Prompts=game:GetService('ProximityPromptService')
 local Names=require(RS:WaitForChild('GardenDisplayNames'));local Theme=require(RS:WaitForChild('GardenTheme'));local Catalog=require(RS:WaitForChild('PlantCatalog'));local Growth=require(RS:WaitForChild('PlantGrowth'))
-local Rules=require(RS:WaitForChild('PlantRules'));local Traits=require(RS.ItemTraitNames)
+local Rules=require(RS:WaitForChild('PlantRules'));local Traits=require(RS.ItemTraitNames) -- (R152: selecting a plant is silent; R150 clicked Bubble04 for it)
 local fruitTarget=require(RS:WaitForChild('FruitCursorTarget')).new();local touchPointer;local overHarvest=false
 local Picker=require(RS:WaitForChild('PlantShovelPicker'));local player=Players.LocalPlayer;local pg=player:WaitForChild('PlayerGui')
 local picker,releasePicker=Picker.Acquire(workspace:WaitForChild('ChestChaseMap'))
@@ -200,7 +201,7 @@ connect(Run.Heartbeat,function(dt)
   Traits.Style(traits,fruit)
   if def.Regrows==false or def.Mode=='whole'then text..='\nSingle harvest';lines+=1 end
   if lastTraits~=text then traits.Text=text;lastTraits=text end
-  action.Text=(keyButton.Text=='E'and'Press E'or keyButton.Text)..' to harvest'
+  action.Text=(keyButton.Text=='E'and'Press E'or keyButton.Text)..' to pick'
   local traitHeight=13*lines;traits.Size=UDim2.new(1,-52,0,traitHeight);action.Position=UDim2.fromOffset(46,23+traitHeight)
   local size=UDim2.fromOffset(panelWidth,37+traitHeight)
   if harvest.Size~=size then harvest.Size=size;harvestWorld.Size=size end

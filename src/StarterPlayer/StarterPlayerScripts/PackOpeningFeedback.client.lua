@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R37 local presentation. Click counts and the seed award are owned by ChestService.
 local Players=game:GetService('Players')
 local RS=game:GetService('ReplicatedStorage')
@@ -14,6 +15,21 @@ local function frame(name,parent,color,position,size,angle)
  f.BackgroundColor3=color;f.BorderSizePixel=0;f.Rotation=angle or 0;f.Parent=parent;return f
 end
 local sequence=require(RS.RarityRevealScreen).Create(gui);local revealAudio=require(RS.RarityRevealAudio);revealAudio.Preload()
+-- R151: one reveal ladder for every rarity (RarePullCinematic): the seed card for Common..Mythic, the story scenes for Secret / Cosmic / King.
+-- The pack's suspense (wobble, tear, hint colour) is in the world (SeedPackClient); this script keeps the clicks, the shakes and the small pops.
+local Ladder=require(RS:WaitForChild('RarePullRules'))
+local MechFx;local function mech()if not MechFx then local m=RS:FindFirstChild('MechPackFx153');local ok,mod=pcall(function()return m and require(m)end);MechFx=ok and mod or nil end;return MechFx end -- R153: the Mech pack's clicks 1-4 back out a bolt each, with a ratchet tick
+-- R152 (owner: "sometimes the animation not playing"): the director is fetched again on the next pack if it was not there yet (it used
+-- to be given 10 s at start-up, then every pull of the session fell back to the old reveal).
+local Rare
+local function director()
+ if Rare then return Rare end
+ local m=RS:FindFirstChild('RarePullCinematic')
+ if not m and Rare==nil then m=RS:WaitForChild('RarePullCinematic',10)end -- (only at start-up: a reveal never waits for it)
+ local ok,mod=pcall(require,m);if ok and type(mod)=='table'then Rare=mod;pcall(Rare.Bind,script)else Rare=false end
+ return Rare or nil
+end
+director()
 local white=Color3.fromRGB(245,247,255)
 local panel=frame('Cover',gui,Color3.fromRGB(9,9,18),UDim2.fromScale(.5,.5),UDim2.fromScale(1.06,1.06));panel.Visible=false;panel.ZIndex=1
 local canvas=frame('Effects',gui,white,UDim2.fromScale(.5,.5),UDim2.fromScale(1,1));canvas.BackgroundTransparency=1;canvas.ZIndex=2
@@ -55,11 +71,15 @@ local function clearCopy(restore)
  if restore then for p,value in pairs(originals)do if p.Parent then p.LocalTransparencyModifier=value end end end
  table.clear(originals)
 end
+-- R152 perf: the cover, rings, burst, sparkles and crown pieces are shown / hidden every frame of a reveal (and hidden every frame after a small
+-- one); only this script shows them, so it remembers what it set and writes a change only
+local shown={}
+local function vis(o,v)if shown[o]~=v then shown[o]=v;o.Visible=v end;return v end
 local function hideEffects()
  sequence:Hide()
- panel.Visible=false;ring.Visible=false;burst.Visible=false
- for _,p in ipairs(nodes)do p.Visible=false end
- for _,p in ipairs(crownParts)do p.Visible=false end
+ vis(panel,false);vis(ring,false);vis(burst,false)
+ for _,p in ipairs(nodes)do vis(p,false)end
+ for _,p in ipairs(crownParts)do vis(p,false)end
 end
 local function clear()
  revealAudio.Stop()
@@ -78,19 +98,35 @@ local function cloneBag(bag)
   end
  end
  copy.Parent=workspace
- for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')then originals[p]=p.LocalTransparencyModifier;p.LocalTransparencyModifier=1 end end
+ for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')or p:IsA('Decal')then originals[p]=p.LocalTransparencyModifier;p.LocalTransparencyModifier=1 end end -- R147: a Decal (the Verity picture) too
 end
 local function pulse()
  if not active or active:GetAttribute('RevealAt')then return end
  pulseAt=os.clock();pulseStrength=.13+count*.025
- cloneBag(active);kick(.85+count*.16);Audio.Play('Bubble04')
+ -- R150: every click the server rules accept (one per Rules.ClickInterval) sounds: the cue's own 0.09 s gap used to swallow 2 of 5 at full
+ -- tapping speed while the bag still shook. The gap here is a little under the click interval, so rapid input never stacks beyond the accepted rate.
+ cloneBag(active);kick(.85+count*.16);local m=mech();if m and copy and m.Click(copy,count,os.clock())then Audio.Play('MechClick',Rules.ClickInterval*.8)else Audio.Play('Bubble04',Rules.ClickInterval*.8)end
 end
 local function beginReveal(bag)
  if reveal or not bag:GetAttribute('RevealSeedId')then return end
- clearCopy(false)
- local _,rarity=Rules.GetRarity(bag:GetAttribute('RevealSeedId'))
  local at=bag:GetAttribute('RevealAt');if not at then return end
- reveal={At=at,Rank=rarity.Rank,Color=rarity.Color};revealAudio.Begin(rarity.Rank,workspace:GetServerTimeNow()-at)
+ clearCopy(false)
+ -- R152: a seed this client does not know (yet) still gets a reveal (as Common) instead of an error every frame and no reveal at all
+ local okR,_,rarity=pcall(Rules.GetRarity,bag:GetAttribute('RevealSeedId'))
+ if not okR or type(rarity)~='table'or not rarity.Rank then rarity={Rank=1,Color=white}end
+ reveal={At=at,Rank=rarity.Rank,Color=rarity.Color or white}
+ -- R151: the director decides first (R153: the short version only with "Skip pack animations" on), so the world pack's suspense uses the same timing.
+ local started=false
+ local Director=director()
+ if Director then
+  local tool=player.Character and player.Character:FindFirstChildOfClass('Tool')
+  local ok,run=pcall(Director.Start,{Rank=rarity.Rank,SeedId=bag:GetAttribute('RevealSeedId'),At=at,Bag=bag,Tool=tool and tool:GetAttribute('SeedPackTool')and tool or nil,Mutation=bag:GetAttribute('PackMutation')})
+  started=ok and run~=nil -- (R152: a start that failed returns nothing, and the older reveal below plays instead of nothing)
+ end
+ reveal.Director=started
+ local quick=Ladder.QuickFor(bag);reveal.BurstAt=Ladder.BurstAt(rarity.Rank,quick);reveal.Pulses=Ladder.Pulses(rarity.Rank,quick);reveal.Pulse=1
+ if rarity.Rank>=6 and started then reveal.Cinematic=true;return end -- the story scene owns the screen, the camera and the sound
+ if not started then revealAudio.Begin(rarity.Rank,workspace:GetServerTimeNow()-at)end
  kick(rarity.Rank>=6 and 2.1 or 1.65)
 end
 local function watchTool(tool)
@@ -114,10 +150,12 @@ table.insert(connections,player.CharacterAdded:Connect(character))
 table.insert(connections,player.CharacterRemoving:Connect(clear))
 if player.Character then character(player.Character)end
 Run:BindToRenderStep('ChestChasePackCameraReset',Enum.RenderPriority.Camera.Value-1,resetCamera)
-Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Value+1,function()
+local function presentation()
  local char=player.Character;local bag=char and char:FindFirstChild('CarriedSeed')
  local tool=char and char:FindFirstChildOfClass('Tool')
- if bag and bag:GetAttribute('SeedPackCarry')and tool and tool:GetAttribute('SeedPackTool')then
+ -- (R152: a pack whose reveal has begun keeps it when the tool is put away: the hotbar switched on the frame of the last click used to
+ -- drop the reveal before it was ever started)
+ if bag and bag:GetAttribute('SeedPackCarry')and(tool and tool:GetAttribute('SeedPackTool')or bag:GetAttribute('RevealAt'))then
   if active~=bag then clear();active=bag end
  elseif active then clear()end
  local now=os.clock()
@@ -126,44 +164,102 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
   if serverCount>count then count=serverCount;pulse()end
   if active:GetAttribute('RevealAt')then beginReveal(active)end
   if copy and not reveal then
-   local age=now-pulseAt;local envelope=math.exp(-age*15);local wave=math.cos(age*72)
-   local intensity=reduced()and .22 or 1
-   copy:PivotTo(active.PrimaryPart.CFrame*CFrame.new(wave*pulseStrength*envelope*intensity,math.sin(age*55)*pulseStrength*.8*envelope*intensity,pulseStrength*1.2*envelope*intensity)*CFrame.Angles(0,0,wave*.19*envelope*intensity))
+   -- (R152: a struck spring, sin not cos: it moves off its rest from the click instead of jumping a quarter stud on the click's frame)
+   local age=now-pulseAt;local envelope=math.exp(-age*15);local wave=math.sin(age*72)
+   local intensity=reduced()and .22 or 1;local push=math.sin(math.min(age*31,math.pi/2))
+   copy:PivotTo(active.PrimaryPart.CFrame*CFrame.new(wave*pulseStrength*envelope*intensity,math.sin(age*55)*pulseStrength*.8*envelope*intensity,pulseStrength*1.2*push*envelope*intensity)*CFrame.Angles(0,0,wave*.19*envelope*intensity))
+   local m=mech();if m then m.StepClicks(copy,now,reduced())end -- (R153: the clicked bolts, after the shake)
   end
  end
- if reveal then
-  local t=workspace:GetServerTimeNow()-reveal.At;local rank=reveal.Rank
-  local sequenceState=sequence:Step(rank,t,reduced());revealAudio.Step(rank,t)
-  if not reveal.Burst and t>=require(RS.RarityRevealSequence).SeedAt(rank)then reveal.Burst=true;revealAudio.Burst(rank);kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)end
-  local duration=rank>=6 and 0 or .7
-  burst.Visible=rank<6 and t>=0 and t<.23
-  if burst.Visible then local a=math.clamp(t/.23,0,1);burst.Size=UDim2.fromScale(.08+.38*a,.08+.38*a);burstStroke.Transparency=a;burstStroke.Color=reveal.Color end
-  if t<duration then
-   local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
-   local rise=1-(1-math.clamp(t/.3,0,1))^3
-   -- Common to Rare use the world seed reveal. No screen-cover treatment.
-   if rank>=4 then
-    panel.Visible=rank>=6
-    panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
-    panel.BackgroundTransparency=fade
-    local color=rank==6 and white or rank==7 and Color3.fromRGB(180,159,255)or rank==5 and Color3.fromRGB(255,85,102)or Color3.fromRGB(255,213,100)
-    ring.Visible=true;ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
-    local n=rank>=6 and 24 or 10
+ if reveal and not reveal.Cinematic then
+  local t=workspace:GetServerTimeNow()-reveal.At+Ladder.Shift(active);local rank=reveal.Rank -- (R153: a skipped card: the pack's pops jump with it)
+  local sequenceState=sequence:Step(rank,t,reduced());if not reveal.Director then revealAudio.Step(rank,t)end
+  revealAudio.Tick(t)
+  -- R151: the pack wobbles in the world on each suspense pulse; the camera gives a small kick with it (not with ReducedMotion)
+  while reveal.Pulses[reveal.Pulse]and t>=reveal.Pulses[reveal.Pulse]do reveal.Pulse+=1;if rank>=2 and t-reveal.Pulses[reveal.Pulse-1]<.15 then kick(.35+.12*rank)end end
+  if not reveal.Burst and t>=reveal.BurstAt then
+   reveal.Burst=true
+   -- (RarityRevealAudio drops a cue that reaches it late against SeedAt; the seed now bursts out at the end of the suspense, so lateness
+   -- is measured from there)
+   -- (R152: with the director, Legendary / Mythic hear ITS hit on the burst; the older impact + chime here doubled it. The low tiers'
+   -- second / third notes wait on this clock.)
+   do local clock=t;local t=t-(reveal.BurstAt-require(RS.RarityRevealSequence).SeedAt(rank));revealAudio.Burst(rank,t,clock,not reveal.Director)end
+   kick(rank==8 and 2.6 or rank==7 and 2 or 1.2)
+  end
+  local duration=rank>=6 and 0 or math.max(.7,reveal.BurstAt+.6) -- (R151: the small pops follow the burst, which now ends the suspense)
+  vis(burst,rank<6 and t>=0 and t<.23)
+  -- (R152: the ring of the fifth click is neutral: in the tier colour it told the rarity before the suspense had begun)
+  if shown[burst] then local a=math.clamp(t/.23,0,1);local e=1-(1-a)^3;burst.Size=UDim2.fromScale(.08+.38*e,.08+.38*e);burstStroke.Transparency=a;burstStroke.Color=Ladder.Neutral end
+  -- R136 (owner: polish Legendary / Mythic pulls): motes gather during their short charge-up, then the ring bursts
+  -- out with a soft colour flash exactly when the seed does.
+  local at=reveal.BurstAt
+  if(rank==4 or rank==5)and not reveal.Director then -- (R151: the seed card draws Legendary / Mythic now; this is the fallback without it)
+   local color=rank==5 and Color3.fromRGB(235,120,255)or Color3.fromRGB(255,213,100)
+   local n=rank==5 and 16 or 10
+   if t<at then
+    local q=math.clamp(t/at,0,1)
+    vis(ring,false);vis(panel,false)
     for i,p in ipairs(nodes)do
-     p.Visible=i<=n
-     if p.Visible then
-      local angle=i*math.pi*2/n+(rank==7 and t*.45 or 0);local radius=.17+rise*(rank>=6 and .39 or .20)
+     if vis(p,i<=n)then
+      local angle=i*math.pi*2/n+t*(rank==5 and 2.2 or 1.6);local radius=.46-q*.32
       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
-      p.BackgroundColor3=color;p.BackgroundTransparency=fade
-      if rank==6 then p.Size=UDim2.fromScale(.006,.05+rise*.08);p.Rotation=angle*180/math.pi+90
-      elseif rank==7 then p.Size=UDim2.fromScale(.008+(i%3)*.004,.008+(i%3)*.004);p.Rotation=45+t*50
-      elseif rank==8 then p.Size=UDim2.fromScale(.007,.10+rise*.10);p.Rotation=angle*180/math.pi+90
-      else p.Size=UDim2.fromScale(.008,.018);p.Rotation=45+t*40 end
+      p.Size=UDim2.fromScale(.01,.01);p.Rotation=45;p.BackgroundColor3=color;p.BackgroundTransparency=1-q*.85
      end
     end
-    for _,p in ipairs(crownParts)do p.Visible=rank==8;p.BackgroundTransparency=fade end
-   end
-  elseif rank<6 then hideEffects()end
+   elseif t<at+.75 then
+    local tb=t-at;local fade=math.clamp((tb-.15)/.6,0,1);local rise=1-(1-math.clamp(tb/.3,0,1))^3
+    vis(panel,not reduced()and tb<.3);panel.BackgroundColor3=color;panel.BackgroundTransparency=.72+math.clamp(tb/.3,0,1)*.28
+    vis(ring,true);ring.Size=UDim2.fromScale(.15+rise*.55,.15+rise*.55);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank==5 and 3 or 2
+    for i,p in ipairs(nodes)do
+     if vis(p,i<=n)then
+      local angle=i*math.pi*2/n;local radius=.14+rise*(rank==5 and .30 or .24)
+      p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+      p.Size=UDim2.fromScale(.009,.024);p.Rotation=angle*180/math.pi+90;p.BackgroundColor3=color;p.BackgroundTransparency=fade
+     end
+    end
+   else vis(ring,false);vis(panel,false);for _,p in ipairs(nodes)do vis(p,false)end end
+  else
+   if t<duration then
+    local fade=math.clamp((t-(rank>=6 and .5 or .15))/(duration-(rank>=6 and .5 or .15)),0,1)
+    local rise=1-(1-math.clamp(t/.3,0,1))^3
+    -- Common to Rare use the world seed reveal. No screen-cover treatment.
+    -- R138 (owner: "very little minor animations" for Common / Uncommon / Rare): a few tiny sparkles pop out in the
+    -- tier colour when the seed does (4 / 6 / 8), plus a faint second ring for Rare. Skipped with reduced motion.
+    if rank<=3 then
+     local tb=t-at;local life=.45
+     local show=tb>=0 and tb<life and not reduced()
+     local k=math.clamp(tb/life,0,1);local pop=1-(1-k)^3;local n=rank==3 and 8 or rank==2 and 6 or 4
+     if vis(ring,show and rank==3)then ring.Size=UDim2.fromScale(.1+pop*.22,.1+pop*.22);stroke.Color=reveal.Color;stroke.Transparency=.35+k*.65;stroke.Thickness=2 end
+     for i,p in ipairs(nodes)do
+      if vis(p,show and i<=n)then
+       local angle=i*math.pi*2/n+.4;local radius=.05+pop*(.06+rank*.025);local size=.006+rank*.0015
+       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+       p.Size=UDim2.fromScale(size,size);p.Rotation=45+tb*160;p.BackgroundColor3=reveal.Color;p.BackgroundTransparency=k
+      end
+     end
+    end
+    if rank>=6 then -- (R151: was rank>=4, but Legendary / Mythic never reached this branch; with the seed card they do, and must not)
+     vis(panel,rank>=6)
+     panel.BackgroundColor3=rank==6 and Color3.fromRGB(7,7,10)or rank==7 and Color3.fromRGB(12,8,33)or Color3.fromRGB(40,25,5)
+     panel.BackgroundTransparency=fade
+     local color=rank==6 and white or rank==7 and Color3.fromRGB(180,159,255)or rank==5 and Color3.fromRGB(255,85,102)or Color3.fromRGB(255,213,100)
+     vis(ring,true);ring.Size=UDim2.fromScale(.15+rise*.49,.15+rise*.49);stroke.Color=color;stroke.Transparency=fade;stroke.Thickness=rank>=6 and 4 or 2
+     local n=rank>=6 and 24 or 10
+     for i,p in ipairs(nodes)do
+      if vis(p,i<=n)then
+       local angle=i*math.pi*2/n+(rank==7 and t*.45 or 0);local radius=.17+rise*(rank>=6 and .39 or .20)
+       p.Position=UDim2.fromScale(.5+math.cos(angle)*radius,.5+math.sin(angle)*radius)
+       p.BackgroundColor3=color;p.BackgroundTransparency=fade
+       if rank==6 then p.Size=UDim2.fromScale(.006,.05+rise*.08);p.Rotation=angle*180/math.pi+90
+       elseif rank==7 then p.Size=UDim2.fromScale(.008+(i%3)*.004,.008+(i%3)*.004);p.Rotation=45+t*50
+       elseif rank==8 then p.Size=UDim2.fromScale(.007,.10+rise*.10);p.Rotation=angle*180/math.pi+90
+       else p.Size=UDim2.fromScale(.008,.018);p.Rotation=45+t*40 end
+      end
+     end
+     for _,p in ipairs(crownParts)do vis(p,rank==8);p.BackgroundTransparency=fade end
+    end
+   elseif rank<6 then hideEffects()end
+  end
  end
  if shake then
   local age=now-shake.At
@@ -171,12 +267,19 @@ Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Val
   else
    local camera=workspace.CurrentCamera
    if camera then
-    local a=(1-age/.22)^2*shake.Strength
-    local offset=CFrame.new(math.cos(age*96)*.028*a,math.sin(age*73)*.018*a,-.025*a)*CFrame.Angles(0,0,math.sin(age*83)*math.rad(.22)*a)
+    local a=(1-age/.22)^2*shake.Strength*math.sin(math.min(age*40,math.pi/2)) -- (R152: eased in over 40 ms, no jump on the kick's frame)
+    local offset=CFrame.new(math.sin(age*96)*.028*a,math.sin(age*73)*.018*a,-.025*a)*CFrame.Angles(0,0,math.sin(age*83)*math.rad(.22)*a)
     lastCamera=camera;lastOffset=offset;camera.CFrame=camera.CFrame*offset;lastWritten=camera.CFrame
    end
   end
  end
+end
+-- R152: an error in one frame (a missing part, a pack this client cannot draw) is logged once and the next frame runs again: it never
+-- stops every later pack's reveal for the rest of the session.
+local warned=false
+Run:BindToRenderStep('ChestChasePackPresentation',Enum.RenderPriority.Camera.Value+1,function()
+ local ok,err=pcall(presentation)
+ if not ok and not warned then warned=true;warn('[PackOpening] '..tostring(err))end
 end)
 script.Destroying:Connect(function()
  Run:UnbindFromRenderStep('ChestChasePackCameraReset');Run:UnbindFromRenderStep('ChestChasePackPresentation')

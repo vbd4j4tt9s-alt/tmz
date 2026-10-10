@@ -83,7 +83,7 @@ function Admin.Execute(ctx,requester,command)
   else
    local records=data:GetChestRecords(p);local count=0;local inventory=command.Item~='garden'
    if command.Operation=='give'then
-    if #records+#selected>ctx.Config.MaxSavedChests then reason='seed inventory is full'
+    if #records+#selected>ctx.Config.MaxSavedChests or not data:RoomFor(p,#selected)then reason='inventory is full (200 items max)' -- R155: the cap
     else
      local pending={};local serial=p:GetAttribute('ChestInventorySerial')or 0
      for _,spec in ipairs(selected)do
@@ -91,11 +91,13 @@ function Admin.Execute(ctx,requester,command)
       if not seed then reason='seed catalog mismatch';break end
       serial+=1;table.insert(pending,{Id=Http:GenerateGUID(false),Kind='Seed',ChestNumber=serial,ChestName=seed.Name,
        Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
-       SeedScale=Packs.SanitizeSeedScale(size),BagVariant='Pack03',PackSize=1,PackMutation=coat})
+       SeedScale=Packs.SanitizeSeedScale(size),BagVariant='Pack03',PackSize=1,PackMutation=coat,TestGrant=true}) -- R152: an owner-given seed is a TEST seed
      end
      if not reason then
       for _,record in ipairs(pending)do table.insert(records,record);data:MarkSeedDiscovered(p,record.SeedId,true)end
       p:SetAttribute('ChestInventorySerial',serial);count=#pending
+      -- R151: seeds an owner gave are not counted for the hub's BIGGEST FRUIT / BEST PULL boards (the rest of this session).
+      local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,p)end
      end
     end
    elseif command.Operation=='take'then

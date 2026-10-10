@@ -6,6 +6,14 @@ local Config=require(script.Parent.KeeperRigConfig)
 local Combat=require(script.Parent.KeeperCombat)
 local Signature=require(script.Parent.KeeperSignatureStrike)
 local Fx={MaxLights=3,DustDistance=120,BreathDistance=90,ShakeDistance=60,Rate=90,LowRate=35}
+-- R124: keepers whose move smashes the ground (KeeperSignatureStrike Ground) play this at the visual impact frame.
+-- Punches, swipes and pushes keep their sounds. A silent lead-in can be trimmed with SoundTiming Start_<id>.
+Fx.GroundSound={Id='rbxassetid://73468358342062',Volume=.5,Lifetime=4}
+-- R150: the slam SOUND is gated by how far a one-shot can be heard (LocalSfx rolls off at 260), not by DustDistance (120), which only limits the
+-- dust, accent and shake. Fx.SlamHeard[stage] = when a slam sound of that stage last actually played: KeeperHitEffects skips its generic snap
+-- exactly then, so a hit near any distance sounds as one slam OR one snap, never both and never neither.
+Fx.GroundSoundDistance=260;Fx.SlamHeard={};Fx.SlamHeardSeconds=1.5
+local groundPreloaded=false
 local V,CF=Vector3.new,CFrame.new
 local SMOKE='rbxasset://textures/particles/smoke_main.dds'
 local SPARK='rbxasset://textures/particles/sparkles_main.dds'
@@ -186,9 +194,12 @@ function Fx.Accent(kind,point,frame,isLow)
 end
 -- Per keeper ------------------------------------------------------------------------------------
 local function center(b)return V((b[1][1]+b[2][1])/2,(b[1][2]+b[2][2])/2,(b[1][3]+b[2][3])/2)end
-function Fx.new(root,stage)
- local spec=Fx.Stages[stage];local rig=Config[stage];if not spec or not rig then return nil end
- local self={Root=root,Stage=stage,Spec=spec,Feet={},NextBreath=0,NextSlither=0,LastCycle=nil}
+-- R152: config = the keeper's rig config (KeeperRigConfig152.Get for the baked models: their bounds, eyes and Mouth); nil = today's.
+function Fx.new(root,stage,config)
+ local spec=Fx.Stages[stage];local rig=config or Config[stage];if not spec or not rig then return nil end
+ local self={Root=root,Stage=stage,Spec=spec,Feet={},NextBreath=0,NextSlither=0,LastCycle=nil,MouthPoint=rig.Mouth and V(table.unpack(rig.Mouth))or Fx.Mouth[stage]}
+ self.GroundSound=(Signature.Moves[stage]and Signature.Moves[stage].Ground)==true
+ if self.GroundSound and not groundPreloaded then groundPreloaded=true;require(script.Parent.LocalSfx).Preload({Fx.GroundSound.Id})end
  local s=spec.Size
  self.Foot=Instance.new('Attachment');self.Foot.Name='KeeperFxFoot';self.Foot.Parent=root
  self.Dust=emitter(self.Foot,SMOKE,spec.Dust,3.2*s,.5,.8,5*s)
@@ -243,13 +254,16 @@ function Fx.Step(self,c)
   local want=not isLow and c.Distance<120 and c.Chasing and c.Awake>.5
   if want and not lit[self]then local count=0;for _ in pairs(lit)do count+=1 end;if count>=Fx.MaxLights then want=false end end
   if want then
-   lit[self]=true;self.Light.Enabled=true;self.Light.Brightness=.6+1.6*math.clamp(c.Urgency or 0,0,1)
+   -- (R152 perf: the light, its brightness and the breath rate are written when they change, against what was written: Roblox keeps them as
+   -- 32-bit floats, so reading them back never matched; nothing else writes them)
+   if not lit[self]then lit[self]=true;self.Light.Enabled=true end
+   local b=.6+1.6*math.clamp(c.Urgency or 0,0,1);if self.LitB~=b then self.LitB=b;self.Light.Brightness=b end
    if frames and frames.Head then place(self.Eyes,self.Root,frame*frames.Head*CF(self.EyePoint))end
-  elseif lit[self]then lit[self]=nil;self.Light.Enabled=false end
+  elseif lit[self]then lit[self]=nil;self.Light.Enabled=false;self.LitB=nil end
  end
  if self.Ambient then
   local on=not isLow and c.Distance<Fx.BreathDistance and c.Awake>.6
-  if on then self.Ambient.Rate=spec.Ambient.Rate*(1+(c.Urgency or 0));if frames and frames.Body then place(self.Body,self.Root,frame*frames.Body*CF(self.BodyPoint))end end
+  if on then local r=spec.Ambient.Rate*(1+(c.Urgency or 0));if self.AmbientRate~=r then self.AmbientRate=r;self.Ambient.Rate=r end;if frames and frames.Body then place(self.Body,self.Root,frame*frames.Body*CF(self.BodyPoint))end end
   if self.Ambient.Enabled~=on then self.Ambient.Enabled=on end
  end
  -- Footfalls: detect the gait phase crossing a contact and puff at the lowest foot.
@@ -282,7 +296,7 @@ function Fx.Step(self,c)
  if self.Breath and not isLow and c.Distance<Fx.BreathDistance and frames.Head and now>=self.NextBreath then
   self.NextBreath=now+(c.Chasing and .55 or 1.5)+math.random()*.3
   local n=Fx.Spend(c.Chasing and 3 or 2,now,isLow)
-  if n>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(Fx.Mouth[self.Stage]));self.Breath:Emit(n)end
+  if n>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(self.MouthPoint));self.Breath:Emit(n)end
  end
 end
 -- Wake burst: ground ring and dust at the body, a breath burst, and a short shake nearby.
@@ -294,19 +308,24 @@ function Fx.Wake(self,c)
  local n=Fx.Spend(c.Low and 6 or 14,c.Now,c.Low)
  if n>0 then place(self.Foot,self.Root,CF(ground));self.Dust:Emit(n)end
  if self.Breath and frames and frames.Head and not c.Low then
-  local m=Fx.Spend(8,c.Now,c.Low);if m>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(Fx.Mouth[self.Stage]));self.Breath:Emit(m)end
+  local m=Fx.Spend(8,c.Now,c.Low);if m>0 then place(self.Mouth,self.Root,frame*frames.Head*CF(self.MouthPoint));self.Breath:Emit(m)end
  end
  if c.LocalDistance and c.LocalDistance<45 then Fx.Shake((.25+spec.Heavy*.5)*(1-c.LocalDistance/45))end
 end
 -- Strike slam at the client's impact instant (visual only; the server decides the hit).
 function Fx.Slam(self,c)
- if not self or self.Destroyed or c.Distance>Fx.DustDistance then return end
+ if not self or self.Destroyed then return end
  local spec=self.Spec;local reach=Combat.Get(self.Stage).Reach
  local point=c.Frame*V(0,-4,-reach*.55)
  -- R123: the move's own accent at its striking tip (from the client strike frames), small and budgeted.
  local tip,n0=V(),0
  if c.Frames then for _,t in ipairs(self.Tips)do local f=c.Frames[t.Group];if f then tip+=c.Frame*(f*t.Point);n0+=1 end end end
  local strike=n0>0 and tip/n0 or point
+ -- R150: the sound first, gated by hearing range (Fx.GroundSoundDistance), not by the dust range below.
+ if self.GroundSound and c.Distance<=Fx.GroundSoundDistance then
+  if require(script.Parent.LocalSfx).Play(Fx.GroundSound.Id,V(strike.X,point.Y,strike.Z),Fx.GroundSound.Volume,1,Fx.GroundSound.Lifetime)then Fx.SlamHeard[self.Stage]=os.clock()end
+ end
+ if c.Distance>Fx.DustDistance then return end
  local n=Fx.Spend(c.Low and 2 or 4,c.Now,c.Low)
  if n>0 then place(self.Foot,self.Root,CF(V(strike.X,point.Y,strike.Z)));self.Dust:Emit(n)end
  if self.Accent then Fx.Accent(self.Accent,strike,c.Frame,c.Low)end

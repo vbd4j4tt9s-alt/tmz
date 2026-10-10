@@ -72,7 +72,18 @@ function E:_publish()
 end
 function E:EnsureGuardian()
  if not self.Home or not self.Folder or not self.Folder.Parent then return nil end
- if not self.Guardian or not self.Guardian.Parent then self.Guardian=Art.Build(self.Home,self.Folder)end
+ if not self.Guardian or not self.Guardian.Parent then
+  -- R152: the baked rev 6 Darkened when its template is ready (KeeperMeshes152), else today's blocks; a spawn never waits for the bake.
+  local okMeshes,Meshes=pcall(require,script.Parent:FindFirstChild('KeeperMeshes152'))
+  local meshes=okMeshes and Meshes.Wanted(0)and Meshes.DarkenedParts()or nil
+  self.Guardian=Art.Build(self.Home,self.Folder,meshes)
+  -- R141: The Darkened runs at a fixed speed; its label shows the Speed that outruns it.
+  if self.Guardian then
+   self.Guardian:SetAttribute('KeeperEscapeSpeed',require(game:GetService('ReplicatedStorage').RouteBalance83).EventSpeed)
+   self.Guardian:SetAttribute('KeeperHome',self.Home.Position) -- R153: where it spawned for this appearance (the SPEED NEEDED sign stays there)
+   game:GetService('CollectionService'):AddTag(self.Guardian,'BiomeKeeper')
+  end
+ end
  return self.Guardian
 end
 function E:_dropSlot(slot)
@@ -123,13 +134,13 @@ function E:_makeSlot(index,cycle,ground,floorY,endZ)
  local body=Instance.new('Part');body.Name='Body';body.Size=Vector3.new(.3,.3,.3);body.Anchored=true;body.Transparency=1
  body.CanCollide=false;body.CanQuery=false;body.CanTouch=false
  body.CFrame=CFrame.new(ground.Position.X+(E.SlotOffsets[index]or 0),floorY+5,endZ-48);body.Parent=model;model.PrimaryPart=body
- local prompt=Instance.new('ProximityPrompt');prompt.Name='Steal';prompt.KeyboardKeyCode=Enum.KeyCode.E;prompt.HoldDuration=0
+ local prompt=Instance.new('ProximityPrompt');prompt.Name='Steal';prompt.KeyboardKeyCode=Enum.KeyCode.E;prompt.HoldDuration=chase.Config.StealHoldSeconds or 1 -- R125: hold E
  prompt.MaxActivationDistance=24;prompt.RequiresLineOfSight=false;prompt.ActionText='STEAL';prompt.ObjectText='Void Pack';prompt.Parent=body
  local billboard=Instance.new('BillboardGui');billboard.Enabled=false;billboard.Parent=body
  local glow=Instance.new('PointLight');glow.Enabled=false;glow.Parent=body
  model.Parent=self.Folder
  local seed={Model=model,Body=body,Prompt=prompt,Billboard=billboard,Glow=glow,Stage=7,EventKeeper=true,SlotIndex=index,
-  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=PackRules.OddsVersion}
+  Kind='Pack',SeedName='Void Pack',Available=false,Generation=cycle,PartState={},PackHome=body.Position,OddsVersion=PackRules.OddsVersion,TestGrant=self.Forced==true or nil} -- R151: a Void pack of an owner-forced event is a TEST pack (its open is never announced)
  chase.KnownSeeds[seed]=true
  chase.Chests:RefreshWorldPack(seed,'EclipseReliquary')
  seed.Connection=prompt.Triggered:Connect(function(player)chase:Begin(player,seed)end)
@@ -140,6 +151,7 @@ function E:Spawn(cycle,force)
  if self:Active()and not force then return false end
  if not force and not require(RS.PackSchedule81).Event(cycle)then return false end
  self:Clear()
+ self.Forced=force==true -- R151: force = an owner command / Studio test; the packs of this event carry TestGrant (ChestService:Bank hands it to the pack record)
  local chase=self.Chase;local ground=chase.Chests:_packGround(7)
  if not ground then warn('[R81] Storm event ground is missing');return false end
  local endZ=chase.Map.MapRoot:GetAttribute('BiomeTrackEndZ')or(ground.Position.Z+ground.Size.Z*.5)

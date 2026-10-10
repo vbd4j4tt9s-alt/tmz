@@ -1,6 +1,9 @@
 -- R54. Two arms reach forward using this frame's animated torso, on both R6 and R15.
 -- Cosmetic arm solver for R6/R15 and Motor6D/AnimationConstraint.
 -- Writes only Transform, after Animator evaluation; never edits rig attachments.
+-- R158 bats: while this client plays a bat swing on the character (BatClient sets the client-only attribute BatSwingArm), the right arm is the bat's:
+-- the carry pose leaves it alone and keeps the left hand on the pack, and the bat leaves the left arm and the waist alone (it folds the twist into the
+-- right arm), so the two scripts never write the same joint or read one the other writes, in whatever order their PreSimulation handlers run.
 local Rules=require(script.Parent.SeedPackRules)
 local Pose={};Pose.__index=Pose
 local function jointInfo(j)
@@ -81,7 +84,9 @@ function Pose:Apply(bag,now)
     local characterRoot=character:FindFirstChild('HumanoidRootPart')
     local carryOffset=bag:GetAttribute('CarryRootOffset')
     local bagFrame=characterRoot and typeof(carryOffset)=='CFrame'and characterRoot.CFrame*carryOffset or root.CFrame
+    local batArm=character:GetAttribute("BatSwingArm")==true
     for _,side in ipairs({"Left","Right"}) do
+        if batArm and side=="Right" then continue end
         local sign=side=="Left" and -1 or 1
         local shoulder=self.ByChild[side.."UpperArm"] or self.ByChild[side.." Arm"]
         local grip=root:FindFirstChild(side.."Grip")

@@ -221,7 +221,7 @@ function ChaseService:_createCarriedChest(character, _rootPart, chest)
     local humanoid=character:FindFirstChildOfClass("Humanoid")
     if humanoid then humanoid:UnequipTools() end
     local old=character:FindFirstChild("CarriedSeed");if old then old:Destroy() end
-    local model=require(ReplicatedStorage.SeedPackVisuals).CarryBag(character,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation)
+    local model=require(ReplicatedStorage.SeedPackVisuals).CarryBag(character,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation,chest.PackShape) -- R151: chest.PackShape = the pack's chip-bag shape (the world seed's roll, cloned with the seed)
     if model then require(ReplicatedStorage.ItemEffectAnchor).Set(model,chest.Weather,nil,chest.PackSize,2*(chest.PackSize or 1))end
     assert(model,"Character torso is not ready")
     model:SetAttribute("Stage",chest.Stage)
@@ -263,7 +263,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	model:SetAttribute("SeedName", "Seed Sack")
     model:SetAttribute("BagVariant",chest.BagVariant)
     model:SetAttribute("SeedScale",chest.SeedScale)
-    model:SetAttribute("PackSize",chest.PackSize);model:SetAttribute("PackMutation",chest.PackMutation)
+    model:SetAttribute("PackSize",chest.PackSize);model:SetAttribute("PackMutation",chest.PackMutation);model:SetAttribute("PackShape",chest.PackShape)
 	model.Parent = self.Map.RuntimeFolder
 
 	local body = self.Map:CreateRuntimePart({Name = "Body", Size = Vector3.new(0.2, 0.2, 0.2),
@@ -271,7 +271,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	body.Transparency = 1
 	body.CanTouch = false
 	body.CanQuery = false
-	local packet = self.Chests:BuildSeedPacket(nil,body.CFrame,model,nil,nil,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation)
+	local packet = self.Chests:BuildSeedPacket(nil,body.CFrame,model,nil,nil,chest.Stage,chest.BagVariant,chest.SeedScale,chest.PackSize,chest.PackMutation,chest.PackShape)
     require(ReplicatedStorage.ItemEffectAnchor).Set(packet,chest.Weather,nil,chest.PackSize,2*(chest.PackSize or 1))
 	local latch = packet.PrimaryPart
 
@@ -286,7 +286,7 @@ function ChaseService:_createDroppedChest(position, chest, dropToken)
 	prompt.Name = "RecoverPrompt"
 	prompt.ActionText = "STEAL"
 	prompt.ObjectText = ""
-	prompt.HoldDuration = 0
+	prompt.HoldDuration = self.Config.DroppedStealHoldSeconds or .5 -- R125: hold E to steal (short: a drop lasts 5 s)
 	prompt.MaxActivationDistance = 24
 	prompt.RequiresLineOfSight = false
     local bounds=self.Chests:GetPackBounds(chest.Stage,chest.BagVariant,chest.PackSize)
@@ -535,6 +535,10 @@ function ChaseService:_preparePersistentGuardian(model, stage)
 	model.Archivable = true
 	model:SetAttribute("PersistentBiomeGuardian", true)
 	model:SetAttribute("Stage", stage)
+	-- R141: the walk speed that outruns this keeper (KeeperSpeedLabels shows the Speed it takes over its head).
+	model:SetAttribute("KeeperEscapeSpeed", require(ReplicatedStorage.KeeperPursuit).EscapeSpeed(stage))
+	local homes = self.GuardianHomeCFrames; if homes and homes[stage] then model:SetAttribute("KeeperHome", homes[stage].Position) end -- R153: the spawn point the SPEED NEEDED sign is pinned to (KeeperSpeedLabels)
+	game:GetService("CollectionService"):AddTag(model, "BiomeKeeper")
 	local isPlaceholder = model:GetAttribute("FutureNPCModelSlot") == true
 		or model:GetAttribute("FallbackGuardian") == true
 
@@ -1078,7 +1082,7 @@ function ChaseService:_applyGuardianFling(run)
     keeper:SetAttribute('KeeperLastHitAt',now)
     self.HitSerial+=1
     self.HitRemote:FireAllClients({Id=self.HitSerial,At=now,Position=root.Position,Stage=run.Stage,
-        VoiceId=keeper:GetAttribute('KeeperVoiceId'),VictimUserId=run.Player.UserId,Direction=direction})
+        VoiceId=keeper:GetAttribute('KeeperVoiceId'),VictimUserId=run.Player.UserId,Direction=direction,Veiled=special and true or nil}) -- R124: The Darkened's own catch effect
     return true
 end
 
@@ -1662,10 +1666,7 @@ end
 
 -- V087_CONCURRENT_KEEPERS
 ChaseService=require(script.Parent:WaitForChild("ConcurrentKeeperService"))(ChaseService)
-local startV142=ChaseService.Start
-function ChaseService:Start(...)
- startV142(self,...)
- require(script.Parent:WaitForChild('StudioTestCommands')).Start(self.Config,self.PlayerData,self.Chests,self,self.Bases,self.Notifications,self.Map)
-end
+-- R153 (architecture review): the owner / test commands no longer start from here (they used to, without a pcall, so an error in the most-edited test file stopped ChaseService:Start
+-- and with it the whole server). ChestChaseServerMain starts them after the game is up, inside a pcall.
 return ChaseService
 	

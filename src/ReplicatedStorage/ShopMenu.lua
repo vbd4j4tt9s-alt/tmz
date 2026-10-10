@@ -15,7 +15,7 @@ function M.Layout(width,trail)
 end
 function M.Action(product,cash,busy)
  cash=cash or 0
- if busy then return 'Please wait',false end
+ if busy then return 'Wait a sec',false end
  if product.Owned then return product.Equipped and'Unequip'or'Equip',true end
  if product.Enabled==false then return product.UnavailableReason or'Coming soon',false end
  if (cash or 0)<(product.Price or 0)then return 'Need $'..Cash.Compact(product.Price-cash),false end
@@ -73,7 +73,7 @@ function M:Render()
  local ids={self.Tab or'',tostring(layout.Narrow),state.BootBiome or'Forest'};for _,p in ipairs(products)do table.insert(ids,p.Id)end
  local key=table.concat(ids,'|')
  if key~=self.Key then self:Clear();self.Key=key;for i,p in ipairs(products)do self.Rows[i]=self:MakeRow(p,i,layout)end end
- self.Empty.Visible=#products==0;self.Empty.Text=self.State and'No items yet.'or'Loading shop…'
+ self.Empty.Visible=#products==0;self.Empty.Text=self.State and'Nothing here yet!'or'Loading shop…'
  local canvas=#products*layout.Height;self.List.CanvasSize=UDim2.fromOffset(0,canvas)
  local y=math.clamp(self.List.CanvasPosition.Y,0,math.max(0,canvas-self.List.AbsoluteSize.Y));if y~=self.List.CanvasPosition.Y then self.List.CanvasPosition=Vector2.new(0,y)end
  for i,r in ipairs(self.Rows)do

@@ -19,15 +19,24 @@ local styles={
  [6]={FrontFold=.20,BackFold=-.55,Splay=.42,Head=-.18,Swing=.60,Roll=math.pi/2},
  [7]={FrontFold=1.70,BackFold=1.70,Splay=.08,Head=-.85,Swing=.80,Pitch=-.15},
 }
-for stage,source in pairs(Config) do
+local function build(source,floor)
  local rig={Pivots={},FloorSamples={},SnakeJoints={}}
  for name,p in pairs(source.Pivots) do rig.Pivots[name]=vector(p) end
- for name,points in pairs(source.FloorSamples) do
+ for name,points in pairs(floor) do
   local samples={};for _,p in ipairs(points) do table.insert(samples,vector(p)) end
   rig.FloorSamples[name]=samples
  end
  for i,p in pairs(source.SnakeJoints or {}) do rig.SnakeJoints[i]=vector(p) end
- rigs[stage]=rig
+ return rig
+end
+for stage,source in pairs(Config) do rigs[stage]=build(source,source.FloorSamples) end
+-- R152: variant 'R152' (the baked rev 6 model) grounds with that model's floor samples (KeeperRigConfig152); same pivots and joints.
+local variantRigs={}
+local function rigFor(stage,variant)
+ if variant~='R152'or not rigs[stage]then return rigs[stage]end
+ local rig=variantRigs[stage]
+ if not rig then rig=build(Config[stage],require(script.Parent.KeeperRigConfig152).Stages[stage].FloorSamples);variantRigs[stage]=rig end
+ return rig
 end
 
 local function legPhase(stage,group)
@@ -42,10 +51,10 @@ local function legPhase(stage,group)
  return (right and math.pi or 0)+(front and 0 or math.pi)
 end
 
-function Pose.Frames(stage,t,awake,moving,phase,urgency,speed,turning)
- local replacement=UpgradePose.Frames(stage,t,awake,moving,phase,urgency,speed,turning)
+function Pose.Frames(stage,t,awake,moving,phase,urgency,speed,turning,variant)
+ local replacement=UpgradePose.Frames(stage,t,awake,moving,phase,urgency,speed,turning,variant)
  if replacement then return replacement end
- local rig=assert(rigs[stage],'Unknown keeper stage')
+ local rig=assert(rigFor(stage,variant),'Unknown keeper stage')
  awake=math.clamp(awake,0,1);moving=math.clamp(moving,0,1)*awake
  -- Smooth endpoints keep the body settled while the eyes start to wake.
  local blend=awake*awake*(3-2*awake);local sleep=1-blend

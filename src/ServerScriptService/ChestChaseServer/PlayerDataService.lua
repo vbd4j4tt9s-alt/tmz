@@ -11,6 +11,16 @@ local Weather=require(game:GetService('ReplicatedStorage').WeatherTraits)
 local Points=require(game:GetService('ReplicatedStorage').SpeedPoints)
 local Progression=require(game:GetService('ReplicatedStorage').Progression81)
 local PackRules = require(game:GetService("ReplicatedStorage"):WaitForChild("SeedPackRules"))
+local VerityCatalog = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityCatalog")) -- R147
+local StarterVerity = require(game:GetService("ReplicatedStorage"):WaitForChild("StarterVerityRules158d")) -- R158d: the new-player gift pack's floor (Floor = Mythic)
+local VerityReasons = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityConfig")).Reasons -- R152: what Verity says when a hand-in is refused (CheckVoidPack / ConvertVoidPack)
+local PackShapes = require(game:GetService("ReplicatedStorage"):WaitForChild("PackShapes151")) -- R151: a pack's chip-bag shape (an optional field of its record)
+-- R151: the optional PackShape of a saved / gifted Pack row: 1-6, or nil (absent, 0, or anything else = the default shape).
+local function savedPackShape(row)
+	if row.Kind ~= "Pack" or not PackShapes.Applies(PackRules.VariantKey(row.BagVariant)) then return nil end -- R152: the Verity pack (flat pouch) and the Void / Mech never carry a shape, whatever an older record says
+	local shape = PackShapes.Sanitize(row.PackShape)
+	return shape > 0 and shape or nil
+end
 
 local function gardenClonePremium(t)local o={};for k,v in pairs(t)do o[k]=type(v)=='table'and gardenClonePremium(v)or v end;return o end
 local PlayerDataService = {}
@@ -35,6 +45,7 @@ function PlayerDataService.new(config, mapService, notifications)
 	self.Revision = {}
 	self.ChestRecords = {}
 	self.OwnedBoosts = {}
+    self.TestBoosts = {};self.TestLuck = {} -- R152: boots an owner command gave (TestGrant), and whether the luck in use comes from them
     self.EquippedBoosts = {}
     self.Treadmills = {}
 	self.PedestalItems = {}
@@ -56,14 +67,31 @@ function PlayerDataService:_disconnectStatLinks(player)
  for _,link in pairs(links.Values)do disconnectStat(link)end
  links.Destroying:Disconnect()
 end
-local function rawStat(self,player,name,class,default,priority)
- local folder=statFolder(player,'ChestChaseStats');local leader=statFolder(player,'leaderstats')
+local function statLinks(self,player)
  self.StatLinks=self.StatLinks or{}
  local links=self.StatLinks[player]
  if not links then
   links={Values={}};self.StatLinks[player]=links
   links.Destroying=player.Destroying:Connect(function()self:_disconnectStatLinks(player)end)
  end
+ return links
+end
+-- The player-list cell: a StringValue tagged ChestChaseDisplayStat (never read back as progress) with its Priority (the higher number shows first: Speed 2, Cash 1, Gems 0).
+local function displayStat(leader,name,priority)
+ local display=leader:FindFirstChild(name)
+ if display and not display:IsA('StringValue')then display:Destroy();display=nil end
+ if not display then display=Instance.new('StringValue');display.Name=name;display.Parent=leader end
+ display:SetAttribute('ChestChaseDisplayStat',true)
+ local order=display:FindFirstChild('Priority')
+ if order and not order:IsA('NumberValue')then order:Destroy();order=nil end
+ if not order then order=Instance.new('NumberValue');order.Name='Priority';order.Parent=display end
+ order.Value=priority
+ local primary=display:FindFirstChild('IsPrimary');if primary and primary:IsA('BoolValue')then primary.Value=false end
+ return display
+end
+local function rawStat(self,player,name,class,default,priority)
+ local folder=statFolder(player,'ChestChaseStats');local leader=statFolder(player,'leaderstats')
+ local links=statLinks(self,player)
  local previous=links.Values[name];local value=folder:FindFirstChild(name)
  if not value and previous and previous.Raw then value=previous.Raw;value.Parent=folder end
  if not value then
@@ -78,15 +106,7 @@ local function rawStat(self,player,name,class,default,priority)
   end
  end
  if not value then value=Instance.new(class);value.Name=name;value.Value=default;value.Parent=folder end
- local display=leader:FindFirstChild(name)
- if display and not display:IsA('StringValue')then display:Destroy();display=nil end
- if not display then display=Instance.new('StringValue');display.Name=name;display.Parent=leader end
- display:SetAttribute('ChestChaseDisplayStat',true)
- local order=display:FindFirstChild('Priority')
- if order and not order:IsA('NumberValue')then order:Destroy();order=nil end
- if not order then order=Instance.new('NumberValue');order.Name='Priority';order.Parent=display end
- order.Value=priority
- local primary=display:FindFirstChild('IsPrimary');if primary and primary:IsA('BoolValue')then primary.Value=false end
+ local display=displayStat(leader,name,priority)
  if not previous or previous.Raw~=value or previous.Display~=display then
   if previous then disconnectStat(previous)end
   local link={Raw=value,Display=display,Connections={}};links.Values[name]=link
@@ -109,6 +129,27 @@ function PlayerDataService:GetOrCreateCashValue(player)
 end
 function PlayerDataService:GetOrCreateSpeedValue(player)
  return rawStat(self,player,'Speed','StringValue',self.Config.NormalizeSpeedStat(self.Config.DefaultSpeed),2)
+end
+
+-- R153: the Gems column (after Cash). Display only: never read back, never saved, no raw object. Premium.Gems stays the balance; PublishPremium sets the Gems attribute after every
+-- gain and spend (money auto-collect, quests, shop, converter, passes, owner command) and the cell follows that attribute. The link lives in StatLinks, so leaving cleans it up.
+function PlayerDataService:GetOrCreateGemsDisplay(player)
+ local links=statLinks(self,player);local display=displayStat(statFolder(player,'leaderstats'),'Gems',0)
+ local previous=links.Values.Gems
+ if previous and previous.Display==display then return display end
+ if previous then disconnectStat(previous)end
+ local link={Display=display,Connections={}};links.Values.Gems=link
+ local function update()
+  if self.StatLinks[player]~=links or links.Values.Gems~=link then return end
+  local text=require(game:GetService('ReplicatedStorage').CashNumbers).PlayerList(player:GetAttribute('Gems'))
+  if display.Value~=text then display.Value=text end
+ end
+ local function unbind()
+  if links.Values.Gems==link then links.Values.Gems=nil end
+  disconnectStat(link)
+ end
+ link.Connections={player:GetAttributeChangedSignal('Gems'):Connect(update),display.Destroying:Connect(unbind)}
+ update();return display
 end
 
 function PlayerDataService:AddSpeed(player,amount)
@@ -226,16 +267,21 @@ function PlayerDataService:GetDiscoveredSeeds(player)
 	return result
 end
 
-function PlayerDataService:CanReceiveSeed(player)
+-- R155: one cap of Config.MaxHeldItems (200) items held in total (InventoryCap155.RoomFor: packs, seeds, fruit, loot; a carried pack keeps its place);
+-- MaxSavedChests stays the old storage ceiling. opts (AddChest's options): Banked = the carried pack itself, Receipt = a paid Robux receipt.
+function PlayerDataService:CanReceiveSeed(player, opts)
 	if not self:IsLoaded(player) then return false, "YOUR DATA IS STILL LOADING" end
 	if #self:GetChestRecords(player) >= self.Config.MaxSavedChests then
-		return false, "SEED INVENTORY FULL — MAKE ROOM BEFORE STEALING"
+		return false, "BAG FULL - MAKE ROOM IN YOUR BAG FIRST"
 	end
+	local room, why = self:RoomFor(player, 1, opts)
+	if not room then return false, why end
 	return true
 end
 
 function PlayerDataService:_notifySeedInventory(player)
 	player:SetAttribute("SeedInventoryCount", #self:GetChestRecords(player))
+	if self.PublishHeld then self:PublishHeld(player) end -- R155: the Bag's "143/200"
 	player:SetAttribute("SeedInventoryRevision", (player:GetAttribute("SeedInventoryRevision") or 0) + 1)
 end
 
@@ -294,6 +340,7 @@ end
 function PlayerDataService:PreparePlayer(player)
 	self:GetOrCreateSpeedValue(player)
 	self:GetOrCreateCashValue(player)
+	self:GetOrCreateGemsDisplay(player) -- R153
 	self:GetOrCreateLootInventory(player)
 	self:GetOrCreateDiscoveredLoot(player)
 	self:GetOrCreateDiscoveredSeeds(player)
@@ -301,6 +348,7 @@ function PlayerDataService:PreparePlayer(player)
 	self.Gardens[player] = {Version = 7, Plots = {}, Harvests = {}}
 	player:SetAttribute("GardenRevision", 0)
 	self.OwnedBoosts[player] = {}
+    self.TestBoosts[player] = {};self.TestLuck[player] = nil
     self.EquippedBoosts[player] = {}
     self.Treadmills[player]={Tier=1,Skin=1,Cleared={}}
     self:PublishTreadmillData(player)
@@ -313,6 +361,12 @@ function PlayerDataService:PreparePlayer(player)
 	player:SetAttribute("DataStatus", "Loading")
 	player:SetAttribute("TreadmillMultiplier", 1)
 	player:SetAttribute("ChestLuckMultiplier", 1)
+	-- R153: owning a luck pass (any way) changes the luck at once, not at the next boots change.
+	for _, pass in ipairs(require(game:GetService('ReplicatedStorage').GamePassCatalog)) do
+		if (pass.Luck or 1) > 1 then
+			player:GetAttributeChangedSignal(pass.Attribute):Connect(function() if self.OwnedBoosts[player] then self:RefreshBoostMultipliers(player) end end)
+		end
+	end
 	player:SetAttribute("SeedInventoryCount", 0)
 	player:SetAttribute("SeedInventoryRevision", 0)
 	player:SetAttribute("DiscoveredSeedCount", 0)
@@ -353,9 +407,17 @@ function PlayerDataService:HasChest(player, chestId)
 	return false
 end
 
-function PlayerDataService:AddChest(player, chest)
-	local canReceive, reason = self:CanReceiveSeed(player)
+-- R137: options.Luck = a pack the player earned (track steal, event pack, treadmill bonus): its size goes through
+-- the hidden pack-size pity (PackSizePityData). Bought, gifted and test packs pass no options.
+-- R151: options.TestGrant = a pack an owner / admin command made (OwnerTestPacks): the record carries TestGrant=true and its open is never announced.
+-- R151: chest.PackShape = the pack's chip-bag shape (PackShapes151): a world pack brings the one it rolled when it spawned (0 = the default shape, kept for life);
+-- a pack made here (bonus rolls, daily rewards, the mystery pedestal, owner commands ...) rolls its own, once. The record keeps it as an OPTIONAL field (absent = the
+-- default shape, which is every record saved before it), so ProfileVersion stays 22.
+function PlayerDataService:AddChest(player, chest, options)
+	local canReceive, reason = self:CanReceiveSeed(player, options) -- R155: the 200 cap (options.Banked / options.Receipt, InventoryCap155)
 	if not canReceive then return nil, reason end
+	local packSize = chest.PackSize
+	if type(options) == "table" and options.Luck then packSize = self:RollPackLuck(player, chest.Stage, PackRules.VariantKey(chest.BagVariant), PackRules.SanitizePackSize(chest.PackSize)) end
 	local chestNumber = (player:GetAttribute("ChestInventorySerial") or 0) + 1
 	player:SetAttribute("ChestInventorySerial", chestNumber)
 	-- Escaping banks a biome pack; no seed is rolled or discovered yet.
@@ -364,40 +426,62 @@ function PlayerDataService:AddChest(player, chest)
 		ChestNumber = chestNumber, ChestName = "Seed Pack", Kind = "Pack",
 		Stage = chest.Stage, AccentColor = self.Map:GetStageAccent(chest.Stage),
         BagVariant = PackRules.VariantKey(chest.BagVariant),OddsVersion=chest.OddsVersion or 81,
-            PackSize=PackRules.SanitizePackSize(chest.PackSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
-        SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,chest.PackSize),
+            PackSize=PackRules.SanitizePackSize(packSize),PackMutation=PackRules.MutationKey(chest.PackMutation),Weather=Weather.Key(chest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chest.WeatherCheckedEvent),
+        SeedScale = PackRules.NewSeedScale(chest.Stage,chest.BagVariant,packSize),
+        RateBoost = PackRules.SanitizeRateBoost(chest.RateBoost), -- R138: the free starter pack's 2x rates
+        TestGrant = (type(options) == "table" and options.TestGrant == true) or nil, -- R151: made by an owner command (never announced when opened)
+        GiftLocked = chest.GiftLocked == true or nil, -- R152: a free giveaway pack (VoidGiveaway152): it can't be gifted (an optional field, like PackShape)
+        Floor = StarterVerity.PackFloor({Kind = "Pack", BagVariant = PackRules.VariantKey(chest.BagVariant), Stage = chest.Stage, Floor = chest.Floor}), -- R158d: the new-player gift pack rolls Mythic or better (an optional field, only a Verity pack; set by server code only)
 	}
+	do local shape = chest.PackShape;if shape == nil then shape = PackShapes.Roll(chest.BagVariant) end;shape = PackShapes.Sanitize(shape);if shape > 0 and PackShapes.Applies(chest.BagVariant) then record.PackShape = shape end end
 	table.insert(self:GetChestRecords(player), record)
     if chest.Stage<=self.Config.StageCount then self:MarkTreadmillBiome(player,chest.Stage)end
 	self:_notifySeedInventory(player)
 	self:MarkDirty(player)
-	self:TutorialEvent(player,'Pack')
+	if type(options) == "table" and options.Banked == true then self:TutorialEvent(player,'Pack') end -- R158e: only a pack stolen on the track and banked ticks the tutorial's steal step (never a gift, a roll or a grant)
 	return record
 end
 
 -- One non-yielding inventory transaction. Replays find a Seed, not a Pack.
 function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
     if not self:IsLoaded(player) then return nil, "YOUR DATA IS STILL LOADING" end
-    if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "INVALID PACK" end
+    if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, "TRY AGAIN!" end
     local records = self:GetChestRecords(player)
     for index, pack in ipairs(records) do
         if pack.Id ~= inventoryId then continue end
-        if pack.Kind ~= "Pack" then return nil, "THIS PACK WAS ALREADY OPENED" end
-        if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS PURCHASED PACK IS UNAVAILABLE FOR THIS ACCOUNT' end
-        local seed, rarity = PackRules.Roll(self.Config,pack.Stage,unitRoll,player:GetAttribute("ChestLuckMultiplier"),pack.BagVariant,pack.OddsVersion)
-        local testSeed=require(script.Parent.RarePackTests).Expected(self,player,pack.Id)
+        if pack.Kind ~= "Pack" then return nil, "YOU ALREADY OPENED THIS PACK!" end
+        if pack.PaidRandom and player:GetAttribute('PaidRandomAllowed')~=true then return nil,'THIS BOUGHT PACK DOESN\'T WORK ON THIS ACCOUNT' end
+        local testSeed=nil
+        do -- R153: the owner's guaranteed-reveal test hook can never break a real open: a failure means "no test override"
+            local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self,player,pack.Id)end)
+            if okTest then testSeed=expected else warn("[R153] RarePackTests.Expected failed (the pack opens normally): "..tostring(expected)) end
+        end
+        local luckTest=self:HasTestLuck(player) -- R152: the luck comes from owner-given boots (/test boots): a TEST open, like an owner-made pack (its seed is a TEST seed too)
+        -- R155 (owner): the pack pity (PackPityData155): is this the 10th open of its group (Normal, or Event = Void / Verity / Mech)? Then it is LUCKY: x1.5 on the luck
+        -- and on the pass luck below, and the luck cap x1.5 for this roll only. A TEST open neither counts nor is lucky. The count moves only once the open went through.
+        local pity=self:PlanPackPity(player,pack,testSeed~=nil or pack.TestGrant==true or luckTest)
+        local luck,passLuck=self:PackPityLuck(pity,player:GetAttribute("ChestLuckMultiplier"),self:PassLuck(player)) -- R154: passLuck = the luck passes alone (the 4 Leaf Clover's x2): the only luck the Void, Verity and Mech packs take
+        -- R158d: the new-player gift pack (record.Floor = Mythic, a Verity pack only) rolls its OWN odds for this open (the same luck, clover and pity), kept to Mythic and above and rolled again over what is
+        -- left (StarterVerityRules158d.RollFloored); an owner TEST reveal still wins below. Every other pack rolls exactly as before.
+        local floor = testSeed == nil and StarterVerity.PackFloor(pack) or nil
+        local seed, rarity
+        if floor then seed, rarity = self:PackPityRoll(pity,StarterVerity.RollFloored,PackRules,floor,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
+        else seed, rarity = self:PackPityRoll(pity,PackRules.Roll,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck) end
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
-        if not seed then return nil, "THIS PACK NEEDS AN UPDATE" end
+        if not seed then return nil, "REJOIN TO OPEN THIS PACK!" end
         local rewardCash,reason=self:SeedCollectReward(player,seed.Id)
         if not rewardCash then return nil,reason end
         local reward = {
             Id=pack.Id, ChestNumber=pack.ChestNumber, ChestName=seed.Name, Kind="Seed",
-            PaidRandom=pack.PaidRandom==true,Stage=pack.BagVariant=='EclipseReliquary'and PackRules.SeedDesignById[seed.Id].SaveStage or pack.Stage, SeedId=seed.Id, SeedName=seed.Name, SeedEmoji=seed.Emoji,
+            PaidRandom=pack.PaidRandom==true,Stage=(pack.BagVariant=='EclipseReliquary'or VerityCatalog.IsPack(pack.BagVariant))and PackRules.SeedDesignById[seed.Id].SaveStage or pack.Stage, SeedId=seed.Id, SeedName=seed.Name, SeedEmoji=seed.Emoji,
             AccentColor=seed.Color, Rarity=rarity, SeedScale=PackRules.NewSeedScale(pack.Stage,pack.BagVariant,pack.PackSize),
             BagVariant=PackRules.VariantKey(pack.BagVariant),OddsVersion=pack.OddsVersion,
             PackSize=PackRules.SanitizePackSize(pack.PackSize),PackMutation=PackRules.MutationKey(pack.PackMutation),Weather=Weather.Key(pack.Weather),WeatherCheckedEvent=Weather.CheckedEvent(pack.WeatherCheckedEvent),
+            TestGrant=(pack.TestGrant==true or luckTest) or nil, -- R152: the seed of a TEST open is a TEST seed (the fruit it grows never counts for the hub / announcements)
+            GiftLocked=pack.GiftLocked==true or nil, -- R153 (review M2): the seed of a gift-locked pack (the free giveaway's, the day-7 login Void Pack) is gift-locked too; PlantRules.NewCrop hands it on to the plant and its fruit
         }
         records[index] = reward
+        self:CommitPackPity(player,pity) -- R155: the open went through: its group's count moves on (the lucky one back to 0)
         self:_gardenChanged(player)
         if testSeed then self.StudioPackRewards[player][pack.Id]=nil end
         self:MarkDirty(player)
@@ -406,9 +490,61 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:_notifySeedInventory(player)
         self:QueueGardenSave(player)
         self:TutorialEvent(player,'Seed')
-        return reward
+        self:QuestEvent(player,'Open',1) -- R140 daily quest
+        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil or luckTest or pack.Floor~=nil)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is; R158d: nor the new-player gift pack)
+        -- R151: the hub's BEST PULL board (this server's own, R153; HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
+        -- TestGrant) is flagged so it is not counted and never announced as a record.
+        local hook=self.OnPackOpened
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=luck,PassLuck=passLuck,Lucky=pity~=nil and pity.Lucky or nil,Test=testSeed~=nil or pack.TestGrant==true or luckTest or pack.Floor~=nil}) end -- (R158d: the new-player gift pack is silent: no BEST PULL) -- (R155: the luck the roll took; Lucky = the pity's lucky pack)
+        return reward,nil,pity -- (R155: this open's pack pity {Group, Lucky, Count}; nil for a TEST open)
     end
-    return nil, "THIS PACK IS NO LONGER IN YOUR INVENTORY"
+    return nil, "THAT PACK IS GONE FROM YOUR BAG!"
+end
+
+-- R147: the Verity NPC turns a Void Pack into a Verity Pack. CheckVoidPack finds the record or says why not (changes nothing).
+function PlayerDataService:CheckVoidPack(player, inventoryId)
+	if not self:IsLoaded(player) then return nil, VerityReasons.Loading end
+	if type(inventoryId) ~= "string" or #inventoryId > 80 then return nil, VerityReasons.Invalid end
+	for _, pack in ipairs(self:GetChestRecords(player)) do
+		if pack.Id == inventoryId then
+			if pack.Kind ~= "Pack" or pack.BagVariant ~= "EclipseReliquary" or pack.Stage ~= 7 then return nil, VerityReasons.NotVoid end
+			return pack
+		end
+	end
+	return nil, VerityReasons.Gone
+end
+
+-- One non-yielding inventory transaction, like OpenSeedPack. The Verity Pack takes the Void Pack's slot (the bag keeps its
+-- order) with a fresh Id from the serial; size, coat, weather and the paid flag carry over. Returns the new record, or nil
+-- and the reason with nothing changed.
+function PlayerDataService:ConvertVoidPack(player, inventoryId)
+	local old, reason = self:CheckVoidPack(player, inventoryId)
+	if not old then return nil, reason end
+	local records = self:GetChestRecords(player)
+	for index, pack in ipairs(records) do
+		if pack ~= old then continue end
+		local chestNumber = (player:GetAttribute("ChestInventorySerial") or 0) + 1
+		player:SetAttribute("ChestInventorySerial", chestNumber)
+		local size = PackRules.SanitizePackSize(pack.PackSize)
+		local record = {
+			Id = string.format("%d_%d", player.UserId, chestNumber),
+			ChestNumber = chestNumber, ChestName = "Seed Pack", Kind = "Pack",
+			Stage = VerityCatalog.PackStage, AccentColor = pack.AccentColor or self.Map:GetStageAccent(VerityCatalog.PackStage),
+			BagVariant = VerityCatalog.Variant, OddsVersion = PackRules.OddsVersion,
+			PackSize = size, PackMutation = PackRules.MutationKey(pack.PackMutation), Weather = Weather.Key(pack.Weather),
+			WeatherCheckedEvent = Weather.CheckedEvent(pack.WeatherCheckedEvent), PaidRandom = pack.PaidRandom == true,
+			SeedScale = PackRules.NewSeedScale(VerityCatalog.PackStage, VerityCatalog.Variant, size),
+			TestGrant = pack.TestGrant == true or nil, -- R151: an owner-made Void pack stays a test pack as a Verity pack
+			GiftLocked = pack.GiftLocked == true or nil, -- R152: so does a free giveaway pack: the Verity Pack it becomes can't be gifted either
+		}
+		records[index] = record
+		local tests = self.StudioPackRewards and self.StudioPackRewards[player]
+		if tests then tests[pack.Id] = nil end -- an owner-test guarantee on the old pack does not carry over
+		self:_notifySeedInventory(player)
+		self:MarkDirty(player)
+		return record
+	end
+	return nil, VerityReasons.Gone
 end
 
 function PlayerDataService:AddCash(player, amount)
@@ -500,6 +636,7 @@ function PlayerDataService:TakeBestLoot(player)
 	local item = self:_lootRecordFromValue(selected)
 	selected:Destroy()
 	self:MarkDirty(player)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155 (review): a loot item left the bag, so the Bag's count (HeldItemCount) drops now
 	return item
 end
 
@@ -513,7 +650,7 @@ function PlayerDataService:RemovePedestalItem(player)
 	end
 	local current = self.PedestalItems[player]
 	if not current then
-		return false, "YOUR PEDESTAL IS EMPTY"
+		return false, "THE PEDESTAL IS EMPTY!"
 	end
 	self.PedestalItems[player] = nil
 	self:ReturnLootRecord(player, current)
@@ -535,6 +672,7 @@ function PlayerDataService:SellLoot(player, lootInstanceName)
 	local cashValue = self:GetOrCreateCashValue(player)
 	cashValue.Value = cashValue.Value + value
 	self:MarkDirty(player)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155 (review): a loot item left the bag, so the Bag's count (HeldItemCount) drops now
 	return true, value
 end
 
@@ -617,9 +755,23 @@ function PlayerDataService:EquipBoost(player, id, equipped)
  return true
 end
 
+-- R152: the luck in use comes from boots an owner command gave (/test boots): no bought boots reach it. A pull made with that luck is a TEST pull (never announced, never on the hub's boards).
+function PlayerDataService:HasTestLuck(player)
+	return self.TestLuck[player] == true
+end
+-- R153: the product of the luck passes the player owns (a pass counts when its Owned attribute is on, which the Robux check, a game-pass purchase, a Gem purchase and a gift all set, or when the saved Gem / gift entitlement is there).
+function PlayerDataService:PassLuck(player)
+	local luck = 1
+	local premium = self.Premium and self.Premium[player]
+	for _, pass in ipairs(require(game:GetService('ReplicatedStorage').GamePassCatalog)) do
+		if (pass.Luck or 1) > 1 and (player:GetAttribute(pass.Attribute) == true or (premium and type(premium.Entitlements) == "table" and premium.Entitlements[pass.Key] == true)) then luck = luck * pass.Luck end
+	end
+	return luck
+end
 function PlayerDataService:RefreshBoostMultipliers(player)
 	local bestSpeedMultiplier = 1
 	local bestLuckMultiplier = 1
+	local realLuck, testLuck, tests = 1, 1, self.TestBoosts[player] or {}
 	for productId in pairs(self:GetOwnedBoosts(player)) do
 		local product = self:_findShopProduct(productId)
 		if product and product.Enabled ~= false then
@@ -627,12 +779,18 @@ function PlayerDataService:RefreshBoostMultipliers(player)
 				bestSpeedMultiplier = math.max(bestSpeedMultiplier, product.SpeedMultiplier)
 			elseif product.Type == "Accessory" and product.LuckMultiplier then
 				bestLuckMultiplier = math.max(bestLuckMultiplier, product.LuckMultiplier)
+				if tests[productId] then testLuck = math.max(testLuck, product.LuckMultiplier) else realLuck = math.max(realLuck, product.LuckMultiplier) end
 			end
 		end
 	end
 	player:SetAttribute("TreadmillMultiplier", bestSpeedMultiplier)
-	bestLuckMultiplier=math.clamp(bestLuckMultiplier,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck)
+	-- R153: the best boots (owner test boots too) x every luck pass the player owns (GamePassCatalog Luck: the 4 Leaf Clover = x2, bought with Robux or Gems), then the cap.
+	-- The pass multiplies real and test luck alike, so HasTestLuck still says whether the BOOTS in use are the owner's.
+	-- R154 (owner: "the 2x luck is universal"): the cap is the boots' cap (MaxLuck) x the passes too, so the clover's x2 also applies on top of Thunder Boots (R155: the boots are x25M, a clover owner's x50M).
+	local passLuck=self:PassLuck(player)
+	bestLuckMultiplier=math.clamp(bestLuckMultiplier*passLuck,1,require(game:GetService('ReplicatedStorage').BalanceValues81).MaxLuck*passLuck)
 	player:SetAttribute("ChestLuckMultiplier", bestLuckMultiplier)
+	self.TestLuck[player] = testLuck > realLuck
 	return bestSpeedMultiplier, bestLuckMultiplier
 end
 
@@ -640,7 +798,8 @@ function PlayerDataService:RefreshTreadmillMultiplier(player)
 	return self:RefreshBoostMultipliers(player)
 end
 
-function PlayerDataService:AddBoost(player, productId)
+-- R152: options.TestGrant = boots an owner command gave (/test boots): remembered (and saved, as the optional TestBoosts list) so pulls made with their luck count as TEST pulls.
+function PlayerDataService:AddBoost(player, productId, options)
 	local product = self:_findShopProduct(productId)
 	if not product or product.Enabled == false
 		or (product.Type ~= "Trail" and product.Type ~= "Accessory") then
@@ -651,6 +810,7 @@ function PlayerDataService:AddBoost(player, productId)
 		return false
 	end
 	owned[productId] = true
+	if type(options) == "table" and options.TestGrant == true then self.TestBoosts[player] = self.TestBoosts[player] or {};self.TestBoosts[player][productId] = true end
     self.EquippedBoosts[player]=self.EquippedBoosts[player]or{}
     self.EquippedBoosts[player][product.Type]=productId
 	self:RefreshBoostMultipliers(player)
@@ -700,7 +860,8 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 	local stage = math.clamp(
 		math.floor((tonumber(savedChest.Stage) or 1) + 0.5),
 		1,
-		(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8 or self.Config.StageCount
+		(savedChest.BagVariant=='MechLimited'or require(game:GetService('ReplicatedStorage').MechCatalog).Is(savedChest.SeedId))and 8
+			or VerityCatalog.Is(savedChest.SeedId)and VerityCatalog.Stage or self.Config.StageCount -- R147: the Verity seed keeps its Index category 9
 	)
 	local chestNumber = math.max(
 		1,
@@ -723,8 +884,12 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
 		Id = type(savedChest.Id) == "string" and string.sub(savedChest.Id, 1, 80)
 			or string.format("%d_%d", player.UserId, chestNumber),
 		Kind = savedChest.Kind == "Pack" and "Pack" or "Seed",
-                PaidRandom=savedChest.PaidRandom==true,
-                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=(savedChest.OddsVersion==81 or savedChest.OddsVersion==PackRules.OddsVersion)and savedChest.OddsVersion or nil,
+                PaidRandom=savedChest.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(savedChest.RateBoost),
+                TestGrant=savedChest.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: on a Seed record too (an owner-given seed, or the seed of a TEST opening)
+                PackShape=savedPackShape(savedChest), -- R151 (optional chip-bag shape 1-6; absent / anything else = the default shape)
+                GiftLocked=savedChest.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: on a Seed row as well (a seed opened from a gift-locked pack)
+                Floor=savedChest.Kind=="Pack" and StarterVerity.CleanFloor(savedChest.Floor) or nil, -- R158d (optional; an older server drops it: the pack then rolls like any Verity pack)
+                BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
 		ChestNumber = chestNumber,
@@ -780,7 +945,7 @@ function PlayerDataService:Load(player)
 			tostring(storedData)
 			))
 		if not self.IsStudio then
-			player:Kick("Your progress could not be loaded. Please rejoin to retry. Your saved data has not been changed.")
+			player:Kick("Couldn't load your progress. Rejoin to try again! Your saved data is safe.")
 			return false
 		end
 		task.delay(0.75, function()
@@ -802,18 +967,26 @@ function PlayerDataService:Load(player)
 		or (type(storedData) == "table" and (tonumber(storedData.Version) or 0) > self.Config.ProfileVersion) then
 		self.CanSave[player] = false
 		player:SetAttribute("DataStatus", "UnsupportedProfile")
-		player:Kick("Your saved garden requires a newer server. Please rejoin; your data has not been changed.")
+		player:Kick("Your saved garden needs a newer server. Rejoin and you'll be good! Your data is safe.")
 		return false
 	end
 	local premium=require(script.Parent.PremiumProgress).Decode(type(storedData)=='table'and storedData.Premium or nil)
-    if not premium then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedPremium');player:Kick('Your progress needs a newer server. Your save is unchanged.');return false end
+    if not premium then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedPremium');player:Kick('Your progress needs a newer server. Rejoin! Your save is safe.');return false end
     self.Premium=self.Premium or{};self.Premium[player]=premium
+    -- R150: publish the saved audio mix on the Player right away (replicated attributes, no remote): the client's AudioMixer applies it before
+    -- SettingsState answers, so a saved Music / Effects of 0 is not heard at 100% at the start of the session. A new player gets the defaults.
+    pcall(function()
+        local config=require(game:GetService('ReplicatedStorage'):WaitForChild('SettingsConfig'))
+        local mix=config.Read(premium.Settings)
+        for key,attribute in pairs(config.AudioAttributes)do player:SetAttribute(attribute,mix[key])end
+        for key,attribute in pairs(config.ToggleAttributes or{})do player:SetAttribute(attribute,mix[key])end -- R153: "Skip pack animations" for the reveal
+    end)
     if not premium.Tutorial then premium.Tutorial={Version=1,Mask=0,Done=storedData~=nil}end
     local garden, gardenError = self:DecodeGarden(type(storedData) == "table" and storedData.Garden or nil)
 	if not garden then
 		self.CanSave[player] = false
 		player:SetAttribute("DataStatus", "UnsupportedGarden")
-		player:Kick("Your garden could not be read safely. Your save was left unchanged. Please contact the developer.")
+		player:Kick("Couldn't read your garden safely. Your save is safe. Please tell the developer!")
 		warn("[V0.73] Garden load rejected: "..tostring(gardenError))
 		return false
 	end
@@ -822,20 +995,21 @@ function PlayerDataService:Load(player)
         if type(item) ~= "table" or type(item.Name) ~= "string" or #item.Name<1 or #item.Name>80
             or (item.Stage ~= nil and (not self.Config.IsFiniteGardenNumber(item.Stage) or item.Stage<1 or item.Stage>self.Config.StageCount)) then
             self.CanSave[player]=false; player:SetAttribute("DataStatus","UnsupportedPedestal")
-            player:Kick("Your previous display item could not be recovered safely. Your save is unchanged.")
+            player:Kick("Couldn't get back your old display item safely. Your save is safe.")
             return false
         end
         garden.RetiredPedestalItem = item
         local checked=self:DecodeGarden(garden)
         if not checked then
             self.CanSave[player]=false; player:SetAttribute("DataStatus","UnsupportedPedestal")
-            player:Kick("Your previous display item needs a safe migration. Your save is unchanged.")
+            player:Kick("Your old display item needs a safe update. Your save is safe.")
             return false
         end
         garden=checked
     end
     self.Gardens[player] = garden
     self.SaveHeads[player] = getSaveHead(storedData)
+    self.FreshProfile = self.FreshProfile or {};self.FreshProfile[player] = storedData == nil -- R158d: a brand-new profile (nothing was saved before this join); StarterVerity158d reads it for the whole session
 	local speedValue = self:GetOrCreateSpeedValue(player)
 	local cashValue = self:GetOrCreateCashValue(player)
 	local lootInventory = self:GetOrCreateLootInventory(player)
@@ -848,7 +1022,7 @@ function PlayerDataService:Load(player)
 	local loadedCash = 0
 	local loadedItems = {}
 	local loadedChests = {}
-	local loadedBoosts = {}
+	local loadedBoosts, loadedTestBoosts = {}, {}
 	local loadedPedestalItem = nil
 	local loadedDiscoveries = {}
 	local loadedSeedDiscoveries = {}
@@ -856,7 +1030,7 @@ function PlayerDataService:Load(player)
 	local seedMigrationNeeded = false
 	if type(storedData) == "table" then
 		if storedData.SpeedExact~=nil then
-            if not Points.Valid(storedData.SpeedExact)then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedSpeed');player:Kick('Your Speed data needs a newer server. Your save is unchanged.');return false end
+            if not Points.Valid(storedData.SpeedExact)then self.CanSave[player]=false;player:SetAttribute('DataStatus','UnsupportedSpeed');player:Kick('Your Speed data needs a newer server. Your save is safe.');return false end
             loadedSpeed=Points.Normalize(storedData.SpeedExact)
         elseif type(storedData.Speed) == "number" then
 			if storedData.SpeedSystemVersion == self.Config.SpeedSystemVersion then
@@ -890,6 +1064,7 @@ function PlayerDataService:Load(player)
 		if type(storedData.OwnedBoosts) == "table" then
 			loadedBoosts = storedData.OwnedBoosts
 		end
+		if type(storedData.TestBoosts) == "table" then loadedTestBoosts = storedData.TestBoosts end -- R152 (optional; an R151 server drops it)
 		if type(storedData.PedestalItem) == "table" then
 			loadedPedestalItem = storedData.PedestalItem
 		end
@@ -950,6 +1125,10 @@ function PlayerDataService:Load(player)
 		if type(productId) == "string" and self:_findShopProduct(productId) then
 			self.OwnedBoosts[player][productId] = true
 		end
+	end
+	self.TestBoosts[player] = {}
+	for _, productId in ipairs(loadedTestBoosts) do
+		if type(productId) == "string" and self.OwnedBoosts[player][productId] then self.TestBoosts[player][productId] = true end
 	end
 
     self:RestoreEquippedBoosts(player,type(storedData)=='table'and storedData.EquippedBoosts or nil)
@@ -1020,8 +1199,10 @@ function PlayerDataService:Load(player)
 	end)
 	player:SetAttribute("ChestInventorySerial", math.max(highestChestNumber,
 		type(storedData) == "table" and tonumber(storedData.SeedInventorySerial) or 0))
+	player:SetAttribute("PackSerialAtJoin", player:GetAttribute("ChestInventorySerial")) -- R139: packs numbered above this are new (hotbar rainbow)
 	player:SetAttribute("SeedInventoryCount", #self.ChestRecords[player])
 	player:SetAttribute("LootCount", loadedItemCount)
+	self:LoadHotbarLayout(player) -- R155: the saved hotbar layout (Premium.Hotbar155) for the client: HotbarLayout155
     local pedestalMigrationNeeded = self.PedestalItems[player] ~= nil
     if pedestalMigrationNeeded then
         self:ReturnLootRecord(player,self.PedestalItems[player])
@@ -1029,11 +1210,16 @@ function PlayerDataService:Load(player)
     end
 	self:LoadTreadmillData(player,type(storedData)=="table" and storedData.Treadmill or nil)
     self:LoadFenceData(player,type(storedData)=='table'and storedData.Fence or nil)
+    self:LoadPackLuck(player,type(storedData)=='table'and storedData.PackLuck or nil)
+    self:LoadPackPity(player,type(storedData)=='table'and storedData.PackPity or nil) -- R155: the pack pity's two counts (optional field; absent = 0 / 0)
 	player:SetAttribute("DataStatus", "Loaded")
 	self.Loaded[player] = true
+	self:PublishHeld(player) -- R155: what the player holds (an older save above 200 loads whole: nothing is cut)
 	self.CanSave[player] = true
+    local oldRosterSettled=self:SettleOldRoster148(player) -- R148: which Index milestones were met before the Aloe and the Sand Fruit joined Desert (saved below)
     self:PublishPremium(player);self:PublishTutorial(player)
 	self.Dirty[player] = storedData == nil
+		or oldRosterSettled
 		or discoveryMigrationNeeded
 		or speedMigrationNeeded
         or (type(storedData)=="table" and (storedData.SpeedExact==nil or type(storedData.Premium)~='table' or storedData.Premium.BalanceVersion81~=81))
@@ -1054,7 +1240,11 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
 	return {
 		Id = string.sub(chestRecord.Id, 1, 80),
 		Kind = chestRecord.Kind or "Seed",
-            PaidRandom=chestRecord.PaidRandom==true,
+            PaidRandom=chestRecord.PaidRandom==true,RateBoost=PackRules.SanitizeRateBoost(chestRecord.RateBoost),
+            TestGrant=chestRecord.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: Seed records too
+            PackShape=savedPackShape(chestRecord), -- R151 (optional chip-bag shape 1-6)
+            GiftLocked=chestRecord.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: Seed records too (an R152 server drops it from a seed)
+            Floor=chestRecord.Kind=="Pack" and StarterVerity.CleanFloor(chestRecord.Floor) or nil, -- R158d (optional; the new-player gift pack: Mythic or better on open)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),
@@ -1077,7 +1267,7 @@ function PlayerDataService:DecodeGiftedSeed(player, saved)
 	if type(saved) ~= "table" or (saved.Kind ~= "Pack" and saved.Kind ~= "Seed")
 		or type(saved.Id) ~= "string" or #saved.Id < 1 or #saved.Id > 80
 		or type(saved.ChestName) ~= "string" or #saved.ChestName > 80
-		or type(saved.Stage) ~= "number" or saved.Stage ~= saved.Stage or saved.Stage % 1 ~= 0 or saved.Stage < 1 or saved.Stage > 8
+		or type(saved.Stage) ~= "number" or saved.Stage ~= saved.Stage or saved.Stage % 1 ~= 0 or saved.Stage < 1 or saved.Stage > 9
 		or type(saved.ChestNumber) ~= "number" or saved.ChestNumber ~= saved.ChestNumber or saved.ChestNumber < 1 or saved.ChestNumber > 1e12 then
 		return nil
 	end
@@ -1088,6 +1278,7 @@ function PlayerDataService:DecodeGiftedSeed(player, saved)
 	if saved.Kind == "Seed" and (type(saved.SeedId) ~= "string" or not self.Config.GetSeedById(saved.SeedId)) then return nil end
 	local record = self:_canonicalizeSeedRecord(self:_decodeSavedSeedRecord(player, saved, 1))
 	if record.Kind == "Seed" and record.SeedId ~= saved.SeedId then return nil end
+	record.RateBoost = nil -- R139: a gifted starter pack arrives as a normal pack (gifts staged before R139 too)
 	return record
 end
 
@@ -1118,6 +1309,9 @@ function PlayerDataService:_buildSaveData(player)
 		table.insert(savedBoosts, productId)
 	end
 	table.sort(savedBoosts)
+	local savedTestBoosts = {}
+	for productId in pairs(self.TestBoosts[player] or {}) do if self:OwnsBoost(player, productId) then table.insert(savedTestBoosts, productId) end end
+	table.sort(savedTestBoosts)
 
 	local discoveredItems = self:GetDiscoveredItems(player)
 
@@ -1133,7 +1327,7 @@ function PlayerDataService:_buildSaveData(player)
 
 	return {
 		Version = self.Config.ProfileVersion,
-        Premium = gardenClonePremium(self:GetPremium(player)),
+        Premium = require(script.Parent.PremiumProgress).Pack(gardenClonePremium(self:GetPremium(player))), -- R153: late passes' data goes to the optional Later153 (an R152 server ignores it)
 		Garden = self:CopyGarden(self.Gardens[player]),
 		DiscoveredSeeds = self:GetDiscoveredSeeds(player),
 		SeedInventorySerial = player:GetAttribute("ChestInventorySerial") or 0,
@@ -1145,9 +1339,12 @@ function PlayerDataService:_buildSaveData(player)
 		Items = items,
 		Seeds = savedChests,
 		OwnedBoosts = savedBoosts,
+		TestBoosts = #savedTestBoosts > 0 and savedTestBoosts or nil, -- R152 (optional; an R151 server drops it)
         EquippedBoosts = self:CopyEquippedBoosts(player),
         Treadmill = self:CopyTreadmillData(player),
         Fence = self:CopyFenceData(player),
+        PackLuck = self:CopyPackLuck(player),
+        PackPity = self:CopyPackPity(player), -- R155 (optional; an R154 server drops it)
 		DiscoveredItems = discoveredItems,
 		PedestalItem = savedPedestalItem,
 		SavedAt = os.time(),
@@ -1201,7 +1398,7 @@ function PlayerDataService:Save(player, reason, forceSave, finalization)
 		self.Loaded[player] = false
 		player:SetAttribute("DataStatus", "SaveConflict")
 		if player.Parent then
-			player:Kick("Your garden was updated in another server. Please rejoin to load the latest save.")
+			player:Kick("Your garden was updated in another server. Rejoin to load the newest save!")
 		end
 	end
 	warn(string.format("[%s] Save did not complete for %s (%s): %s", self.Config.Version,
@@ -1294,11 +1491,13 @@ function PlayerDataService:CleanupPlayer(player)
 	self.Dirty[player] = nil
 	self.Saving[player] = nil
 	self.SaveHeads[player] = nil
+	if self.FreshProfile then self.FreshProfile[player] = nil end -- R158d
 	self.Gardens[player] = nil
 	self.GardenSaveQueued[player] = nil
 	self.Revision[player] = nil
 	self.ChestRecords[player] = nil
 	self.OwnedBoosts[player] = nil
+    self.TestBoosts[player] = nil;self.TestLuck[player] = nil
     self.EquippedBoosts[player] = nil
     self.Treadmills[player] = nil
     if self.Fences then self.Fences[player]=nil end
@@ -1426,6 +1625,7 @@ end
 function PlayerDataService:_gardenChanged(player)
 	self:MarkDirty(player)
 	player:SetAttribute("GardenRevision", (player:GetAttribute("GardenRevision") or 0) + 1)
+	if self.PublishHeld then self:PublishHeld(player) end -- R155: the Bag's "143/200"
 end
 
 function PlayerDataService:QueueGardenSave(player)
@@ -1460,7 +1660,7 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
 		if record.Id == seedInventoryId then seed, seedIndex = record, index; break end
 	end
 	if not seed then return false, "THAT SEED IS NO LONGER IN YOUR INVENTORY" end
-	if seed.Kind == "Pack" then return false, "OPEN THE PACK BEFORE PLANTING" end
+	if seed.Kind == "Pack" then return false, "OPEN THE PACK FIRST!" end
 	local growing = self.Config.GardenPlants[seed.SeedId]
 	if not growing then return false, "THIS SEED CANNOT BE PLANTED YET" end
 	if not gardenInteger(growing.Seconds, 1, 86400) or not gardenInteger(growing.Value, 1, 9000000000000) then
@@ -1470,6 +1670,8 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
     require(game:GetService('ReplicatedStorage'):WaitForChild('GardenFenceRules')).ApplyPlant(crop,growing,self:GetFenceTier(player))
  require(game:GetService('ReplicatedStorage'):WaitForChild('GrowthBoostRules')).Apply(crop,player:GetAttribute('DoubleGrowthOwned')and 2 or 1,now)
 
+	-- R158e: the plant planted in the tutorial's plant step (once per player) has its first fruit in 10 s (TutorialProgress.TutorialFastCrop; never yields).
+	do local okFast,fastError=pcall(self.TutorialFastCrop,self,player,seed,crop,growing,now);if not okFast then warn("[R158e] Tutorial first fruit skipped: "..tostring(fastError)) end end
 	-- Both tables commit before revision signals or optional presentation work.
 	table.insert(crops, crop)
 	garden.Plots[tostring(slot)] = crops
@@ -1478,6 +1680,7 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
 	self:_notifySeedInventory(player)
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Plant')
+	self:QuestEvent(player,'Plant',1) -- R140 daily quest
 	return true, gardenClone(crop)
 end
 
@@ -1496,10 +1699,11 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
 	if not self.Config.GardenPlants[crop.SeedId] then return false, "THIS PLANT NEEDS A NEWER UPDATE" end
 	if now < crop.ReadyAt then return false, "YOUR PLANT IS STILL GROWING" end
 	if #garden.Harvests >= self.Config.MaxSavedHarvests then return false, "HARVEST BAG FULL — SELL SOME HARVESTS FIRST" end
+	if not self:RoomFor(player, 1) then return false, require(script.Parent.InventoryCap155).HarvestFullText end -- R155: the 200 cap
     local definition = self.Config.GardenPlants[crop.SeedId]
     fruitIndex = fruitIndex or PlantRules.NextFruit(crop, definition, now)
     if not gardenInteger(fruitIndex, 1, definition.FruitCount) or not PlantRules.FruitReady(crop, fruitIndex, now) then
-        return false, "THAT FRUIT WAS ALREADY PICKED"
+        return false, "THAT FRUIT IS ALREADY PICKED!"
     end
     local trait = PlantRules.Fruit(crop, fruitIndex, definition)
     local harvest = gardenClone(crop)
@@ -1517,9 +1721,18 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
     harvest.Value = trait.Value
     table.insert(garden.Harvests, harvest)
     self:MarkAdultDiscovered(player,crop.SeedId)
-    if PlantRules.FinishFruit(crop,definition,fruitIndex,now,self:GetFenceTier(player))then table.remove(crops,cropIndex)end
+    if PlantRules.FinishFruit(crop,definition,fruitIndex,now,self:GetFenceTier(player))then
+     table.remove(crops,cropIndex)
+     -- R151: this harvest removed the plant (a single-harvest plant, or the last fruit of one that does not regrow). GardenPlantRuntime reads this when it takes the
+     -- plant's model out of the garden: the model stays for a beat, marked HarvestedBy / HarvestedIndex, so every client sees the fruit fly to the harvester (a shovel
+     -- removal never comes through here).
+     local marks=self.HarvestRemovals or{};self.HarvestRemovals=marks
+     marks[crop.Id]={Index=fruitIndex,By=player.UserId,At=os.clock()}
+     for id,mark in pairs(marks)do if os.clock()-mark.At>30 then marks[id]=nil end end
+    end
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Harvest')
+	self:QuestEvent(player,'Harvest',1) -- R140 daily quest
 	return true, gardenClone(harvest)
 end
 
@@ -1561,12 +1774,15 @@ function PlayerDataService:SellHarvest(player, harvestId)
 	for index, crop in ipairs(garden and garden.Harvests or {}) do
 		if crop.Id == harvestId then
 			if not self.Config.GardenPlants[crop.SeedId] then return false, "THIS HARVEST NEEDS A NEWER UPDATE" end
-			local receipt,reason=self:_prepareSale(player,crop.Value);if not receipt then return false,reason end
+			-- R132: the Fruit of the Hour sells for its bonus (x1.5 to x3).
+			local value=require(game:GetService('ReplicatedStorage').FruitOfHour).SaleValue(crop.SeedId,crop.Value,workspace:GetServerTimeNow())
+			local receipt,reason=self:_prepareSale(player,value);if not receipt then return false,reason end
 			table.remove(garden.Harvests, index)
 			table.insert(garden.PendingSales,receipt)
 			self:_gardenChanged(player)
 			self:TutorialEvent(player,'Sell')
-			return true, crop.Value
+			self:QuestEvent(player,'Sell',1) -- R140 daily quest
+			return true, value
 		end
 	end
 	return false, "THAT HARVEST WAS ALREADY SOLD OR IS NOT YOURS"
@@ -1584,15 +1800,16 @@ end
 function PlayerDataService:SellAllHarvests(player)
  if not self:IsLoaded(player)then return false,'YOUR DATA IS STILL LOADING'end
  local garden=self.Gardens[player];local crops=garden and garden.Harvests or{}
- if #crops==0 then return false,'NO CROPS TO SELL'end
- local total=0
+ if #crops==0 then return false,'NO CROPS TO SELL YET!'end
+ local total=0;local Hour=require(game:GetService('ReplicatedStorage').FruitOfHour);local now=workspace:GetServerTimeNow()
  for _,crop in ipairs(crops)do
   if not self.Config.GardenPlants[crop.SeedId]or not gardenInteger(crop.Value,1,9000000000000)then return false,'THIS HARVEST NEEDS A NEWER UPDATE'end
-  total+=crop.Value
+  total+=Hour.SaleValue(crop.SeedId,crop.Value,now) -- R132: Fruit of the Hour bonus
  end
  local receipt,reason=self:_prepareSale(player,total);if not receipt then return false,reason end
  local count=#crops;garden.Harvests={};table.insert(garden.PendingSales,receipt);self:_gardenChanged(player)
  self:TutorialEvent(player,'Sell')
+ self:QuestEvent(player,'Sell',count) -- R140 daily quest (every fruit sold counts)
  return true,total,count
 end
 
@@ -1628,7 +1845,9 @@ function PlayerDataService:GetHarvestInventory(player)
             local key = crop.SeedId..":"..crop.Value..":"..mutation..":"..weather..":"..fruitScale..(holo.Is(crop.SeedId)and(":"..holo.Form(crop,crop.FruitIndex))or'')
 			local group = groups[key]
 			if not group then
-				group = {SeedId = crop.SeedId, InventoryId = crop.Id, Count = 0, SellValue = crop.Value,
+				-- R132: the list shows what it sells for now (Fruit of the Hour bonus included).
+				local hourBonus=require(game:GetService('ReplicatedStorage').FruitOfHour).Multiplier(crop.SeedId,workspace:GetServerTimeNow())
+				group = {SeedId = crop.SeedId, InventoryId = crop.Id, Count = 0, SellValue = math.floor(crop.Value*hourBonus+.5), HourMultiplier = hourBonus>1 and hourBonus or nil,
                     VisualCrop = {SourceCropId=crop.SourceCropId or crop.Id,FruitIndex=crop.FruitIndex or 1,HarvestCycle=crop.HarvestCycle or 0},
 					Name = (weather~="None"and Weather.Display(weather).." "or"")..(mutation ~= "None" and mutation.." " or "")..fruitName, Mutation=mutation,Weather=weather,WeatherMultiplier=Weather.Traits[weather].Multiplier, FruitScale=fruitScale, Emoji = seed.Emoji, Stage = stage,
 					Color = {R = seed.Color.R * 255, G = seed.Color.G * 255, B = seed.Color.B * 255}}
@@ -1698,26 +1917,30 @@ function PlayerDataService:CopyTreadmillData(player)
     return {Tier=d.Tier,Skin=d.Skin,Cleared=cleared}
 end
 function PlayerDataService:BuyTreadmill(player,expectedTier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if expectedTier~=d.Tier+1 then return false,'The upgrade changed. Try again.'end
+    if expectedTier~=d.Tier+1 then return false,'The upgrade changed! Try again.'end
     local nextTier=self.Config.TreadmillTiers[expectedTier]
     if not nextTier then return false,'Fully upgraded!'end
-    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough coins.'end
+    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough cash!'end
     -- Spend and level change do not yield; duplicate clicks cannot buy this level twice.
     d.Tier=expectedTier;d.Skin=expectedTier;self:PublishTreadmillData(player)
     self:MarkDirty(player);self:QueueGardenSave(player)
     return true,'Upgraded to '..nextTier.Name..'!'
 end
 function PlayerDataService:SelectTreadmillSkin(player,tier)
-    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save is not ready.'end
+    if not self:IsLoaded(player)or not self.CanSave[player]then return false,'Your save isn\'t ready yet!'end
     local d=self:GetTreadmillData(player)
-    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is locked.'end
+    if type(tier)~='number'or tier~=math.floor(tier)or tier<1 or tier>d.Tier then return false,'That style is still locked!'end
     d.Skin=tier;self:PublishTreadmillData(player);self:MarkDirty(player);self:QueueGardenSave(player)
-    return true,'Style changed; your training power stays the same.'
+    return true,'Style changed! Your training power stays the same.'
 end
 
 require(script.Parent.GardenFenceData).Install(PlayerDataService)
+require(script.Parent.PackSizePityData).Install(PlayerDataService)
+require(script.Parent.PackPityData155).Install(PlayerDataService) -- R155: the pack pity (Normal / Event counts, the lucky 10th)
 require(script.Parent.PremiumProgress).Attach(PlayerDataService)
 require(script.Parent.TutorialProgress).Attach(PlayerDataService)
+require(script.Parent.DailyProgress).Attach(PlayerDataService) -- R140: login rewards + daily quests
+require(script.Parent.InventoryCap155).Attach(PlayerDataService) -- R155: the 200 cap, the saved hotbar layout, discarding
 return PlayerDataService

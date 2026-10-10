@@ -6,6 +6,8 @@ local PackRules = require(ReplicatedStorage:WaitForChild("SeedPackRules"))
 local PackVisuals = require(ReplicatedStorage:WaitForChild("SeedPackVisuals"))
 
 local Weather=require(ReplicatedStorage.WeatherTraits);local FX=require(ReplicatedStorage.ItemEffectAnchor)
+local PackShapes=require(ReplicatedStorage.PackShapes151) -- R151: each pack rolls one of six chip-bag shapes and keeps it for life (PlayerDataService.AddChest, RefreshWorldPack)
+local VerityReasons=require(ReplicatedStorage.VerityConfig).Reasons -- R152: what Verity says when a hand-in is refused (ConvertVoidPack)
 local ChestService = {}
 ChestService.__index = ChestService
 
@@ -42,7 +44,7 @@ function ChestService.new(config, mapService, playerData, baseService, notificat
 			entry:SetAttribute("Color", seed.Color)
             local rarity, style = PackRules.GetRarity(seed.Id)
             entry:SetAttribute("Rarity",rarity)
-            entry:SetAttribute('BaseChance',PackRules.SeedOdds(config,PackRules.ObtainableStage(seed.Id)or stage,'Pack01',1)[seed.Id])
+            entry:SetAttribute('BaseChance',require(ReplicatedStorage.SeedRarity153).Percent(seed.Id)) -- R153: the seed's one fixed chance (its home pack's), the same text everywhere
             entry:SetAttribute("RarityColor",style.Color)
 			entry:SetAttribute("Stage", PackRules.ObtainableStage(seed.Id) or stage)
 			entry:SetAttribute("SeedIndex", index)
@@ -98,7 +100,7 @@ function ChestService:_createTool(seedRecord, backpack)
 	local tool = Instance.new("Tool")
 	tool.Name = (PackRules.MutationKey(seedRecord.PackMutation) ~= "None" and seedRecord.PackMutation.." " or "")..seedName
     local rarity = PackRules.GetRarity(canonical.Id)
-    tool.ToolTip = rarity.." | "..(self.Config.GardenPlants[canonical.Id] and "Click or tap soil to plant. Controller: RT" or "Collectible seed. Planting coming later.")
+    tool.ToolTip = rarity.." | "..(self.Config.GardenPlants[canonical.Id] and "Click or tap the soil to plant! Controller: RT" or "A seed to collect. Planting is coming soon!")
     tool:SetAttribute("Weather",Weather.Key(seedRecord.Weather))
     tool:SetAttribute("Mutation", PackRules.MutationKey(seedRecord.PackMutation))
     tool:SetAttribute("SeedScale",PackRules.SanitizeSeedScale(seedRecord.SeedScale))
@@ -188,8 +190,17 @@ function ChestService:OnCharacterAdded(player)
 end
 
 function ChestService:Bank(player, seed)
-	local record, reason = self.PlayerData:AddChest(player, seed)
+	-- R137: hidden pack-size pity. R155 (review): Banked = this is the pack the player carried home. Its place was kept at the pickup (every other grant counted it),
+	-- so the 200 cap never refuses it, even when a paid Robux receipt (never refused for the cap) filled that place meanwhile (InventoryCap155.RoomFor);
+	-- the old storage ceiling (Config.MaxSavedChests, CanReceiveSeed) still applies.
+	local record, reason = self.PlayerData:AddChest(player, seed, {Luck=true, Banked=true})
 	if not record then return nil, reason end
+	if seed.TestGrant == true then record.TestGrant = true end -- R151: a world pack an owner command spawned (a forced event) is a TEST pack: never announced when opened
+	if seed.Pyramid156 ~= nil and self.Pyramid156 then -- R156: the Desert pyramid's secret pack is claimed in the same step it is banked (SecretPyramid156:Banked; never yields)
+		local okClaim, claimError = pcall(self.Pyramid156.Banked, self.Pyramid156, player, seed, record)
+		if not okClaim then warn("[R156] Secret pyramid claim: " .. tostring(claimError)) end
+	end
+	self.PlayerData:QuestEvent(player,'Steal',1) -- R140 daily quest: a pack stolen from the track and banked
 	self:SyncTools(player)
 	return record
 end
@@ -269,8 +280,8 @@ function ChestService:BuildArtParts(specs, parent, origin, scale, anchored)
 	return parts, names
 end
 
-function ChestService:BuildSeedPacket(_seedId, origin, parent, scale, weldRoot,stage,variantKey,seedScale,packSize,mutation)
-    return PackVisuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation)
+function ChestService:BuildSeedPacket(_seedId, origin, parent, scale, weldRoot,stage,variantKey,seedScale,packSize,mutation,shape)
+    return PackVisuals.Bag(origin,parent,scale,weldRoot,stage,variantKey,seedScale,packSize,mutation,nil,nil,shape) -- R151: shape = the pack's roll (nil = the default shape)
 end
 function ChestService:BuildLooseSeed(seedId,origin,parent,scale,weldRoot,mutation)
     local definition,_,index = self.Config.GetSeedById(seedId)
@@ -317,85 +328,9 @@ function ChestService:GetApprovedGardenTemplate(seedId, growthStage)
 	return ok and template or nil
 end
 
-function ChestService:BuildPlantAt(seedId, growthStage, origin)
-	local template = self:GetApprovedGardenTemplate(seedId, growthStage)
-	if template then
-		local model = template:Clone()
-		model:PivotTo(origin)
-		for _, part in ipairs(model:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.Anchored, part.CanCollide, part.CanTouch, part.CanQuery = true, false, false, false
-				part.Massless = true
-			end
-		end
-		return model
-	end
-	local stages = self.Config.ArtModels.Plants[seedId]
-	local specs = stages and stages[tostring(growthStage)] or self.Config.GardenUnknownArt
-	local model = Instance.new("Model")
-	local parts = self:BuildArtParts(specs, model, origin, 1, true)
-	model.PrimaryPart = parts[1]
-	return model
-end
-
-function ChestService:BuildGrowthModel(plot, crop, growthStage)
-	local origin = plot.CFrame * CFrame.new(crop.OffsetX or 0, plot.Size.Y / 2 + 0.025, crop.OffsetZ or 0)
-	-- Replicate one cheap proxy per crop; full growth art is rendered locally.
-    -- Crop identity/placement/harvest prompts remain server-owned.
-    local model = Instance.new("Model")
-    local proxy = Instance.new("Part")
-    proxy.Name = "CropAnchor"; proxy.Size = Vector3.new(0.5, 0.12, 0.5)
-    proxy.CFrame = origin * CFrame.new(0, 0.06, 0)
-    proxy.Color = Color3.fromRGB(94, 127, 73)
-    proxy.Anchored = true; proxy.CanCollide = false; proxy.CanTouch = false; proxy.CanQuery = false
-    proxy.Parent = model; model.PrimaryPart = proxy
-    model:SetAttribute("GardenClientVisual", true)
-	model.Name = "Crop_"..crop.Id
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
-	model:SetAttribute("GardenGenerated", true)
-	model:SetAttribute("CropId", crop.Id)
-	model:SetAttribute("SeedId", crop.SeedId)
-	model:SetAttribute("GrowthStage", growthStage)
-	model:SetAttribute("OffsetX", crop.OffsetX or 0)
-	model:SetAttribute("OffsetZ", crop.OffsetZ or 0)
-	model.Parent = plot
-	return model
-end
-
-function ChestService:BuildArtLibrary()
-	local old = self.Remotes:FindFirstChild("SeedArt")
-	if old then old:Destroy() end
-	local library = Instance.new("Folder")
-	library.Name = "SeedArt"
-	local plants = Instance.new("Folder")
-	plants.Name = "Plants"
-	plants.Parent = library
-    local stages = Instance.new("Folder"); stages.Name = "GrowthStages"; stages.Parent = library
-	local seeds = Instance.new("Folder")
-	seeds.Name = "Seeds"
-	seeds.Parent = library
-	for _, catalog in ipairs(self.Config.SeedCatalogByStage) do
-		for _, definition in ipairs(catalog) do
-            if plants:FindFirstChild(definition.Id) then continue end -- V090: exactly 25 art entries
-            if self.Config.GardenPlants[definition.Id] then
-            local stageFolder = Instance.new("Folder"); stageFolder.Name = definition.Id; stageFolder.Parent = stages
-            for stage = 1, 4 do
-                local template = self:BuildPlantAt(definition.Id, stage, CFrame.new())
-                template.Name = tostring(stage); template.Parent = stageFolder
-            end
-			local model = self:BuildPlantAt(definition.Id, 4, CFrame.new())
-			model.Name = definition.Id
-			model.Parent = plants
-            end -- New seeds are collectibles; plant art remains deferred.
-			local packet = self:BuildLooseSeed(definition.Id, CFrame.new(), seeds)
-			packet.Name = definition.Id
-		end
-	end
-	library:SetAttribute("Version", 138)
-	library:SetAttribute("Ready", true)
-	library.Parent = self.Remotes
-	self.ArtLibrary = library
-end
+-- R153 (architecture review, item 2): BuildPlantAt, BuildGrowthModel and BuildArtLibrary are GardenPlantRuntime's. GardenPlantRuntime.Install
+-- (the end of this file) puts them on ChestService as it loads, so the R85-era bodies that stood here never ran; they were removed. Read and edit
+-- them in GardenPlantRuntime.lua (docs/proposals/R153/tests/test_live_methods153.luau checks which functions are live).
 
 function ChestService:SelectBiomePacks()
     -- Keep all five authored spawn locations and their identity. Pickups are finite per cycle.
@@ -530,16 +465,30 @@ function ChestService:FindPackPlacement(preferred,stage,variant,size,ownSlot,dro
     return nil
 end
 
-function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds)
+-- rolledSize (R137): the size SkinWorldSeeds already rolled for this spot (after the hidden track pity); it is an
+-- ordinary roll, unlike testSize, so alerts and odds treat it as natural.
+-- rolledShape (R151): the chip-bag shape SkinWorldSeeds rolled for this spot (its pair is baked ahead of the refresh); a spawn without one (a forced test pack) rolls its own.
+-- deferred (R153 perf, lag audit D9; SkinWorldSeedsStep only): a list. The pack is built but left hidden and unavailable, and the rest - made
+-- available, the weather roll, the rare-pack alert - is added to the list, for the reopening (SkinWorldSeeds) to run in the same frame and order as before.
+function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,spawnOdds,rolledSize,rolledShape,deferred)
     seed.Prompt.MaxActivationDistance=24;seed.Prompt.RequiresLineOfSight=false
+    PackShapes.Unpin(seed) -- the slot's previous pack is gone
     seed.Weather='None';seed.WeatherCheckedEvent=nil;seed.Model:SetAttribute('WeatherTrait','None')
     local variant=forcedVariant or PackRules.RollVariant(self.PackRandom:NextNumber())
-    local size=testSize and PackRules.SanitizePackSize(testSize)or PackRules.RollPackSize(self.PackRandom:NextNumber())
+    local size=testSize and PackRules.SanitizePackSize(testSize)or rolledSize and PackRules.SanitizePackSize(rolledSize)or PackRules.RollPackSize(self.PackRandom:NextNumber())
     local mutation=testMutation and PackRules.MutationKey(testMutation)or PackRules.RollMutation(self.PackRandom:NextNumber())
     seed.PackHome=seed.PackHome or seed.Body.Position
     -- Keep the rolled size: search forward into clear ground instead of shrinking it.
     local frame,bounds=self:FindPackPlacement(seed.PackHome,seed.Stage,variant,size,seed)
     local seedScale=PackRules.NewSeedScale(seed.Stage,variant,size)
+    -- R151: the pack's chip-bag shape, rolled once, kept for life. A pack that takes none (the Void, the Mech) has nil; a pack whose pair is not baked yet keeps the
+    -- default shape for life (0; Settle), so it never changes shape between the ground, the carry, a drop and the Bag. The seed table carries it (the carry clones it).
+    local shape
+    if PackShapes.Applies(variant)then
+        local design=PackRules.DesignKey(seed.Stage,variant)
+        shape=PackShapes.Settle(design,rolledShape~=nil and rolledShape or PackShapes.Roll(variant))
+        if shape==nil then shape=0 end -- (variations off: this pack is the default shape, also after they are switched on again)
+    end
     if not frame then
         seed.Generation=(seed.Generation or 0)+1
         self:SetWorldPackAvailable(seed,false)
@@ -548,7 +497,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
         return
     end
     -- Carry/drop records are independent copies; commit only after the complete visual is ready.
-    local packet=self:BuildSeedPacket(nil,frame,nil,nil,nil,seed.Stage,variant,seedScale,size,mutation)
+    local packet=self:BuildSeedPacket(nil,frame,nil,nil,nil,seed.Stage,variant,seedScale,size,mutation,shape)
     local platform=PackVisuals.Platform(frame,seed.Stage,variant,size)
     packet:SetAttribute("PackVisible",not self.Map.Refreshing)
     local oldPlatform=seed.Model:FindFirstChild('PackPlatform')
@@ -560,11 +509,13 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     seed.Body.CFrame=frame
     seed.PackPosition=frame.Position;seed.PackRadius=bounds.Radius
     seed.PackSize=size;seed.PackMutation=mutation
+    seed.PackShape=shape -- R151
+    if shape and shape>0 then PackShapes.Pin(seed,PackRules.DesignKey(seed.Stage,variant),shape) end -- its pair stays baked while this pack can be stolen, dropped and carried
     seed.BagVariant=variant;seed.SeedScale=seedScale;seed.OddsVersion=PackRules.OddsVersion
     seed.Generation=(seed.Generation or 0)+1
     seed.Model:SetAttribute("SeedArtVersion",123)
     seed.Model:SetAttribute("BagVariant",variant);seed.Model:SetAttribute("SeedScale",seedScale)
-    seed.Model:SetAttribute('PackSize',size);seed.Model:SetAttribute('PackMutation',mutation)
+    seed.Model:SetAttribute('PackSize',size);seed.Model:SetAttribute('PackMutation',mutation);seed.Model:SetAttribute('PackShape',shape)
     -- The interaction sits at the reachable near edge, even on a ten-times pack.
     local promptAnchor=seed.Body:FindFirstChild('PackPickupPoint')or Instance.new('Attachment')
     promptAnchor.Name='PackPickupPoint'
@@ -574,6 +525,7 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     seed.Billboard.Enabled=false
     seed.Glow.Enabled=false
     seed.Prompt.ActionText='STEAL';seed.Prompt.ObjectText=''
+    local function finish()
     self:SetWorldPackAvailable(seed,true)
     local weatherProbability=1
     if self.Weather and not seed.EventKeeper then
@@ -583,16 +535,96 @@ function ChestService:RefreshWorldPack(seed,forcedVariant,testSize,testMutation,
     local odds={TierProbability=spawnOdds or(forcedVariant and 1 or nil),ForcedSize=testSize~=nil,ForcedMutation=testMutation~=nil,Weather=seed.Weather,WeatherProbability=weatherProbability}
     local alert=require(ReplicatedStorage.RarePackRules).Message(seed.Stage,variant,size,mutation,odds)
     if alert and not seed.EventKeeper then alert.SpawnId=seed.Model.Name..':'..seed.Generation;alert.At=workspace:GetServerTimeNow();self.RarePackSpawn:FireAllClients(alert)end
+    end
+    if deferred then self:SetWorldPackAvailable(seed,false);table.insert(deferred,finish)else finish()end
 end
-function ChestService:SkinWorldSeeds(cycle)
+-- R151: the plan of one refresh: every spot's tier, size (after the hidden track pity) and chip-bag shape. The NEXT refresh's plan is made right after this one is
+-- applied and the pairs of its shapes are asked for at once, so they are baked long before the refresh (5 minutes, the closure is 10 s); a spawn whose pair is still
+-- not baked keeps the default shape for life (PackShapes.Settle). The first refresh of a server has no earlier plan: its packs are the default shape.
+function ChestService:PlanWorldPacks(cycle)
     local variants={}
     for i in ipairs(self.Map.Chests)do variants[i]=PackRules.RollVariant(self.PackRandom:NextNumber())end
     variants=require(ReplicatedStorage.PackSchedule81).Plan(cycle or 0,variants,function(a,b)return self.PackRandom:NextInteger(a,b)end)
     local odds=require(ReplicatedStorage.RarePackRules).TierProbabilities(cycle or 0,#variants)
-    for i,seed in ipairs(self.Map.Chests)do self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]])end
+    -- R137: every spot's size is rolled first so the hidden track pity (PackSizePity) can make one random spot big
+    -- after a dry spell. Its counters move with the packs that actually spawned.
+    local Pity=require(ReplicatedStorage.PackSizePity)
+    local sizes={};for i in ipairs(self.Map.Chests)do sizes[i]=PackRules.RollPackSize(self.PackRandom:NextNumber())end
+    sizes=Pity.PlanTrack(self.TrackLuck,sizes,function()return self.PackRandom:NextNumber()end)
+    local shapes,wanted={},{}
+    for i,seed in ipairs(self.Map.Chests)do
+        shapes[i]=PackShapes.Roll(variants[i])
+        if shapes[i]then table.insert(wanted,{Key=PackRules.DesignKey(seed.Stage,variants[i]),Id=shapes[i]})end
+    end
+    pcall(PackShapes.Prefetch,wanted)
+    return {Cycle=cycle or 0,Variants=variants,Odds=odds,Sizes=sizes,Shapes=shapes}
+end
+-- R153 perf (lag audit D9): the 35 world packs were all rebuilt in the one server frame the track reopens (a burst of new instances to replicate:
+-- a hitch on every client every 5 minutes). Now the closed window's last SkinSpread seconds build them SkinPerStep a frame (SkinWorldSeedsStep;
+-- they are hidden, their prompts off and they are unavailable while the map is refreshing), and the reopening finishes them: each is made
+-- available, takes the weather and sends its rare-pack alert in the same frame and order as before. The plan, the rolls and their order are the same.
+ChestService.SkinSpread,ChestService.SkinPerStep=2,2
+function ChestService:SkinWorldSeedsStep(cycle,count)
+    local job=self.SkinJob
+    if job and job.Cycle~=(cycle or 0)then return true end
+    if not job then
+        local plan=self.WorldPlan
+        self.WorldPlan=nil
+        if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
+        job={Cycle=cycle or 0,Plan=plan,Next=1,Finish={}};self.SkinJob=job
+    end
+    local plan,list=job.Plan,self.Map.Chests
+    for _=1,count do
+        local i=job.Next;local seed=list[i];if not seed then break end
+        self:RefreshWorldPack(seed,plan.Variants[i],nil,nil,plan.Odds[plan.Variants[i]],plan.Sizes[i],plan.Shapes[i],job.Finish)
+        job.Next=i+1
+    end
+    return job.Next>#list
+end
+-- (called when the track closes for a refresh: from SkinSpread seconds before it reopens, a few packs a frame until all are built or it reopens)
+function ChestService:_spreadWorldSkins()
+    local token={};self.SkinToken=token;self.SkinJob=nil
+    local root=self.Map.MapRoot
+    local endsAt=root and root:GetAttribute('BiomeRefreshEndsAt')
+    if type(endsAt)~='number'then return end
+    task.spawn(function()
+        local wait=endsAt-ChestService.SkinSpread-workspace:GetServerTimeNow()
+        if wait>0 then task.wait(wait)end
+        local cycle=(root:GetAttribute('BiomeRefreshCycle')or 0)+1
+        while self.SkinToken==token and self.Map.Refreshing do
+            local ok,done=pcall(self.SkinWorldSeedsStep,self,cycle,ChestService.SkinPerStep)
+            if not ok then warn('[R153] Pack re-skin left to the reopening: '..tostring(done))end
+            if not ok or done then break end
+            task.wait()
+        end
+    end)
+end
+function ChestService:SkinWorldSeeds(cycle)
+    -- (R153 perf: the packs the closed window already built are finished first, in order; the rest are built and finished as before)
+    local job=self.SkinJob;self.SkinJob=nil;self.SkinToken=nil
+    local plan,from
+    if job and job.Cycle==(cycle or 0)then plan,from=job.Plan,job.Next else
+    plan=self.WorldPlan
+    self.WorldPlan=nil
+    if not plan or plan.Cycle~=(cycle or 0)then plan=ChestService.PlanWorldPacks(self,cycle)end
+    from=1;job=nil
+    end
+    local variants,odds,sizes=plan.Variants,plan.Odds,plan.Sizes
+    local Pity=require(ReplicatedStorage.PackSizePity)
+    if job then for _,finish in ipairs(job.Finish)do finish()end end
+    for i,seed in ipairs(self.Map.Chests)do if i>=from then self:RefreshWorldPack(seed,variants[i],nil,nil,odds[variants[i]],sizes[i],plan.Shapes[i])end end
+    local biggest=0
+    for _,seed in ipairs(self.Map.Chests)do
+        if seed.Available and table.find(PackRules.VariantOrder,seed.BagVariant)then biggest=math.max(biggest,seed.PackSize or 1)end
+    end
+    self.TrackLuck=Pity.After(Pity.Track,self.TrackLuck,biggest)
+    -- the next refresh's plan (its shapes' pairs are baked while this refresh's packs are on the track)
+    local ok,upcoming=pcall(ChestService.PlanWorldPacks,self,(cycle or 0)+1)
+    if ok then self.WorldPlan=upcoming end
 end
 function ChestService:SetWorldPacksClosed(closed)
     for _,seed in ipairs(self.Map.Chests) do self:SetWorldPackAvailable(seed,seed.Available) end
+    if closed then pcall(self._spreadWorldSkins,self)else self.SkinToken=nil end -- R153 perf (D9)
 end
 
 function ChestService:DressGuardian(model, stage)
@@ -788,6 +820,8 @@ function ChestService:InteractGarden(player, action, payload)
 		success, result = self.PlayerData:HarvestPlant(player, slot, crop.Id, os.time(), payload.FruitIndex)
 	end
 	if not success then return reject(result) end
+	-- R151: a fruit picked by hand counts for the hub's BIGGEST FRUIT TODAY board (HubDisplayService.NoteHarvest; set by the main script). Owner test harvests (/test harvestall) do not come through here.
+	if action == "Harvest" and self.HarvestHook then pcall(self.HarvestHook, player, result) end
 	self.PlayerData:QueueGardenSave(player)
 	local refreshed, failure = pcall(function()
 		self:SyncTools(player)
@@ -800,56 +834,8 @@ function ChestService:InteractGarden(player, action, payload)
 		Message = action == "Harvest" and (name.." harvested! Visit Sell to earn cash.") or (name.." planted!")}
 end
 
-function ChestService:RenderGarden(base, owner)
-	if not base then return end
-	local infos = self.GardenPlots[base.Index]
-	if not infos then return end
-	local loaded = owner and self.PlayerData:IsLoaded(owner)
-	local garden = loaded and self.PlayerData.Gardens[owner]
-	for slot, info in ipairs(infos) do
-		local ownerId, seen = owner and owner.UserId or 0, {}
-		local crops = garden and garden.Plots[tostring(slot)] or {}
-		for _, crop in ipairs(crops) do
-			seen[crop.Id] = true
-			local _, stage = self.Config.GetGardenGrowth(crop, os.time())
-			local key = table.concat({ownerId, crop.Id, crop.SeedId, stage, crop.OffsetX, crop.OffsetZ}, ":")
-			local previous = info.Rendered[crop.Id]
-			if not previous or previous.Key ~= key or not previous.Model.Parent then
-				-- Build replacement completely before releasing the previous stage.
-				local model = self:BuildGrowthModel(info.Part, crop, stage)
-				if previous then previous.Model:Destroy(); previous.Anchor:Destroy() end
-				local anchor = Instance.new("Attachment")
-				anchor.Name = "CropInteraction_"..crop.Id
-				anchor.Position = Vector3.new(crop.OffsetX, info.Part.Size.Y / 2 + 0.4, crop.OffsetZ)
-				anchor:SetAttribute("GardenGenerated", true)
-				anchor.Parent = info.Part
-				local prompt
-				if stage == 4 and self.Config.GardenPlants[crop.SeedId] then
-					prompt = Instance.new("ProximityPrompt")
-					prompt.Name = "HarvestPrompt"
-					prompt.ActionText = "PICK! 🌾"
-					local seed = self.Config.GetSeedById(crop.SeedId)
-					prompt.ObjectText = seed and seed.Name:gsub(" Seed$", "") or "Plant"
-					prompt.HoldDuration = 0.3
-					prompt.MaxActivationDistance = self.Config.GardenInteractionDistance
-					prompt.RequiresLineOfSight = false
-					prompt.Exclusivity = Enum.ProximityPromptExclusivity.OneGlobally
-					prompt:SetAttribute("GardenPrompt", true)
-					prompt:SetAttribute("GardenOwnerId", ownerId)
-					prompt:SetAttribute("GardenCropId", crop.Id)
-					prompt:SetAttribute("GardenStage", 4)
-					prompt.Parent = anchor
-				end
-				info.Rendered[crop.Id] = {Key = key, Model = model, Anchor = anchor, Prompt = prompt}
-			end
-		end
-		for id, old in pairs(info.Rendered) do
-			if not seen[id] then old.Model:Destroy(); old.Anchor:Destroy(); info.Rendered[id] = nil end
-		end
-		info.Part:SetAttribute("GardenOwnerId", ownerId)
-		info.Part:SetAttribute("GardenPlantCount", #crops)
-	end
-end
+-- R153 (architecture review, item 2): RenderGarden is GardenPlantRuntime's (installed at the end of this file; it renders only the slot it is
+-- asked for). The older body that stood here never ran and was removed: read and edit GardenPlantRuntime.lua.
 
 function ChestService:StartGardens()
 	if self.GardensRunning then return end
@@ -909,9 +895,49 @@ function ChestService:IsOpening(player)
     local opening=self.Openings[player]
     return opening~=nil and opening.Committed==true
 end
+-- R147: the Verity NPC gives a Verity Pack for a Void Pack. id = the pack's inventory Id (the NPC passes the one the player
+-- chose); without one, the Void Pack in the player's hand, else the first Void Pack in the bag. Returns the new record, or nil
+-- and the reason with nothing changed. A pack whose opening is committed (the reveal is playing) is refused; an opening that
+-- has only been started (held, clicks) is finished first, then the Tool is rebuilt for the new pack.
+function ChestService:ConvertVoidPack(player, id)
+	if not player or not self.PlayerData:IsLoaded(player) then return nil, VerityReasons.Loading end
+	if id == nil then
+		local character = player.Character
+		if character then
+			for _, child in ipairs(character:GetChildren()) do
+				if child:IsA("Tool") and child:GetAttribute("SeedPackTool") and child:GetAttribute("BagVariant") == "EclipseReliquary" then
+					local held = child:GetAttribute("SeedInventoryId")
+					if self.PlayerData:CheckVoidPack(player, held) then id = held; break end
+				end
+			end
+		end
+		if id == nil then
+			for _, record in ipairs(self.PlayerData:GetChestRecords(player)) do
+				if record.Kind == "Pack" and record.BagVariant == "EclipseReliquary" and record.Stage == 7 then id = record.Id; break end
+			end
+		end
+		if id == nil then return nil, VerityReasons.NoVoid end
+	end
+	local target, reason = self.PlayerData:CheckVoidPack(player, id)
+	if not target then return nil, reason end
+	local opening = self.Openings[player]
+	if opening and opening.Tool and opening.Tool:GetAttribute("SeedInventoryId") == target.Id then
+		if opening.Committed then return nil, VerityReasons.Opening end
+		self:_finishOpening(player, opening)
+	end
+	local record, why = self.PlayerData:ConvertVoidPack(player, target.Id)
+	if not record then return nil, why end
+	self:SyncTools(player)
+	return record
+end
 function ChestService:_finishOpening(player, opening, skipSync)
     if not opening or self.Openings[player] ~= opening then return end
     self.Openings[player]=nil
+    -- R155: the reward seed flies into the Bag on the opener's screen for a few seconds (SeedCollect154): it can't be discarded meanwhile (InventoryService155)
+    if opening.Committed and opening.RewardId then
+        self.RecentRewards=self.RecentRewards or setmetatable({},{__mode="k"})
+        local list=self.RecentRewards[player] or {};self.RecentRewards[player]=list;list[opening.RewardId]=os.clock()
+    end
     for _,connection in ipairs(opening.Connections) do connection:Disconnect() end
     if opening.Bag then opening.Bag:Destroy() end
     if opening.Committed and opening.Tool.Parent then opening.Tool:Destroy() end
@@ -919,7 +945,8 @@ function ChestService:_finishOpening(player, opening, skipSync)
         if not player.Parent then return end
         self:SyncTools(player)
         local c=player.Character;local h=c and c:FindFirstChildOfClass('Humanoid');local backpack=player:FindFirstChildOfClass('Backpack')
-        if opening.Committed and opening.RewardId and c==opening.Character and h and h.Health>0 and not h.PlatformStand and not player:GetAttribute('GuardianRagdollActive')and backpack then
+        -- (R153: not when the player already holds something else: they chose it during the reveal, and this hand-off threw it back into the Backpack)
+        if opening.Committed and opening.RewardId and c==opening.Character and h and h.Health>0 and not h.PlatformStand and not player:GetAttribute('GuardianRagdollActive')and backpack and not c:FindFirstChildOfClass('Tool')then
             for _,seed in ipairs(backpack:GetChildren())do
                 if seed:IsA('Tool')and seed:GetAttribute('GardenSeed')and seed:GetAttribute('SeedInventoryId')==opening.RewardId then h:EquipTool(seed);break end
             end
@@ -934,26 +961,103 @@ function ChestService:_canOpenPack(player,tool)
         and not player:GetAttribute("GuardianFlingActive") and not player:GetAttribute("ChestChaseSeedCarrying")
         and not player:GetAttribute("ChestChaseRunActive") and not player:GetAttribute("ChestChaseQueued")
 end
+-- R152 (hotbar reliability): two ways a pack the player equipped was thrown back into the Backpack although nothing was wrong:
+--  * a quick unequip + re-equip while its chip-bag shape was loading starts a SECOND hold of the same pack; the first one to finish held it, the second saw
+--    that opening and bounced the pack out of the hand (R151 known issue). A hold for the pack that is already held does nothing now.
+--  * equipping pack B while pack A is in hand: if B.Equipped is handled before A.Unequipped has finished A's opening, B saw A's opening and bounced. An opening
+--    that is not committed and whose pack is no longer in the hand is stale: it is finished here, then B is held. (Committed openings, whose reveal is playing, still win.)
+-- Returns true when this pack is already the held one.
+-- R153 (hotbar debug aid): a pack sent back says why on the tool (HoldRefused = reason@server time: the hotbar logs it, and says FINISH THAT FIRST! for busy, or
+-- holds it after the reveal / the knock-down) and in a short per-player list /test hotbar prints; a hold that waited for its shape is listed too.
+local function holdNote(self,player,text)
+    self.HoldLog=self.HoldLog or setmetatable({},{__mode="k"});local list=self.HoldLog[player] or {};self.HoldLog[player]=list
+    table.insert(list,("%.1f %s"):format(os.clock(),text));if #list>12 then table.remove(list,1) end
+end
+local function bounce(self,player,tool)
+    local h=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    local why=self.Openings[player] and "opening" or not self.PlayerData:IsLoaded(player) and "loading" or tool.Parent~=player.Character and "moved"
+        or (player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive") or not h or h.Health<=0 or h.PlatformStand) and "knocked" or "busy"
+    holdNote(self,player,tool.Name.." refused: "..why)
+    local backpack=player:FindFirstChildOfClass("Backpack")
+    if backpack and tool.Parent==player.Character then tool:SetAttribute("HoldRefused",why.."@"..("%.2f"):format(workspace:GetServerTimeNow()));tool.Parent=backpack end
+end
+local function settleHold(self,player,tool)
+    local existing=self.Openings[player]
+    if type(existing)~="table" then return false end
+    if existing.Tool==tool and tool.Parent==player.Character then return true end
+    if not existing.Committed and existing.Tool.Parent~=player.Character then ChestService._finishOpening(self,player,existing) end
+    return false
+end
+-- R155 (review): the pack's tooltip, built from its record: one function for the hold and for the refresh below (the pity counts and the boots luck move while a pack is put away).
+-- R156 (owner): the client no longer shows this tooltip (the item info panel was removed); it is still written, cheap and harmless.
+function ChestService:_packTooltip(player,record)
+    -- R139 (owner): the free starter pack's 2x luck is secret, so its tooltip shows the plain pack odds.
+    -- R154: the pack's real odds: the 80% rule (SeedPackRules) and the 4 Leaf Clover's x2 on the Void / Verity / Mech packs (PassLuck, the passes alone) too.
+    local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0,nil,self.PlayerData:PassLuck(player))
+    -- R155 (owner): the pack pity. When this pack's open would be its group's lucky 10th, its odds are the lucky roll's (x1.5) and a line says so; the rule is listed with the odds.
+    local lucky,before,after=nil,{},{}
+    if self.PlayerData.PackPityTooltip then lucky,before,after=self.PlayerData:PackPityTooltip(player,record,function(luck,passLuck)return PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,luck,record.OddsVersion or 0,nil,passLuck)end)end
+    if lucky then odds=lucky end
+    local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
+    local Starter=require(ReplicatedStorage.StarterVerityRules158d)
+    if Starter.PackFloor(record)then table.insert(rows,Starter.TooltipLine)end -- R158d: the new-player gift pack says what it is
+    for _,line in ipairs(before)do table.insert(rows,line)end
+    for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
+        table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
+    end
+    if record.BagVariant=='MechLimited' and record.PaidRandom==true then table.insert(rows,require(ReplicatedStorage.MechCatalog).CoatLine()) end -- R155: the coat line next to a Mech pack's odds (R155 review: a BOUGHT one only; a free / TEST Mech pack never rolls a coat)
+    for _,line in ipairs(after)do table.insert(rows,line)end
+    return table.concat(rows,'\n')
+end
+-- R155 (review): the tooltip of every pack this player has held is rebuilt from its record (the pity counts and the boots luck change what it says); a never-held pack keeps its short line.
+function ChestService:_refreshPackTooltips(player)
+    if not player.Parent then return end
+    local byId={};for _,record in ipairs(self.PlayerData:GetChestRecords(player))do byId[record.Id]=record end
+    for _,container in ipairs((ChestService._getToolContainers(self,player)))do for _,tool in ipairs(container:GetChildren())do
+        if tool:IsA('Tool')and tool:GetAttribute('SeedPackTool')and tool:GetAttribute('OddsTooltip155')==true then
+            local record=byId[tool:GetAttribute('SeedInventoryId')]
+            if record and record.Kind=='Pack' then pcall(function()tool.ToolTip=ChestService._packTooltip(self,player,record)end)end -- (no record, or a seed now: its tool goes at the next sync)
+        end
+    end end
+end
+local packTipWatchers=setmetatable({},{__mode='k'})
+-- R155 (review): once per player (at its first pack tool): a change of a pity count or of the boots luck rebuilds the held packs' tooltips, at most once a frame (never yields).
+local function watchPackTooltips(self,player)
+    if packTipWatchers[player]then return end;packTipWatchers[player]=true
+    local queued=false
+    local function refresh()
+        if queued then return end;queued=true
+        task.defer(function()
+            queued=false
+            local ok,err=pcall(ChestService._refreshPackTooltips,self,player);if not ok then warn("[R155] pack tooltip refresh failed: "..tostring(err))end
+        end)
+    end
+    for _,name in ipairs({'PackPityNormal','PackPityEvent','ChestLuckMultiplier'})do player:GetAttributeChangedSignal(name):Connect(refresh)end
+end
 function ChestService:_holdPack(player,tool)
     local record
     for _,candidate in ipairs(self.PlayerData:GetChestRecords(player))do if candidate.Id==tool:GetAttribute('SeedInventoryId')then record=candidate;break end end
     if record then
-        local odds=PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,player:GetAttribute('ChestLuckMultiplier'),record.OddsVersion or 0)
-        local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
-        for _,seed in ipairs(PackRules.RewardPool(self.Config,record.Stage,record.BagVariant)or{})do
-            if(odds[seed.Id]or 0)>0 then table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))end
-        end
-        tool.ToolTip=table.concat(rows,'\n')
+        tool.ToolTip=ChestService._packTooltip(self,player,record);tool:SetAttribute('OddsTooltip155',true) -- R155 (review): from now on the pity / luck refresh keeps it true
     end
-    if self.Openings[player] or not self:_canOpenPack(player,tool) then
-        local backpack=player:FindFirstChildOfClass("Backpack")
-        if backpack and tool.Parent==player.Character then tool.Parent=backpack end
-        return
+    if settleHold(self,player,tool) then return end
+    if self.Openings[player] or not self:_canOpenPack(player,tool) then bounce(self,player,tool);return end
+    -- R151: a pack with a chip-bag shape is put in the hand once its (design, variation) pair is baked: a short bounded wait BEFORE anything of the opening exists (the
+    -- checks run again after it), so the pack in the hand is the shape its picture shows. Past the wait it is built in the default shape this once (never yields).
+    local shape=tool:GetAttribute("PackShape")
+    if shape~=nil then
+        local design=PackRules.DesignKey(tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"))
+        local neutral=PackRules.VariantKey(tool:GetAttribute("BagVariant"))==require(ReplicatedStorage.VerityCatalog).Variant
+        if PackShapes.State(design,shape,neutral)~="Ready" then
+            local waited=os.clock();pcall(PackShapes.Await,design,shape,neutral);holdNote(self,player,("%s waited %.2f s for its shape"):format(tool.Name,os.clock()-waited))
+            if settleHold(self,player,tool) then return end -- (R152: a second hold of this very pack began while this one waited)
+            if self.Openings[player] or not self:_canOpenPack(player,tool) then bounce(self,player,tool);return end
+        end
     end
     local opening={Tool=tool,Character=player.Character,Connections={},Committed=false,Clicks=0,LastClick=-math.huge}
     self.Openings[player]=opening
     local ok,err=xpcall(function()
-        opening.Bag=PackVisuals.CarryBag(opening.Character,tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"),tool:GetAttribute("SeedScale"),tool:GetAttribute("PackSize"),tool:GetAttribute("PackMutation"))
+        opening.Bag=PackVisuals.CarryBag(opening.Character,tool:GetAttribute("Stage"),tool:GetAttribute("BagVariant"),tool:GetAttribute("SeedScale"),tool:GetAttribute("PackSize"),tool:GetAttribute("PackMutation"),shape)
         assert(opening.Bag,"Character torso is not ready")
         FX.Set(opening.Bag,tool:GetAttribute("Weather"),nil,tool:GetAttribute("PackSize"),2*(tool:GetAttribute("PackSize")or 1));opening.Bag:SetAttribute("Weather",tool:GetAttribute("Weather"))
         opening.Bag:SetAttribute("PackClickCount",0)
@@ -987,7 +1091,7 @@ function ChestService:_activatePack(player,tool)
         -- R112: a draw function, not one number: King odds reach 1 in 1T and are rolled in stages.
         local reward,reason=self.PlayerData:OpenSeedPack(player,tool:GetAttribute("SeedInventoryId"),function()return self.PackRandom:NextNumber()end)
         if not reward then
-            self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2)
+            self.Notifications:Show(player,reason,Color3.fromRGB(255,185,100),2,"Denied")
             self:_finishOpening(player,opening);return
         end
         opening.Committed=true;opening.RewardId=reward.Id;tool.Enabled=false
@@ -1012,17 +1116,25 @@ function ChestService:_createPackTool(record,backpack)
     local tool=Instance.new("Tool")
     tool.Name=PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)
     tool.ToolTip=PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation).." • Click / tap / RT 5 times to open"
-    local expected=require(script.Parent.RarePackTests).Expected(self.PlayerData,player,record.Id)
+    local okTest,expected=pcall(function()return require(script.Parent.RarePackTests).Expected(self.PlayerData,player,record.Id)end) -- R153: a broken owner test hook means "no test override", never a missing pack tool
+    if not okTest then warn("[R153] RarePackTests.Expected failed (the pack tool is the normal one): "..tostring(expected));expected=nil end
     if expected then
         local rarity=PackRules.GetRarity(expected);tool.Name='TEST '..rarity..' Pack'
         tool.ToolTip='Guaranteed '..rarity..' reveal • Click / tap / RT 5 times to open'
     end
+    do -- R158d: the new-player gift pack (Floor = Mythic) has its own name, so it never shares a hotbar slot / Bag stack with ordinary Verity Packs (the stack key holds the name)
+        local Starter=require(ReplicatedStorage.StarterVerityRules158d)
+        if Starter.PackFloor(record)and not expected then tool.Name=Starter.ToolName;tool.ToolTip=Starter.ToolTip end
+    end
     tool.RequiresHandle=false;tool.CanBeDropped=false;tool.ManualActivationOnly=false;tool.Enabled=true
     tool:SetAttribute("SeedPackTool",true);tool:SetAttribute("SeedInventoryId",record.Id)
+    tool:SetAttribute("PackNumber",record.ChestNumber) -- R139: above the player's PackSerialAtJoin = new this visit (hotbar rainbow)
     tool:SetAttribute("PackSize",PackRules.SanitizePackSize(record.PackSize));tool:SetAttribute("PackMutation",PackRules.MutationKey(record.PackMutation));tool:SetAttribute("Weather",Weather.Key(record.Weather))
     tool:SetAttribute("Stage",record.Stage)
     tool:SetAttribute("BagVariant",PackRules.VariantKey(record.BagVariant))
     tool:SetAttribute("SeedScale",PackRules.SanitizeSeedScale(record.SeedScale))
+    local shape=PackShapes.Sanitize(record.PackShape);if shape>0 then tool:SetAttribute("PackShape",shape) end -- R151: the pack's own chip-bag shape (absent = the default: every record saved before it)
+    if player then watchPackTooltips(self,player) end -- R155 (review)
     tool.Equipped:Connect(function() self:_holdPack(player,tool) end)
     tool.Activated:Connect(function() self:_activatePack(player,tool) end)
     tool.Unequipped:Connect(function()

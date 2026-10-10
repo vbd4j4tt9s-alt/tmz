@@ -5,6 +5,7 @@ local Rules=require(RS:WaitForChild('PlantRules'))
 local PackRules=require(RS:WaitForChild('SeedPackRules'))
 local FruitEffects=require(RS:WaitForChild('ApprovedFruitEffects'))
 local Trees=require(RS:WaitForChild('TreeReworkMotion'))
+local FxBudget;pcall(function()FxBudget=require(RS:WaitForChild('ClientFxBudget',10))end)
 local Effects={}
 local function move(part,frame,batch)if batch then batch:Set(part,frame)else part.CFrame=frame end end
 function Effects.Part(parent,name,size,color)
@@ -31,6 +32,19 @@ function Effects.Profile(def,id)
  return nil
 end
 local palette={RainbowGeode=Color3.fromRGB(190,203,255),Moon=Color3.fromRGB(184,226,255),DuneStar=Color3.fromRGB(255,220,105),Ancient=Color3.fromRGB(173,232,149),Supernova=Color3.fromRGB(255,198,101),Magma=Color3.fromRGB(255,115,55),Frost=Color3.fromRGB(164,232,251),Ash=Color3.fromRGB(170,161,149),Ember=Color3.fromRGB(255,151,67),Crystal=Color3.fromRGB(193,158,255),Storm=Color3.fromRGB(122,227,242),Spore=Color3.fromRGB(127,255,212),Venom=Color3.fromRGB(158,224,90),Firefly=Color3.fromRGB(255,211,105),Mirage=Color3.fromRGB(241,184,233),Solar=Color3.fromRGB(255,205,88)}
+-- R148: every plant of rank 4 or more (Legendary and up) wears a Highlight as its rarity aura, and Roblox draws at most 31 Highlights in all (the plant
+-- selection view, pack previews and the weather glow use some too). The scheduler already allows only four effect plants (two in low mode, which makes no
+-- aura), but it used to hand the slots out nearest-first, so a few near Legendary or Mythic plants could crowd out a King, Cosmic or Secret plant standing
+-- a little further off. Slots now go by rarity rank first (higher first), then distance, then a stable key; callers pass only the plants that qualify.
+function Effects.GrantSlots(entries,cap)
+ table.sort(entries,function(a,b)
+  if a.FxRank~=b.FxRank then return a.FxRank>b.FxRank end
+  if a.Distance~=b.Distance then return a.Distance<b.Distance end
+  return a.SortKey<b.SortKey
+ end)
+ for i,entry in ipairs(entries)do entry.FxGranted=i<=cap end
+ return math.min(#entries,cap)
+end
 function Effects.Create(item,r,def,crop,at,mode)
  if require(RS.HologramProjection).Is(crop.SeedId)then return end
  local style=PackRules.Rarities[def.Rarity];local profile=Effects.Profile(def,crop.SeedId)
@@ -54,6 +68,7 @@ function Effects.Create(item,r,def,crop,at,mode)
   local aura=Instance.new('Highlight');aura.Name='Rarity aura';aura.Adornee=r.Visual
   aura.FillColor=auraColor;aura.OutlineColor=auraColor;aura.FillTransparency=.95;aura.OutlineTransparency=.78
   aura.DepthMode=Enum.HighlightDepthMode.Occluded;aura.Parent=effects;r.Aura=aura
+  if FxBudget then pcall(FxBudget.TrackHighlight,aura)end -- (R153 perf: counted in the shared 31-Highlight budget)
   effects:SetAttribute('AuraRank',style.Rank)
  end
  -- Pulse at most four existing luminous details; no extra lights or Heartbeat connections.
@@ -151,9 +166,12 @@ function Effects.Create(item,r,def,crop,at,mode)
  end
 end
 
-function Effects.Step(r,t,batch,pose)
+-- part (R153, optional): 'tree' = only the tree body's slow drift (GardenVisuals' 20 Hz tick), 'fast' = everything else (its frame pass for a near
+-- plant: the orbits, sparks, glints, fruit effects and glows move every frame); nil = all of it.
+function Effects.Step(r,t,batch,pose,part)
  local at=pose or r.Visual:GetPivot()
- if r.TreeMotion then Trees.Step(r.TreeMotion,at,t,r.TreeMotion.Identity,batch)end
+ if r.TreeMotion and part~='fast'then Trees.Step(r.TreeMotion,at,t,r.TreeMotion.Identity,batch)end
+ if part=='tree'then return end
  if r.FruitEffectsStep then r.FruitEffectsStep(t,batch)end
  if r.GlowParts then for i,e in ipairs(r.GlowParts)do if e.Part.Parent then
   local seam=e.Part.Name=='Infused bark channel'

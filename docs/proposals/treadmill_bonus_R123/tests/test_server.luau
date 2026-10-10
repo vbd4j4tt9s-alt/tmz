@@ -71,19 +71,20 @@ local function packs(p)return #Data:GetChestRecords(p)end
 check(attr(A,'Ready')==0 and attr(A,'Pool')=='1','fresh profile: 0 ready, Forest-only pool ('..tostring(attr(A,'Pool'))..')')
 train(A,900,false)
 check(Bonus:GetProgress(A)==0 and attr(A,'Ready')==0,'15 min off the treadmill: no progress')
-train(A,599,true)
-check(attr(A,'Ready')==0 and near(Bonus:GetProgress(A),599,.01),'9:59 on the treadmill: not ready yet')
+check(Rules.IntervalSeconds==360,'R124: one roll per 6 minutes')
+train(A,359,true)
+check(attr(A,'Ready')==0 and near(Bonus:GetProgress(A),359,.01),'5:59 on the treadmill: not ready yet')
 check(attr(A,'DueAt')~=nil,'DueAt published while training')
 train(A,1,true)
-check(attr(A,'Ready')==1,'10 min on the treadmill -> 1 roll ready')
+check(attr(A,'Ready')==1,'6 min on the treadmill -> 1 roll ready')
 check(near(Bonus:GetProgress(A),0,.01),'progress restarts after a roll becomes ready')
 check(#notes>0 and notes[#notes].Text:find('bonus roll ready'),'ready notice sent')
 -- 2. Progress pauses off the treadmill and is kept (any length of break) ---------------------------------
-train(A,300,true);train(A,3600,false)
-check(near(Bonus:GetProgress(A),300,.01),'5 min, then an hour off: the 5 min are kept')
-check(attr(A,'DueAt')==nil and attr(A,'Left')==300,'off the treadmill: no DueAt, 5:00 left published')
-train(A,300,true)
-check(attr(A,'Ready')==2,'5 + 5 min -> second roll ready')
+train(A,180,true);train(A,3600,false)
+check(near(Bonus:GetProgress(A),180,.01),'3 min, then an hour off: the 3 min are kept')
+check(attr(A,'DueAt')==nil and attr(A,'Left')==180,'off the treadmill: no DueAt, 3:00 left published')
+train(A,180,true)
+check(attr(A,'Ready')==2,'3 + 3 min -> second roll ready')
 -- 3. Cap: 2 ready; time beyond is lost (progress pauses) -------------------------------------------------
 train(A,1800,true)
 check(attr(A,'Ready')==2 and Bonus:GetProgress(A)==0,'at 2 ready the timer pauses: 30 more min add nothing')
@@ -98,7 +99,9 @@ check(packs(A)==before+1,'exactly one pack added')
 local rec=Data:GetChestRecords(A)[packs(A)]
 check(rec and rec.Kind=='Pack'and rec.Id==res.Id,'granted record is a Pack with the returned id')
 check(rec and rec.Stage==1 and res.Stage==1,'Forest treadmill -> Forest pack')
-check(rec and rec.BagVariant==res.Variant and rec.OddsVersion==PackRules.OddsVersion and rec.PackSize==1 and rec.PackMutation=='None','plain world pack, current odds version')
+check(rec and rec.BagVariant==res.Variant and rec.OddsVersion==PackRules.OddsVersion and rec.PackMutation=='None','plain world pack, current odds version')
+check(rec and rec.PackSize==res.Size and PackRules.SanitizePackSize(res.Size)==res.Size,'R126: the rolled pack size is saved and returned ('..tostring(res.Size)..')')
+check(rec and rec.SeedScale==PackRules.NewSeedScale(rec.Stage,rec.BagVariant,rec.PackSize),'R126: seed scale follows the pack size like a world pack')
 check(res.Rarity==PackRules.GetPackTier(res.Variant).Name,'result rarity = the pack tier ('..tostring(res.Rarity)..')')
 check((Chests.Synced[A]or 0)==synced+1,'Tool synced once')
 check(attr(A,'Ready')==1 and res.Ready==1,'one roll spent')
@@ -112,14 +115,14 @@ check(none.Error and packs(A)==before+2,'no roll ready: refused, nothing granted
 for _=1,50 do invoke(A)end
 check(packs(A)==before+2,'50 spam claims grant nothing')
 -- 5. Full bag: refused, roll stays ready ---------------------------------------------------------------
-train(A,600,true);check(attr(A,'Ready')==1,'roll ready again')
+train(A,360,true);check(attr(A,'Ready')==1,'roll ready again')
 local cap=Config.MaxSavedChests;Config.MaxSavedChests=packs(A)
 R.advance(2);local full=invoke(A)
 check(full.Error and full.Error:find('FULL')and attr(A,'Ready')==1 and packs(A)==Config.MaxSavedChests,'full bag: refused, roll kept ('..tostring(full.Error)..')')
 Config.MaxSavedChests=cap
 R.advance(2);check(invoke(A).Ok,'after making room the kept roll works')
 -- 6. Persistence: progress saved, ready rolls are not ---------------------------------------------------
-train(A,600,true);train(A,250,true)
+train(A,360,true);train(A,250,true)
 check(attr(A,'Ready')==1 and near(Bonus:GetProgress(A),250,.01),'1 ready + 4:10 progress before leaving')
 check(Data:Save(A,'test',true)~=false,'saved')
 local key='Player_'..A.UserId;local saved
@@ -149,29 +152,43 @@ print('Treadmill tier -> bonus pool');print(table.concat(mapping,'\n'))
 local all=Rules.DecodePool(attr(A2,'Pool'));local seen={}
 for _,s in ipairs(all)do seen[s]=true end
 check(#all==7 and seen[1]and seen[2]and seen[3]and seen[4]and seen[5]and seen[6]and seen[7],'Storm treadmill: all 7 biomes')
--- Storm claims: biome spread + never Void / Mech
+-- Storm claims: biome spread + never Mech (R124: a Void Pack, when it comes up, is the Secret tier and always Storm)
 local stageCount,variantSeen={},{}
 for _=1,60 do
  Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2)
  if r.Ok then stageCount[r.Stage]=(stageCount[r.Stage]or 0)+1;variantSeen[r.Variant]=true end
  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)];Data:RemoveChest(A2,last.Id)
 end
-check(not variantSeen.EclipseReliquary and not variantSeen.MechLimited,'never a Void or Mech pack')
+check(not variantSeen.MechLimited,'never a Mech pack')
 local distinct=0;for _ in pairs(stageCount)do distinct+=1 end
 check(distinct>=5,'60 Storm claims spread over many biomes ('..distinct..')')
--- 8. Odds: the existing world spawn weights, uniform biome, luck-free --------------------------------------
-local odds=Rules.VariantOdds();local spawn={Pack01=38,Pack02=25,Pack03=15,Pack04=7,Pack05=10,Pack06=5}
-for k,v in pairs(spawn)do check(near(odds[k],v/100,1e-9),k..' chance = world spawn weight '..v..'%')end
+-- 8. Odds (R124 owner spec): Secret/Void 0.1, Mythic 0.5, Legendary 2, rest 43.5/28.6/17.2/8.1; uniform biome, luck-free
+local odds=Rules.VariantOdds();local spec={Pack01=43.5,Pack02=28.6,Pack03=17.2,Pack04=8.1,Pack05=2,Pack06=.5,EclipseReliquary=.1}
+local sum=0;for k,v in pairs(spec)do sum+=v;check(near(odds[k],v/100,1e-9),k..' chance = '..v..'%')end;check(near(sum,100,1e-9),'odds add up to 100%')
+check(Rules.Tier('EclipseReliquary')=='Secret'and Rules.Special.Secret and Rules.Special.Legendary and Rules.Special.Mythic,'Void Pack shows as SECRET and gets the special reveal')
 math.randomseed(7);local rng={NextNumber=function()return math.random()end};local n=200000;local vc,sc={},{}
 for _=1,n do local p=Rules.RollPack(all,function()return rng:NextNumber()end);vc[p.Variant]=(vc[p.Variant]or 0)+1;sc[p.Stage]=(sc[p.Stage]or 0)+1 end
 local rows={}
 for _,k in ipairs(Rules.VariantOrder)do
  local got=(vc[k]or 0)/n;local want=odds[k];local tol=4*math.sqrt(want*(1-want)/n)
  check(near(got,want,tol),string.format('%s observed %.3f%% vs %.3f%%',k,got*100,want*100))
- rows[#rows+1]=string.format('  %-9s %-6s spec %6.2f%%  observed %6.3f%%',PackRules.GetPackTier(k).Name,k,want*100,got*100)
+ rows[#rows+1]=string.format('  %-9s %-16s spec %6.2f%%  observed %6.3f%%',(Rules.Tier(k)),k,want*100,got*100)
 end
 print('Bonus roll odds over '..n..' rolls (Storm pool)');print(table.concat(rows,'\n'))
-for s=1,7 do check(near((sc[s]or 0)/n,1/7,4*math.sqrt((1/7)*(6/7)/n)),'biome '..s..' ~1/7')end
+local void=odds.EclipseReliquary
+for s=1,7 do local want=(1-void)/7+(s==7 and void or 0);check(near((sc[s]or 0)/n,want,4*math.sqrt(want*(1-want)/n)),'biome '..s..' ~1/7 (Storm + the Void share)')end
+-- A Secret result is a real Storm Void Pack, even from a Forest-only pool, and is granted like any other pack.
+do
+ local p=Rules.RollPack({1},(function()local k=0;return function()k+=1;return k==1 and 0 or .9995 end end)())
+ check(p.Variant=='EclipseReliquary'and p.Stage==7,'Secret roll from a Forest pool = Storm Void Pack')
+ local saved=Bonus.Random;Bonus.Random={NextNumber=function(_)return .9995 end}
+ Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2);Bonus.Random=saved
+ local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
+ check(r.Ok and r.Variant=='EclipseReliquary'and r.Stage==7 and r.Rarity=='Secret'and r.Biome=='Void Pack','server returns SECRET Void Pack: '..tostring(r.Rarity)..' '..tostring(r.Biome))
+ check(last and last.BagVariant=='EclipseReliquary'and last.Stage==7,'Void Pack granted to the bag as a Storm pack')
+ check(last and last.PackSize==PackRules.RollPackSize(.9995)and last.PackSize>1 and r.Size==last.PackSize,'R126: the Void Pack rolls a size too (.9995 -> '..tostring(last and last.PackSize)..'x)')
+ if last then Data:RemoveChest(A2,last.Id)end
+end
 -- Luck/boots never change a result: same random stream, boots on vs off -> identical claims
 local function seq(luck)
  A2:SetAttribute('ChestLuckMultiplier',luck);Bonus.Random=Random.new(99);local out={}
@@ -179,13 +196,38 @@ local function seq(luck)
   local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)];Data:RemoveChest(A2,last.Id)end
  return table.concat(out,'|')
 end
-check(seq(1)==seq(50000000),'boot luck x50M gives the identical 40 claims')
+check(seq(1)==seq(25000000)and seq(1)==seq(50000000),'boot luck x25M (Thunder Boots, R155) and x50M (the cap, with the clover) give the identical 40 claims')
+-- R126 (owner): every roll also rolls the pack size from the world table (BalanceRules.PackSizes), luck-free.
+do
+ local want,weights={},{};for _,row in ipairs(PackRules.PackSizes)do want[row.Scale]=row.Weight/100 end
+ local saved=Bonus.Random;math.randomseed(126);Bonus.Random={NextNumber=function(_)return math.random()end}
+ A2:SetAttribute('ChestLuckMultiplier',50000000)
+ local n,count,bad,scaleBad,labelBad=6000,{},0,0,0
+ for _=1,n do
+  -- R137: bonus packs also go through the hidden size pity; with its counters at 0 the natural table shows.
+  Data:LoadPackLuck(A2,{Big=0,Giant=0})
+  Bonus.Ready[A2]=1;R.advance(2);local r=invoke(A2)
+  local last=Data:GetChestRecords(A2)[#Data:GetChestRecords(A2)]
+  if not(r.Ok and last and last.Id==r.Id and want[last.PackSize]and r.Size==last.PackSize)then bad+=1 end
+  if last and last.SeedScale~=PackRules.NewSeedScale(last.Stage,last.BagVariant,last.PackSize)then scaleBad+=1 end
+  if r.Label~=PackRules.PackLabel(r.Stage,r.Variant,1,'None')then labelBad+=1 end
+  if last then count[last.PackSize]=(count[last.PackSize]or 0)+1;Data:RemoveChest(A2,last.Id)end
+ end
+ Bonus.Random=saved;A2:SetAttribute('ChestLuckMultiplier',1)
+ check(bad==0,'R126: every roll grants a size from the world table ('..bad..' bad)')
+ check(scaleBad==0,'R126: every rolled pack seed scale = NewSeedScale(size)')
+ check(labelBad==0,'R126: result text unchanged (the label never names the size)')
+ for _,s in ipairs({.5,1,1.5,2.5})do local p=want[s];local got=(count[s]or 0)/n
+  check(near(got,p,4*math.sqrt(p*(1-p)/n)),string.format('R126: size %sx ~%.1f%% (got %.2f%%)',s,p*100,got*100))end
+ local big=0;for s,c in pairs(count)do if s>1 then big+=c end end
+ check(big>0 and(count[1]or 0)<n,'R126: sizes really vary ('..big..' bigger than 1x)')
+end
 -- 9. Upgrading the treadmill republishes the pool immediately; leaving drops session state -----------------
 Data:GetTreadmillData(A2).Tier=2;Bonus:Step(0);check(attr(A2,'Pool')=='1,6','upgrade/downgrade republishes pool ('..tostring(attr(A2,'Pool'))..')')
 -- 10. Public API used by owner test commands
 check(Bonus:GrantReady(A2,5)and attr(A2,'Ready')==2,':GrantReady clamps to 2')
-check(Bonus:SetProgress(A2,9999)and Bonus:GetProgress(A2)==600 and attr(A2,'Left')==0,':SetProgress clamps to 600')
-Bonus:SetProgress(A2,123);check(attr(A2,'Left')==477,':SetProgress republishes time left')
+check(Bonus:SetProgress(A2,9999)and Bonus:GetProgress(A2)==360 and attr(A2,'Left')==0,':SetProgress clamps to 360')
+Bonus:SetProgress(A2,123);check(attr(A2,'Left')==237,':SetProgress republishes time left')
 local pool=Bonus:Pool(A2);check(#pool==2 and pool[1]==1 and pool[2]==6,':Pool returns the stages')
 Bonus:Cleanup(A2);check(Bonus.Ready[A2]==nil and Bonus.State[A2]==nil,'cleanup drops session state')
 -- R123 owner commands (/test bonus ...) through OwnerUpdateCommands82.Execute
@@ -197,8 +239,8 @@ do
  ok,msg=X.Execute(ctx,O,'bonus',{'ready','2'});check(ok and Bonus:GetReady(O)==2 and attr(O,'Ready')==2,'bonus ready 2: '..tostring(msg))
  ok,msg=X.Execute(ctx,O,'bonus',{'ready','1'});check(ok and Bonus:GetReady(O)==1,'bonus ready sets (not adds): '..tostring(msg))
  ok,msg=X.Execute(ctx,O,'bonus',{'ready','5'});check(not ok and Bonus:GetReady(O)==1,'bonus ready over 2 refused')
- ok,msg=X.Execute(ctx,O,'bonus',{'progress','9:50'});check(ok and Bonus:GetProgress(O)==590,'bonus progress 9:50 = 590 s: '..tostring(msg))
- ok,msg=X.Execute(ctx,O,'bonus',{'progress','700'});check(not ok and Bonus:GetProgress(O)==590,'bonus progress over 600 refused')
+ ok,msg=X.Execute(ctx,O,'bonus',{'progress','5:50'});check(ok and Bonus:GetProgress(O)==350 and msg:find('/ 360 s',1,true),'bonus progress 5:50 = 350 s: '..tostring(msg))
+ ok,msg=X.Execute(ctx,O,'bonus',{'progress','400'});check(not ok and Bonus:GetProgress(O)==350,'bonus progress over 360 refused')
  local before=packs(O)
  ok,msg=X.Execute(ctx,O,'bonus',{'roll'});check(ok and packs(O)==before+1 and Bonus:GetReady(O)==0,'bonus roll grants one pack: '..tostring(msg))
  R.advance(2);ok,msg=X.Execute(ctx,O,'bonus',{'roll'});check(not ok and packs(O)==before+1,'bonus roll with none ready refused: '..tostring(msg))

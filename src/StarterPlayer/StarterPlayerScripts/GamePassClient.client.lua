@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R120: one scrolling Robux shop (FEATURED, PASSES, SPEED, MONEY, GEMS) with a quick-jump column.
 -- Products, prices and every purchase / gift / owned flow are unchanged from R79; only the look and layout moved.
 -- R122 (owner): no gift buttons, no "DOUBLE Your SPEED" boost banner, and Robux buttons read "49 Robux" (no glyph).
@@ -39,6 +40,15 @@ Art.Studs(body,10,30,C(30,31,40),.25)
 local page=Instance.new('ScrollingFrame');page.Name='Page';page.BackgroundTransparency=1;page.BorderSizePixel=0;page.ScrollBarThickness=6;page.ScrollBarImageColor3=C(200,204,220)
 page.ScrollingDirection=Enum.ScrollingDirection.Y;page.CanvasSize=UDim2.new();page.AutomaticCanvasSize=Enum.AutomaticSize.None;page.ElasticBehavior=Enum.ElasticBehavior.WhenScrollable;page.ZIndex=3;page.Parent=body
 local status=Art.Text(panel,'Status','',16,Theme.Colors.Mint);status.BackgroundTransparency=.15;status.BackgroundColor3=C(16,18,26);status.ZIndex=12;status.Visible=false;status.TextWrapped=true;Art.Corner(status,8)
+-- R148 (owner: "remove this line when purchasing"): the dark strip is only for something worth reading. No message, an empty one or
+-- a blank one (a prompt that merely opened has nothing to say) leaves it hidden, never an empty bar.
+local function setStatus(text)
+ text=type(text)=='string'and text or''
+ if text:match('^%s*$')then text=''end
+ status.Text=text;status.Visible=text~=''
+end
+-- Gem purchases the server announces (notice + chime + sparkles, PurchaseCelebration.client.lua): no KaChing on top of the chime.
+local celebrated={BuyPack=true,BuyBundle=true,BuyPerk=true,Convert=true}
 -- Quick-jump column outside the panel (a row above it in portrait).
 local jumpRoot=Art.Frame(gui,'JumpButtons',nil,1);jumpRoot.Visible=false;jumpRoot.ZIndex=2
 local SectionColor={Featured=C(255,170,40),Passes=C(255,226,40),Speed=C(70,222,255),Money=C(110,255,70),Gems=C(214,150,255)}
@@ -48,7 +58,7 @@ for i,s in ipairs(Layout.Sections)do
  Art.Corner(b,10);local ring=Art.Stroke(b,SectionColor[s.Key],3,'Current');ring.Enabled=false
  b:SetAttribute('Section',s.Key);b:SetAttribute('AccessibleLabel','Jump to '..s.Label)
  local icon=Art.Frame(b,'Icon',nil,1);icon.ZIndex=2
- if s.Key=='Featured'then require(RS.VectorIcons91).Draw(icon,'Mech')
+ if s.Key=='Featured'then require(RS.PremiumEmblems).Draw(icon,'Featured') -- R125: own logo (was the Mech gem)
  elseif s.Key=='Passes'then require(RS.PremiumEmblems).Draw(icon,'Crown')
  elseif s.Key=='Speed'then require(RS.PremiumEmblems).Draw(icon,'Bolt')
  elseif s.Key=='Money'then require(RS.PremiumEmblems).Draw(icon,'Money')
@@ -70,12 +80,20 @@ end end
 local pack=Art.Card(page,'LimitedMechPack',{C(255,196,60),C(255,96,44),C(196,34,74),C(110,30,150)})
 pack.Fill.Rotation=100
 local packTitle=Art.Text(pack,'PackTitle','LIMITED MECH PACK',34);packTitle.ZIndex=4;packTitle.TextXAlignment=Enum.TextXAlignment.Left
-local limited=Art.Text(pack,'Contents','LIMITED TIME!',20,C(255,236,90));limited.ZIndex=4;limited.TextXAlignment=Enum.TextXAlignment.Right
+local limited=Art.Text(pack,'Contents',Catalog.Event.Live,20,C(255,236,90));limited.ZIndex=4;limited.TextXAlignment=Enum.TextXAlignment.Right
+-- R155: the card's two small lines under the buttons: the coat's odds (next to the seed odds above them: "Gold 4.5% / Diamond 0.5% coat") and the limited event's live countdown to
+-- LimitedEvent.EndsAt, in the Index LIMITED tab's format ("⏳ ENDS IN 27d 04h 12m 09s"), on the server's clock. After the end: "EVENT OVER!" / "THANKS FOR PLAYING!" and both buy buttons are off.
+local coatNote=Art.Text(pack,'CoatNote',Catalog.CoatLine(),15,C(255,244,190));coatNote.ZIndex=4;coatNote.TextXAlignment=Enum.TextXAlignment.Left
+local timerNote=Art.Text(pack,'EventTimer',Catalog.TimerText(workspace:GetServerTimeNow()),15,C(255,236,90));timerNote.ZIndex=4;timerNote.TextXAlignment=Enum.TextXAlignment.Right
 local stage=Art.Frame(pack,'PreviewStage',C(20,12,40),.55);stage.ZIndex=2;Art.Corner(stage,10);Art.Stroke(stage,Art.Ink,2)
 local packView=require(RS.PackViewport89).Create(stage)
 local dock=stage:FindFirstChild('MechDockingBay');if dock then dock.Visible=false end
 packView.AnchorPoint=Vector2.zero;packView.Position=UDim2.fromScale(0,0);packView.Size=UDim2.fromScale(1,1);packView.ZIndex=3
 require(RS.GuiShine).Attach(pack,false)
+-- R155 (owner): the pack pity is listed with the odds (the paid-random disclosure): a caption along the bottom of the pack preview
+-- (wrapped and scaled by Roblox to the box, never cut: every word of it is the disclosure)
+do local pity=Art.Text(stage,'PityRule',require(RS:WaitForChild('PackPity155')).EventDisclosure,13,C(236,222,255));pity.ZIndex=5;pity.TextWrapped=true;pity.TextScaled=true;pity.AnchorPoint=Vector2.new(.5,1);pity.Position=UDim2.new(.5,0,1,-3);pity.Size=UDim2.new(1,-10,.26,0);pity.BackgroundColor3=C(20,12,40);pity.BackgroundTransparency=.25;Art.Corner(pity,6)
+ local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=7;fit.MaxTextSize=13;fit.Parent=pity;local pad=Instance.new('UIPadding');pad.PaddingLeft=UDim.new(0,4);pad.PaddingRight=UDim.new(0,4);pad.Parent=pity end
 local outcomes=Art.Frame(pack,'Outcomes',nil,1);outcomes.ZIndex=3
 for i,s in ipairs(Catalog.Seeds)do
  local item=Instance.new('TextButton');item.Text='';item.AutoButtonColor=false;item.Name=s.Id;item.LayoutOrder=i;item.BorderSizePixel=0;item.BackgroundColor3=Color3.new(1,1,1);item.ZIndex=3;item.Parent=outcomes
@@ -116,7 +134,7 @@ for i,pass in ipairs(Passes)do
  local row={Gem=c.GemPerk,Robux=c.RobuxPass,Pass=pass,Views={}}
  passButtons[pass.Key]=row
  table.insert(row.Views,{Card=c,Gem=c.GemPerk,Robux=c.RobuxPass})
- marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info end)
+ marketplaceInfo(Passes.Id(pass),Enum.InfoType.GamePass,function(info)passButtons[pass.Key].Info=info;if pass.Icon=='Clover'then pcall(function()require(RS.CloverIcon153).SetInfo(info)end)end end) -- R153: the pass's own icon (IconImageAssetId) is the clover's first choice
 end
 for _,row in pairs(passButtons)do for _,v in ipairs(row.Views)do table.insert(passViews,v)end end
 -- SPEED and MONEY bundles.
@@ -138,23 +156,42 @@ local gemIcon=require(RS.GemIcon).new(gems);gemIcon.ZIndex=3
 local gemHeading=Art.Text(gems,'Heading','CASH TO GEMS',26,C(190,246,255));gemHeading.ZIndex=4;gemHeading.TextXAlignment=Enum.TextXAlignment.Left
 local rate=Art.Text(gems,'Rate',Cash.Compact(Catalog.CashPerGem)..' Cash = 1 Gem',18);rate.ZIndex=4;rate.TextXAlignment=Enum.TextXAlignment.Left
 local quantityLabel=Art.Text(gems,'QuantityLabel','How many Gems?',15);quantityLabel.ZIndex=4;quantityLabel.TextXAlignment=Enum.TextXAlignment.Left
-local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Whole number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
+local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Type a number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
 local maxButton=button(gems,'Maximum','MAX',UDim2.new(),UDim2.new(),C(255,196,52))
 local cost=Art.Text(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
 local convert=button(gems,'Convert','CONVERT',UDim2.new(),UDim2.new(),C(98,211,255))
 local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
-local waysTitle=Art.Text(ways,'Title','COMPLETE YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
-local waysDetail=Art.Text(ways,'Detail','Collect Gems from your plant index.',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
+local waysTitle=Art.Text(ways,'Title','FILL YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
+local waysDetail=Art.Text(ways,'Detail','Grab Gems from your plant index!',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
+-- R157 (owner: "if bag is full and player tries to buy a pack ... it says bag full"): with a full Bag both Mech buttons read "Bag full" (the dim look of "Unavailable" / "Off sale") but
+-- can still be pressed, only to show the game's red notice with the Denied click; they never send a purchase and never open a prompt. Event over / Off sale come first.
+local Feed;local lastBagNotice=-10
+local function bagFullPress()
+ Audio.Play('Denied');local now=os.clock();if now-lastBagNotice<.7 then return end;lastBagNotice=now
+ pcall(function()Feed=Feed or require(RS:WaitForChild('NoticeFeed83'));Feed.Plain(Catalog.BagFullNotice(packCount),require(RS:WaitForChild('SimpleGameText')).Red,2.5)end) -- R157b review: the notice names the pack count that does not fit (the server's answers use the same function)
+end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
+-- R155: the limited event's clock (the server's) -> the card's words and its two buy buttons. Writes only a change; a flip (the event ending while the shop is open) refreshes the buttons.
+local eventOver
+local function updateEvent()
+ local now=workspace:GetServerTimeNow();local over=Catalog.EventOver(now)
+ local live=over and Catalog.Event.Over or Catalog.Event.Live;if limited.Text~=live then limited.Text=live end
+ local text=Catalog.TimerText(now);if timerNote.Text~=text then timerNote.Text=text end
+ timerNote.TextColor3=over and C(255,255,255)or C(255,236,90)
+ if eventOver~=over then eventOver=over;if refresh then refresh()end end
+end
 refresh=function()
  local offer=Catalog.Offer(packCount);local available=state.PackOffers and state.PackOffers[tostring(packCount)]or{}
- local gemLive=available.GemAvailable==true
- setPrice(gemBuy,state.OnSale==false and'Off sale'or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
+ local over=Catalog.EventOver(workspace:GetServerTimeNow());eventOver=over -- R155: after the end both buy buttons say "Event over" and are off (the server refuses a new purchase too)
+ local bagFull=available.BagFull==true and not over and state.OnSale~=false -- R157: the server says the Bag is the only thing in the way
+ local gemLive=available.GemAvailable==true and not over and not bagFull
+ setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or bagFull and Catalog.BagFull.Button or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
  local packInfo=packInfos[packCount];local packPrice=packInfo and packInfo.PriceInRobux
- local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false
- setPrice(robuxBuy,packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false and not over and not bagFull
+ setPrice(robuxBuy,over and Catalog.Event.Button or bagFull and Catalog.BagFull.Button or packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ for _,b in ipairs({gemBuy,robuxBuy})do b:SetAttribute('BagFull',bagFull or nil);if bagFull and not busy then b.Interactable=true;b.Active=true end end -- (dim, but pressable for the notice)
  for count,b in pairs(quantityButtons)do Bright.Button(b,count==packCount and C(255,186,40)or C(70,74,96));Art.Stroke(b,Art.Ink,2.5,'BrightOutline');b:SetAttribute('Selected',count==packCount);active(b,not busy)end
  for key,row in pairs(bundleButtons)do
   local quote=state.Bundles and state.Bundles[key]
@@ -172,6 +209,11 @@ refresh=function()
   local info=row.Info;local forSale=info~=nil and info.IsForSale==true and info.PriceInRobux~=nil
   for _,v in ipairs(row.Views)do
    if v.Gem.Visible==owned then v.Gem.Visible=not owned;reflow=true end
+   -- R153: a pass that is Gem-only until it has a Robux id (Passes.RobuxSoon) has no Robux button and says ROBUX SOON; once it is owned the button is back and reads OWNED, the tag PERMANENT
+   local soon=Passes.RobuxSoon(row.Pass)and not owned
+   if v.Robux.Visible==soon then v.Robux.Visible=not soon;reflow=true end
+   local tag=v.Card:FindFirstChild('Permanent');local tagText=soon and'ROBUX SOON'or'PERMANENT'
+   if tag and v.Card:GetAttribute('Tag')~=tagText and(soon or v.Card:GetAttribute('Tag')~=nil)then v.Card:SetAttribute('Tag',tagText);tag.Text=tagText end
    setPrice(v.Gem,owned and'Owned'or not ownershipReady and'Checking…'or tostring(Catalog.PassGemPrices[row.Pass.Key]),ownershipReady and not owned);active(v.Gem,ownershipReady and not owned and not busy)
    setPrice(v.Robux,owned and'OWNED'or forSale and Art.RobuxText(info.PriceInRobux)or'Unavailable',forSale and not owned,owned and Art.Colors.Owned or Art.Colors.Robux)
    active(v.Robux,not owned and not busy and info~=nil and info.IsForSale==true)
@@ -182,18 +224,19 @@ refresh=function()
 end
 local pendingState=false
 local function act(action,value,onDone)
- if busy then return end;busy=true;status.Text='';refresh()
+ if busy then return end;busy=true;setStatus('');refresh()
  task.spawn(function()
   local okay,result=pcall(request.InvokeServer,request,action,value);busy=false
   if not gui.Parent then return end
-  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;status.Text=result.Message or'';if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'then Audio.Transaction('Buy')end
-  else status.Text='Please try again.'end;refresh()
+  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success==false then Audio.Play('Denied')end -- R150: a refused purchase
+  if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
+  else setStatus('Try again in a sec!');if action~='State'then Audio.Play('Denied')end end;refresh()
   if onDone then onDone(okay and result or nil)end
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
  end)
 end
-gemBuy.Activated:Connect(function()if gemBuy.Active then act('BuyPack',packCount)end end)
-robuxBuy.Activated:Connect(function()if robuxBuy.Active then act('RobuxPack',packCount)end end)
+gemBuy.Activated:Connect(function()if gemBuy:GetAttribute('BagFull')then bagFullPress()elseif gemBuy.Active then act('BuyPack',packCount)end end)
+robuxBuy.Activated:Connect(function()if robuxBuy:GetAttribute('BagFull')then bagFullPress()elseif robuxBuy.Active then act('RobuxPack',packCount)end end)
 for key,row in pairs(bundleButtons)do
  if row.Gem then row.Gem.Activated:Connect(function()if row.Gem.Active then act('BuyBundle',row.Quote)end end)end
  row.Robux.Activated:Connect(function()if row.Robux.Active then act('RobuxBundle',key)end end)
@@ -207,9 +250,9 @@ for _,row in pairs(passButtons)do
  watch(player:GetAttributeChangedSignal(row.Pass.Key..'OwnershipReady'),refresh)
 end
 local function count()local n=tonumber(quantity.Text);return n and n==n and n%1==0 and n>=1 and n<=9000 and n or nil end
-quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Enter 1–9,000 Gems.'end)
+quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Pick 1–9,000 Gems.'end)
 maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem)))end)
-convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else status.Text='Enter a whole number of Gems.'end end)
+convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else setStatus('Type a whole number of Gems.')end end)
 -- Layout ----------------------------------------------------------------------------------------
 local function place(item,r,dx,dy)item.Position=UDim2.fromOffset(r.X+(dx or 0),r.Y+(dy or 0));item.Size=UDim2.fromOffset(r.W,r.H)end
 local function viewport()
@@ -232,6 +275,8 @@ local function layoutFeatured(f,k,button)
   place(limited,{X=p,Y=p+h1,W=w-p*2,H=h2});limited.TextXAlignment=Enum.TextXAlignment.Left
   Art.SetTextSize(limited,math.floor((h2-2)/1.16),10)
  end
+ place(coatNote,f.Coat);Art.SetTextSize(coatNote,math.floor(f.Coat.H*.78),9);place(timerNote,f.Timer);Art.SetTextSize(timerNote,math.floor(f.Timer.H*.78),9) -- R155
+ if f.Wide then timerNote.TextXAlignment=Enum.TextXAlignment.Right else timerNote.TextXAlignment=Enum.TextXAlignment.Left end
  place(stage,f.Preview)
  local box={X=f.Tiles[1].X,Y=f.Tiles[1].Y,W=f.Tiles[#f.Tiles].X+f.Tiles[#f.Tiles].W-f.Tiles[1].X,H=f.Tiles[#f.Tiles].Y+f.Tiles[#f.Tiles].H-f.Tiles[1].Y}
  place(outcomes,box)
@@ -363,10 +408,24 @@ local function focusBundle()
   scrollTo(row.Rect.Y-headerH-content.Gap,false);pg:SetAttribute('PremiumFocus',nil)
  end)
 end
+-- R155: the countdown ticks every second while the shop is open (the Index LIMITED tab's way: a token ends the loop when the shop closes).
+local tickToken=0
+local function startTicking()
+ tickToken+=1;local token=tickToken;updateEvent()
+ local function tick()
+  task.delay(1,function()
+   if token~=tickToken or not gui.Parent or not panel.Visible then return end
+   updateEvent();tick()
+  end)
+ end
+ tick()
+end
 local function open(value)
  local changed=panel.Visible~=value
+ if value then if changed then startTicking()end else tickToken+=1 end
  if value then relayout()end
  panel.Visible=value;shade.Visible=value;jumpRoot.Visible=value
+ if value then pcall(function()require(RS.CloverIcon153).Ensure()end)end -- R153: the clover picture is drawn when the shop opens (once per client)
  if value then
   if changed then goTo(pg:GetAttribute('PremiumPage'),false)end
   if pg:GetAttribute('SeedMenu')~='Passes'then pg:SetAttribute('SeedMenu','Passes')end;if changed then act('State')end;focusBundle()
@@ -384,6 +443,18 @@ watch(pg:GetAttributeChangedSignal('PremiumPage'),function()if panel.Visible and
 watch(pg:GetAttributeChangedSignal('PremiumFocus'),function()if panel.Visible then focusBundle()end end)
 watch(pg:GetAttributeChangedSignal('SeedMenu'),function()open(pg:GetAttribute('SeedMenu')=='Passes')end)
 watch(player:GetAttributeChangedSignal('PaidRandomAllowed'),function()if panel.Visible and not busy then act('State')end end)
+-- R157b review: a "Bag full" press never asks the server, and State was only read on open / PaidRandomAllowed / a products revision, so room made in the Bag while the shop was open left both buttons on "Bag full".
+-- The 200 cap publishes HeldItemCount / HeldItemCap on the player (InventoryCap155.PublishHeld; the Bag's "143/200" reads them) and a carried pack keeps its place (ChestChaseSeedCarrying): when any of them changes
+-- with the shop open the State is read again, at most once every 0.5 s (a change inside that time is read when it is over; one in the middle of another request waits for it, like the products revision).
+local heldQueued=false;local lastHeldRead=-10
+local function heldChanged()
+ if not panel.Visible or heldQueued then return end
+ heldQueued=true;task.delay(math.max(0,lastHeldRead+.5-os.clock()),function()
+  heldQueued=false;if not gui.Parent or not panel.Visible then return end
+  lastHeldRead=os.clock();if busy then pendingState=true else act('State')end
+ end)
+end
+for _,name in ipairs({'HeldItemCount','HeldItemCap','ChestChaseSeedCarrying'})do watch(player:GetAttributeChangedSignal(name),heldChanged)end
 local productsQueued=false
 watch(RS:GetAttributeChangedSignal('PremiumProductsRevision'),function()
  if not panel.Visible or productsQueued then return end
@@ -404,4 +475,4 @@ end)
 local stopWatch=Hud.Watch(gui,function()if content then relayout()end end)
 watch(GuiService:GetPropertyChangedSignal('ReducedMotionEnabled'),function()if scrollTween and GuiService.ReducedMotionEnabled then scrollTween:Cancel();scrollTween=nil;local y=page:GetAttribute('TargetY');if y then page.CanvasPosition=Vector2.new(0,y)end end end)
 gui.Destroying:Connect(function()stopWatch();for _,r in ipairs(reveals)do r.Destroy()end;for _,c in ipairs(connections)do c:Disconnect()end end)
-relayout(true);refresh();setCurrent('Featured')
+relayout(true);refresh();updateEvent();setCurrent('Featured')

@@ -45,7 +45,7 @@ function Commands.Execute(config,data,chests,chase,player,text)
   if #chosen==0 then for _,spec in ipairs(Rules.SeedDesigns)do if selector==key(spec.name)then chosen={spec};break end end end
  end
  if #chosen==0 then return false,action=="/seeds"and "Biomes: forest, jungle, desert, snow, lava, crystal, storm."or "Seed not found. Try /seed StormSovereignSeed"end
- if #records+#chosen>config.MaxSavedChests then return false,"Inventory full. Use /clearinventory first."end
+ if #records+#chosen>config.MaxSavedChests or not data:RoomFor(player,#chosen)then return false,"Inventory full (200 items max). Use /clearinventory first."end -- R155: the cap
  -- Prepare the complete batch before committing; no yielding or duplicate IDs.
  local pending={};local serial=player:GetAttribute("ChestInventorySerial")or 0
  for _,spec in ipairs(chosen)do
@@ -53,7 +53,7 @@ function Commands.Execute(config,data,chests,chase,player,text)
   serial+=1
   table.insert(pending,{Id=string.format("%d_%d",player.UserId,serial),Kind="Seed",ChestNumber=serial,
    ChestName=seed.Name,Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,
-   AccentColor=seed.Color,Rarity=spec.rarity,SeedScale=size,BagVariant="Pack03",PackSize=1,PackMutation="None"})
+   AccentColor=seed.Color,Rarity=spec.rarity,SeedScale=size,BagVariant="Pack03",PackSize=1,PackMutation="None",TestGrant=true}) -- R152: a Studio-granted seed is a TEST seed
  end
  player:SetAttribute("ChestInventorySerial",serial)
  for _,record in ipairs(pending)do table.insert(records,record);data:MarkSeedDiscovered(player,record.SeedId,true)end
