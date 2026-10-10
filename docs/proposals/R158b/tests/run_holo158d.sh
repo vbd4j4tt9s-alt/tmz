@@ -10,7 +10,10 @@ HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT/w"
 BASE=${HOLO_BASE:-1258821}
 wiring() {
- changed=$(git -C "$REPO" diff --name-only "$BASE" -- src | sort)
+ # only this rework's own commits (every commit since BASE that touched HologramForms.lua): later fixes merged on top (the pack-leak fix,
+ # the gift's silent pull, the release Version line) never trip it
+ changed=$(for c in $(git -C "$REPO" rev-list "$BASE"..HEAD -- src/ReplicatedStorage/HologramForms.lua);do git -C "$REPO" diff-tree --no-commit-id --name-only -r "$c" -- src;done | sort -u)
+ [ -n "$changed" ] || changed=$(git -C "$REPO" diff --name-only "$BASE" -- src | sort)
  want="src/ReplicatedStorage/FruitMeshes149.lua
 src/ReplicatedStorage/HologramForms.lua"
  [ "$changed" = "$want" ] || { echo "src/ changes other than the two scripts:";echo "$changed";return 1; }

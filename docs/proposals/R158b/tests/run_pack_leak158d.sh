@@ -30,7 +30,9 @@ if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  done
  echo "ok: line 1 (the R152 load guard) of the two changed client scripts is as it was"
  [ "$(git -C "$REPO" show "$BASE:src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua" | sed -n 1,2p)" = "$(sed -n 1,2p "$SP/Hotbar.client.lua")" ] && echo "ok: Hotbar lines 1-2 unchanged" || fail "Hotbar lines 1-2 changed"
- git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService && echo "ok: nothing of the server changed (the client was never told the result early: the server sets RevealSeedId / Rarity / Weather and RevealAt on the 5th click, in one go)" || fail "a server file changed"
+ srv=$(for c in $(git -C "$REPO" rev-list "$BASE"..HEAD -- src/ReplicatedStorage/ItemEffectAnchor.lua);do git -C "$REPO" diff-tree --no-commit-id --name-only -r "$c" -- src/ServerScriptService;done | grep -v "ChestChaseServer/Config.lua$" | sort -u)
+ # (only this fix's own commits; Config.lua's release Version line is pinned by frozen.sha256)
+ [ -z "$srv" ] && echo "ok: nothing of the server changed (the client was never told the result early: the server sets RevealSeedId / Rarity / Weather and RevealAt on the 5th click, in one go)" || fail "a server file changed"
  # every line of this fix in SeedPackClient / RarePullScenes is an ADDED line (no existing line was edited), so the pins of the older suites hold
  gone=$(git -C "$REPO" diff -U0 "$BASE" -- src/StarterPlayer/StarterPlayerScripts/SeedPackClient.client.lua src/ReplicatedStorage/RarePullScenes.lua | grep '^-' | grep -vc '^---' || true)
  [ "$gone" = 0 ] && echo "ok: SeedPackClient and RarePullScenes only gained lines (no existing line edited: every older suite's line pin still holds)" || fail "$gone existing lines of SeedPackClient / RarePullScenes were edited"
