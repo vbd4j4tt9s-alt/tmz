@@ -43,7 +43,12 @@ function G.Progress(crop,def,now,index)
  local body=unit((now-start)/math.max(1,finish-start))
  local readyAt=Rules.FruitReadyAt(crop,index or 1);local cycle=Rules.FruitCycle(crop,index or 1)
  local fruit
- if body<1 or cycle==0 then fruit=ease((def.Tree and .57 or ground[crop.SeedId]and .40 or flowers[crop.SeedId]and .50 or .46)+(growthSeed(crop)-.5)*.06,1,body)
+ -- R158e: a fruit whose own regrow time runs from the planting (cycle > 0, a Duration that started when the plant was planted) follows it even while the plant grows up: only the
+ -- tutorial's 10-second plant has such fruit (its fruit 2+ grow in their normal time from the planting, BeginnerGuide.FastFruit). Any other fruit regrows from a harvest, after
+ -- the plant grew up: unchanged.
+ local own=cycle>0 and crop.FruitStates and crop.FruitStates[tostring(index or 1)]
+ local early=own and own.Duration and readyAt-own.Duration<=start
+ if(body<1 and not early)or cycle==0 then fruit=ease((def.Tree and .57 or ground[crop.SeedId]and .40 or flowers[crop.SeedId]and .50 or .46)+(growthSeed(crop)-.5)*.06,1,body)
  else local state=crop.FruitStates and crop.FruitStates[tostring(index or 1)];local duration=math.max(1,(state and state.Duration)or def.RegrowSeconds or def.Seconds or 1);fruit=unit((now-(readyAt-duration))/duration)end
  if now>=readyAt then fruit=1 end
  return body,fruit

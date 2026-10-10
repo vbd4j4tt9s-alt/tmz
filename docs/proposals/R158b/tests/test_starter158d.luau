@@ -2,10 +2,13 @@
 -- R158d new-player gift on the REAL player data (the R123 world, like the R152 giveaway suite): the real PlayerDataService (AddChest, Save / Load, OpenSeedPack, Premium), TreadmillBonusService,
 -- FruitGiftService, ChestService:_createPackTool, SeedPackRules / VerityPackOdds / LimitedEvent, with the real StarterVerity158d on top (recording stand-ins for the notice feed and the hotbar sync).
 -- Checks (every number the owner asked for is pinned):
---  A  a brand-new profile gets exactly ONE Verity Pack with Floor = Mythic (GiftLocked, a real pack, no TestGrant), the flag 'Given', 2 ready bonus rolls and ONE notice with the owner's words;
+--  A  a brand-new profile gets exactly ONE Verity Pack with Floor = Mythic (GiftLocked, a real pack, no TestGrant), the flag 'Given', 2 ready bonus rolls and ONE notice with the owner's words,
+--     R158e (owner: "the verity gift is given instantly to all new players"): at the FIRST SPAWN, while the tutorial runs (a join before the character: owed, given on CharacterAdded); the notice
+--     a few seconds later (after the title screen);
+--  A2 R158e: the gift does not skip the tutorial's steal step (only a pack stolen on the track, banked, ticks it); after it, opening any pack (the gift too) counts;
 --  B  a second join gives nothing (no pack, no notice, no third / fourth roll); the unused starter rolls come back after a rejoin and go down as they are used;
---  C  an old profile (saved before the gift) gets nothing, even after the tutorial; an unfinished tutorial gets nothing yet (and the tutorial's mask is untouched);
---  D  an interrupted grant: lost before any save (given once again), owed and saved but not given (given at the next finished tutorial), a full Bag (retried), a profile that cannot save;
+--  C  an old profile (saved before the gift) gets nothing, at any spawn;
+--  D  an interrupted grant: lost before any save (given once again), owed and saved but not given (given at the next spawn), a full Bag (retried), a profile that cannot save;
 --  E  the Verity event ended: no pack, no rolls, no notice and NO flag for a new profile; an owed profile is given nothing either ("only while the event is active");
 --  F  the floored open: 2,000 real opens never below Mythic, the tier mix = the Verity pack's OWN odds renormalised to Mythic and above (luck, clover and the pity's lucky roll included),
 --     an ordinary Verity Pack still rolls its normal odds (and still gives Legendary), a Forest pack with a forged Floor rolls normally;
@@ -58,29 +61,35 @@ local synced=0;local Chests={SyncTools=function()synced+=1 end,Openings={}}
 R.clock=20727*86400+3600*5
 local EndsAt=Limited.EndsAt
 local clockNow={t=EndsAt-10*86400} -- ten days before the Verity event ends
-local queue={}
+local queue={};local delays={}
 local function flush(passes)for _=1,passes or 30 do if #queue==0 then return end;local q=queue;queue={};for _,fn in ipairs(q)do fn()end end end
 local function newServer(studio)
  local D=PDS.new(Config,Map,Notes)
  local T=TreadSvc.new(Config,D,{TrainingSessions={}},Chests,Notes)
- local S=StarterSvc.new(Config,D,Chests,Notes,T,{Time=function()return clockNow.t end,Delay=function(_,fn)queue[#queue+1]=fn end,Studio=studio==true})
+ local S=StarterSvc.new(Config,D,Chests,Notes,T,{Time=function()return clockNow.t end,Delay=function(sec,fn)delays[#delays+1]=sec;queue[#queue+1]=fn end,Studio=studio==true})
  return{D=D,T=T,S=S}
 end
 -- join: the real order of the main script (load, then the bonus service's Setup, then the gift's Setup). starter=false: an older server without the gift (the profile is saved without any trace of it).
-local function join(sv,id,name,starter)
- local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p;order[#order+1]=p
+-- R158e: the character is spawned before the gift's Setup (the usual case: the profile loads after the first spawn), unless noChar: then spawnIn() spawns it later (CharacterAdded).
+local function spawnIn(p)
+ local m=R.new('Model');m.Name=p.Name;local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.CFrame=CF(0,5,-380);root.Parent=m;m.PrimaryPart=root
+ local hum=R.new('Humanoid');hum.Health=100;function hum.UnequipTools()end;hum.Parent=m;m.Parent=W.workspace;p.Character=m
+ p.CharacterAdded:Fire(m)
+end
+local function join(sv,id,name,starter,noChar)
+ local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p;order[#order+1]=p;p.CharacterAdded=R.signal()
  function p.Kick(_,why)error('kicked '..name..': '..tostring(why),0)end
  R.new('Backpack').Parent=p
  sv.D:PreparePlayer(p);assert(sv.D:Load(p),'load '..name)
- local m=R.new('Model');m.Name=name;local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.CFrame=CF(0,5,-380);root.Parent=m;m.PrimaryPart=root
- local hum=R.new('Humanoid');hum.Health=100;function hum.UnequipTools()end;hum.Parent=m;m.Parent=W.workspace;p.Character=m
+ if not noChar then spawnIn(p)end
  sv.T:Setup(p)
  if starter~=false then sv.S:Setup(p)end
  return p
 end
 local function leave(sv,p)sv.D:FinalizePlayer(p,'PlayerRemoving');present[p.UserId]=nil;p.Parent=nil end
 local function crash(p)present[p.UserId]=nil;p.Parent=nil end -- (the server died: no save)
-local function finishTutorial(sv,p)assert(sv.D:TutorialAction(p,"Skip"),"skip");flush(2)end -- (two passes: the signal runs the try, a gift queues its notice, a refusal queues its retry)
+local function finishTutorial(sv,p)assert(sv.D:TutorialAction(p,"Skip"),"skip");flush(2)end -- (two passes: a gift queues its notice, a refusal queues its retry)
+local function respawn(p)spawnIn(p);flush(3)end -- (R158e: CharacterAdded -> a moment later the try -> its notice / retry)
 local function gifts(sv,p)local out={};for _,r in ipairs(sv.D:GetChestRecords(p))do if Rules.PackFloor(r)then out[#out+1]=r end end;return out end
 local function flag(sv,p)return sv.D:GetPremium(p)[Rules.Flag]end
 local function rolls(sv,p)return sv.D:GetPremium(p)[Rules.RollsField]end
@@ -100,16 +109,19 @@ do
 end
 
 -- A. A brand-new profile -------------------------------------------------------------------------------------------------------------------------------------------
-local s1=newServer();local A=join(s1,3001,'Ava')
+local s1=newServer();local A=join(s1,3001,'Ava',nil,true)
 do
  check(s1.D.FreshProfile[A]==true,'A: PlayerDataService saw a brand-new profile (nothing saved before the join)')
- check(flag(s1,A)==Rules.Owed and #gifts(s1,A)==0 and #s1.D:GetChestRecords(A)==0,'A: a new profile is OWED the gift while the tutorial runs: no pack yet')
+ check(flag(s1,A)==Rules.Owed and #gifts(s1,A)==0 and #s1.D:GetChestRecords(A)==0,'A: loaded before the first spawn: OWED, no pack yet')
  check(noticesFor(A)==0 and s1.T:GetReady(A)==0,'A: no notice and no bonus roll yet')
- local mask=s1.D:GetPremium(A).Tutorial.Mask;check(A:GetAttribute('TutorialStep')==1,'A: the tutorial is at step 1 (grab a pack)')
- flush();check(#s1.D:GetChestRecords(A)==0 and s1.D:GetPremium(A).Tutorial.Mask==mask,'A: nothing happens while the tutorial runs: the tutorial\'s mask is untouched (its "grab a pack" step is not ticked)')
- finishTutorial(s1,A)
+ local mask=s1.D:GetPremium(A).Tutorial.Mask;check(A:GetAttribute('TutorialStep')==1 and A:GetAttribute('TutorialDone')==false,'A: the tutorial is at step 1')
+ -- R158e (owner: "the verity gift is given instantly to all new players"): the first spawn gives it, at once, while the tutorial runs
+ local d0=#delays;respawn(A)
  local g=gifts(s1,A);local rec=g[1]
- check(#g==1 and #s1.D:GetChestRecords(A)==1,'A: exactly ONE gift pack in the Bag')
+ check(#g==1 and #s1.D:GetChestRecords(A)==1,'A: the FIRST SPAWN gives exactly ONE gift pack, at once')
+ check(A:GetAttribute('TutorialDone')==false and A:GetAttribute('TutorialStep')==1 and s1.D:GetPremium(A).Tutorial.Mask==mask,'A: ... while the tutorial runs, and the tutorial is untouched (step 1, same mask)')
+ local noticeDelay=false;for i=d0+1,#delays do if delays[i]==Rules.NoticeDelay then noticeDelay=true end end
+ check(noticeDelay and Rules.NoticeDelay>=3,'A: the notice comes '..Rules.NoticeDelay..' s after the gift (after the title screen: a new player\'s closes ~1.2 s after it shows)')
  check(rec.Kind=='Pack'and rec.Stage==7 and rec.BagVariant==VC.Variant and rec.Floor=='Mythic','A: a Verity Pack (stage 7) with Floor = Mythic')
  check(rec.GiftLocked==true and rec.TestGrant==nil and rec.PackShape==nil and rec.PackSize==1 and rec.PackMutation=='None','A: GiftLocked, a REAL pack (not TestGrant: it announces when opened), 1x, no coat, no shape')
  check(rec.OddsVersion==Packs.OddsVersion and type(rec.Id)=='string'and rec.Id:match('^3001_%d+$')~=nil,'A: the current odds version, a normal inventory id')
@@ -126,6 +138,18 @@ do
  local rolled=s1.D:GetChestRecords(A)[2]
  check(rolled and rolled.Floor==nil and rolled.GiftLocked==nil and Rules.PackFloor(rolled)==nil,'A: the pack a bonus roll gives is ordinary (no floor, no lock)')
  check(rolls(s1,A)==1,'A: the saved starter count went down with the roll (1)')
+ check(A:GetAttribute('TutorialStep')==1 and s1.D:GetPremium(A).Tutorial.Mask==mask,'A: the bonus roll\'s pack does not tick the tutorial\'s steal step either')
+ respawn(A);check(#gifts(s1,A)==1 and noticesFor(A)==1,'A: a respawn gives nothing more')
+end
+
+-- A2. R158e: the gift does not skip the tutorial's steal step --------------------------------------------------------------------------------------------------------------
+do
+ local sv=newServer();local K=join(sv,3090,'Kid');flush(2)
+ local gift=gifts(sv,K)[1]
+ check(gift~=nil and K:GetAttribute('TutorialStep')==1,'A2: joined and spawned: the gift is in the Bag, the tutorial still asks for a steal (step 1)')
+ local stolen=sv.D:AddChest(K,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Luck=true,Banked=true})
+ check(stolen and K:GetAttribute('TutorialStep')==4,'A2: a pack stolen on the track (banked) ticks the steal step')
+ sv.D:OpenSeedPack(K,gift.Id,function()return .5 end);check(K:GetAttribute('TutorialStep')==6,'A2: opening ANY pack (the gift too) counts for the open step (owner)')
 end
 
 -- B. A second join gives nothing; the unused starter rolls come back --------------------------------------------------------------------------------------------------------
@@ -137,7 +161,7 @@ do
  flush();check(#gifts(s2,A2)==1 and #told==told0,'B: second join: still exactly one gift pack (it was SAVED with Floor = Mythic), no notice')
  local rec=gifts(s2,A2)[1];check(rec.Floor=='Mythic'and rec.GiftLocked==true and rec.BagVariant==VC.Variant,'B: the saved record kept Floor, GiftLocked and the variant')
  check(s2.T:GetReady(A2)==1 and A2:GetAttribute('TreadmillBonusReady')==1,'B: the 1 unused starter roll is ready again (not 2, not 3)')
- finishTutorial(s2,A2);check(#gifts(s2,A2)==1 and #told==told0,'B: finishing the tutorial again gives nothing')
+ finishTutorial(s2,A2);respawn(A2);check(#gifts(s2,A2)==1 and #told==told0,'B: a respawn or finishing the tutorial gives nothing')
  local result=s2.T:Roll(A2);check(result.Ok==true and rolls(s2,A2)==nil,'B: the last starter roll is spent: the saved count is gone')
  leave(s2,A2)
  local s3=newServer();local A3=join(s3,3001,'Ava');check(s3.T:GetReady(A3)==0 and #gifts(s3,A3)==1,'B: third join: no rolls left, still one pack')
@@ -154,7 +178,7 @@ do
  finishTutorial(sv,old);leave(sv,old)
  local sv2=newServer();local old2=join(sv2,3010,'Old')
  check(sv2.D.FreshProfile[old2]==false and flag(sv2,old2)==nil,'C: an existing profile is not new and has NO flag')
- finishTutorial(sv2,old2);flush()
+ finishTutorial(sv2,old2);respawn(old2)
  check(flag(sv2,old2)==nil and #sv2.D:GetChestRecords(old2)==0 and rolls(sv2,old2)==nil and sv2.T:GetReady(old2)==0 and noticesFor(old2)==0,'C: nothing for an old player: no flag, no pack, no rolls, no notice')
  check(sv2.S:Grant(old2)==nil,'C: Grant refuses (not owed)')
  local _,why=sv2.S:Grant(old2);check(why=='notowed','C: the reason is "not owed"')
@@ -167,33 +191,33 @@ end
 -- D. Interrupted grants ---------------------------------------------------------------------------------------------------------------------------------------------------
 do
  -- D1: the grant happened but the server died before any save: the profile is still brand-new on the next join: given once
- local sv=newServer();local p=join(sv,3020,'Lost');finishTutorial(sv,p)
+ local sv=newServer();local p=join(sv,3020,'Lost');flush(2)
  check(#gifts(sv,p)==1 and noticesFor(p)==1,'D1: granted in the first session (never saved)')
  crash(p)
- local sv2=newServer();local p2=join(sv2,3020,'Lost')
+ local sv2=newServer();local p2=join(sv2,3020,'Lost',nil,true)
  check(#sv2.D:GetChestRecords(p2)==0 and flag(sv2,p2)==Rules.Owed,'D1: the new session has no pack and is owed again')
- finishTutorial(sv2,p2);check(#gifts(sv2,p2)==1 and flag(sv2,p2)==Rules.Given and noticesFor(p2)==1,'D1: the next join gives it, once, with one notice')
+ respawn(p2);check(#gifts(sv2,p2)==1 and flag(sv2,p2)==Rules.Given and noticesFor(p2)==1,'D1: the next join gives it at the spawn, once, with one notice')
  flush();sv2.S:Grant(p2);check(#gifts(sv2,p2)==1,'D1: never twice')
  leave(sv2,p2)
- -- D2: owed and SAVED (a player who left in the tutorial): not new on the next join, still owed, given when the tutorial is finished
- local sa=newServer();local q=join(sa,3021,'Left');leave(sa,q)
- local sb=newServer();local q2=join(sb,3021,'Left')
+ -- D2: owed and SAVED (a player who left before the first spawn): not new on the next join, still owed, given at the spawn
+ local sa=newServer();local q=join(sa,3021,'Left',nil,true);leave(sa,q)
+ local sb=newServer();local q2=join(sb,3021,'Left',nil,true)
  check(sb.D.FreshProfile[q2]==false and flag(sb,q2)==Rules.Owed and #sb.D:GetChestRecords(q2)==0,'D2: the saved profile is still owed (not new any more, but the saved state says Owed)')
- finishTutorial(sb,q2);check(#gifts(sb,q2)==1 and flag(sb,q2)==Rules.Given and sb.T:GetReady(q2)==2,'D2: given when the tutorial is finished, with its 2 rolls')
+ respawn(q2);check(#gifts(sb,q2)==1 and flag(sb,q2)==Rules.Given and sb.T:GetReady(q2)==2,'D2: given at the spawn, with its 2 rolls')
  leave(sb,q2)
  local sc=newServer();local q3=join(sc,3021,'Left');flush();check(#gifts(sc,q3)==1 and sc.T:GetReady(q3)==2 and noticesFor(q3)==0,'D2: and never again (one pack; the 2 unused rolls are back, not 4; no second notice)')
  leave(sc,q3)
  -- D3: a full Bag: refused without a trace, tried again
- local sd=newServer();local f=join(sd,3022,'Full')
+ local sd=newServer();local f=join(sd,3022,'Full',nil,true)
  for i=1,sd.D:HeldItemCap()do assert(sd.D:AddChest(f,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion}),'fill '..i)end
- finishTutorial(sd,f)
+ respawn(f)
  check(#gifts(sd,f)==0 and flag(sd,f)==Rules.Owed and noticesFor(f)==0 and sd.T:GetReady(f)==0,'D3: a full Bag (200): no pack, no flag change, no notice, no rolls')
  table.remove(sd.D:GetChestRecords(f));sd.D:_notifySeedInventory(f)
  flush();check(#gifts(sd,f)==1 and flag(sd,f)==Rules.Given and #sd.D:GetChestRecords(f)==sd.D:HeldItemCap(),'D3: a slot is free: the retry gives it (200 items exactly), once')
  check(noticesFor(f)==1,'D3: one notice')
  -- D4: a profile that cannot save
- local se=newServer();local n=join(se,3023,'NoSave');se.D.CanSave[n]=false
- finishTutorial(se,n);check(#gifts(se,n)==0 and flag(se,n)==Rules.Owed,'D4: a profile that cannot save is given nothing (a pack that cannot be saved would be given again)')
+ local se=newServer();local n=join(se,3023,'NoSave',nil,true);se.D.CanSave[n]=false
+ respawn(n);check(#gifts(se,n)==0 and flag(se,n)==Rules.Owed,'D4: a profile that cannot save is given nothing (a pack that cannot be saved would be given again)')
  se.D.CanSave[n]=true;flush();check(#gifts(se,n)==1,'D4: when it can save, it is given')
 end
 
@@ -201,20 +225,20 @@ end
 do
  check(Limited.Active(clockNow.t)==true,'E: (the event is running)')
  -- an owed profile saved while the event ran
- local sv0=newServer();local w=join(sv0,3030,'Waits');leave(sv0,w)
+ local sv0=newServer();local w=join(sv0,3030,'Waits',nil,true);leave(sv0,w)
  clockNow.t=EndsAt+5
  check(Limited.Active(clockNow.t)==false,'E: the event has ended')
  local sv=newServer();local n=join(sv,3031,'LateNew')
  check(sv.D.FreshProfile[n]==true and flag(sv,n)==nil,'E: a brand-new profile after the end: the flag is NOT set')
- finishTutorial(sv,n)
+ respawn(n)
  check(#sv.D:GetChestRecords(n)==0 and flag(sv,n)==nil and rolls(sv,n)==nil and sv.T:GetReady(n)==0 and noticesFor(n)==0,'E: no pack, no rolls, no notice, no flag')
  local _,why=sv.S:Grant(n);check(why=='notowed','E: nothing is owed')
  leave(sv,n)
- local sv2=newServer();local n2=join(sv2,3031,'LateNew');finishTutorial(sv2,n2);check(flag(sv2,n2)==nil and #sv2.D:GetChestRecords(n2)==0,'E: and on every later join')
+ local sv2=newServer();local n2=join(sv2,3031,'LateNew');respawn(n2);check(flag(sv2,n2)==nil and #sv2.D:GetChestRecords(n2)==0,'E: and on every later join')
  -- the profile that was owed before the end: the rule is "only while the event is active"
  local w2=join(sv2,3030,'Waits')
  check(flag(sv2,w2)==Rules.Owed,'E: (the saved profile still says Owed)')
- finishTutorial(sv2,w2);flush()
+ respawn(w2)
  local _,why2=sv2.S:Grant(w2)
  check(why2=='ended'and #sv2.D:GetChestRecords(w2)==0 and sv2.T:GetReady(w2)==0 and noticesFor(w2)==0,'E: an owed profile after the end is given nothing (no pack, no rolls, no notice): the event is over')
  clockNow.t=EndsAt-10*86400
@@ -400,15 +424,15 @@ end
 
 -- J. The owner tool ----------------------------------------------------------------------------------------------------------------------------------------------------
 do
- local sv=newServer();local P=join(sv,3080,'Boss')
+ local sv=newServer();local P=join(sv,3080,'Boss',nil,true)
  local ok,text=sv.S:_command(P,{})
  check(ok==true and text:find('OWED',1,true)~=nil and text:find('running',1,true)~=nil,'J: starterverity shows OWED and the running event ('..tostring(text)..')')
  local ok2,why=sv.S:_command(P,{'reset'});check(ok2==false and why:find('Studio only',1,true)~=nil,'J: reset is refused outside Studio')
  check(sv.S:_command(P,{'nonsense'})==false,'J: junk is refused')
- local st=newServer(true);local Q=join(st,3081,'StudioBoss');finishTutorial(st,Q)
+ local st=newServer(true);local Q=join(st,3081,'StudioBoss');flush(2)
  check(#gifts(st,Q)==1 and flag(st,Q)==Rules.Given,'J: (Studio: the gift is given)')
  local ok3,msg=st.S:_command(Q,{'reset'})
- check(ok3==true and #gifts(st,Q)==2 and flag(st,Q)==Rules.Given and msg:find('given again',1,true)~=nil,'J: reset in Studio gives it again at once when the tutorial is done ('..tostring(msg)..')')
+ check(ok3==true and #gifts(st,Q)==2 and flag(st,Q)==Rules.Given and msg:find('given again',1,true)~=nil,'J: reset in Studio gives it again at once (spawned) ('..tostring(msg)..')')
  check(select(2,st.S:_command(Q,{})):find('GIVEN',1,true)~=nil,'J: and status says GIVEN')
  check(select(1,StarterSvc.Command(nil,Q,{}))==true,'J: the owner command reaches the running service (StarterVerity158d.Command)')
 end

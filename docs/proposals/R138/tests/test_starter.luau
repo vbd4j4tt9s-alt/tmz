@@ -59,8 +59,9 @@ end
 -- Finish the tutorial as PremiumService's Tutorial request does (PremiumService.new itself starts product loaders
 -- that never settle on the mock, so its Tutorial branch is checked from source below).
 local synced=0
-local state=Data:GetPremium(A).Tutorial;state.Mask=bit32.bor(state.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);Data:PublishTutorial(A)
-check(A:GetAttribute('TutorialStep')==5,'on the last (slides) step')
+-- R158e (on purpose): the tutorial has ten steps; its last one (the treadmill, step 10) comes after the harvest and the sale.
+local state=Data:GetPremium(A).Tutorial;state.Mask=bit32.bor(state.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant,Guide.Bits.Harvest,Guide.Bits.Sell);Data:PublishTutorial(A)
+check(A:GetAttribute('TutorialStep')==10,'on the last (treadmill) step')
 local function finish()
  if Data:TutorialAction(A,'TreadmillInfo')then Data:PublishTutorial(A)end
  if A:GetAttribute('TutorialDone')==true then local gift=Data:GrantStarterPack(A);if gift then synced+=1;Data.Notifications:Show(A,Guide.StarterPack.Notice)end end
@@ -74,7 +75,7 @@ check(gift and gift.Stage==1 and gift.BagVariant=='Pack01'and gift.RateBoost==2 
 check(gift and gift.ChestName==Guide.StarterPack.Name,'named '..tostring(gift and gift.ChestName))
 check(synced>=1 and shownNotes[#shownNotes]==Guide.StarterPack.Notice,'it shows up in the hotbar and a notice says so')
 -- Once per account.
-local s2=Data:GetPremium(A).Tutorial;s2.Mask=1;s2.Done=false;s2.Mask=bit32.bor(s2.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);Data:PublishTutorial(A) -- (started again by hand: a Replay request is refused now)
+local s2=Data:GetPremium(A).Tutorial;s2.Mask=1;s2.Done=false;s2.Mask=bit32.bor(s2.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant,Guide.Bits.Harvest,Guide.Bits.Sell);Data:PublishTutorial(A) -- (started again by hand: a Replay request is refused now)
 finish()
 check(select(1,packs(A))==n,'finishing the tutorial again does not give another')
 -- Saved and loaded with its boost.

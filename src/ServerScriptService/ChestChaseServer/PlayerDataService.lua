@@ -438,7 +438,7 @@ function PlayerDataService:AddChest(player, chest, options)
     if chest.Stage<=self.Config.StageCount then self:MarkTreadmillBiome(player,chest.Stage)end
 	self:_notifySeedInventory(player)
 	self:MarkDirty(player)
-	self:TutorialEvent(player,'Pack')
+	if type(options) == "table" and options.Banked == true then self:TutorialEvent(player,'Pack') end -- R158e: only a pack stolen on the track and banked ticks the tutorial's steal step (never a gift, a roll or a grant)
 	return record
 end
 
@@ -1670,6 +1670,8 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
     require(game:GetService('ReplicatedStorage'):WaitForChild('GardenFenceRules')).ApplyPlant(crop,growing,self:GetFenceTier(player))
  require(game:GetService('ReplicatedStorage'):WaitForChild('GrowthBoostRules')).Apply(crop,player:GetAttribute('DoubleGrowthOwned')and 2 or 1,now)
 
+	-- R158e: the plant planted in the tutorial's plant step (once per player) has its first fruit in 10 s (TutorialProgress.TutorialFastCrop; never yields).
+	do local okFast,fastError=pcall(self.TutorialFastCrop,self,player,seed,crop,growing,now);if not okFast then warn("[R158e] Tutorial first fruit skipped: "..tostring(fastError)) end end
 	-- Both tables commit before revision signals or optional presentation work.
 	table.insert(crops, crop)
 	garden.Plots[tostring(slot)] = crops

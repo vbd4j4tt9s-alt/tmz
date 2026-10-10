@@ -5,10 +5,10 @@
 --  * SAVED STATE (Premium.StarterVerity158d, an optional field: no ProfileVersion change; an older server keeps it as it is): the moment a brand-new profile loads while the event runs it is set to 'Owed'
 --    (saved with the profile), so a gift whose grant was interrupted (a crash, a full Bag, a lost save) is still owed on the next join; the grant sets 'Given'.
 --    Rule for an owed gift after the event ended: NOTHING is given ("only while the event is active"); 'Owed' just stays in the profile.
---  * WHEN: the grant waits for the finished tutorial (the player attribute TutorialDone, true after finishing OR skipping), the same moment the tutorial's own free Forest pack comes. Why: AddChest
---    tells the tutorial "a pack was added", which would tick off its "grab a pack" step, and its "open it" step would point at the wrong pack. After the tutorial nothing of that is left, and the
---    title screen and the tutorial card are gone, so the notice can be read. The grant is retried every 5 s (6 times) while a Bag is full or data cannot save, and on the next join.
---  * THE GRANT (Grant, never yields, one step like VoidGiveaway152:_grant): the flag is 'Owed', the event runs, the tutorial is done, the profile is loaded and can save (Studio may not), room in the Bag
+--  * WHEN: R158e (owner: "the verity gift is given instantly to all new players"): at the player's FIRST SPAWN (a character exists; else the next CharacterAdded), while the tutorial runs. The
+--    gift never ticks the tutorial's steal step: only a pack stolen on the track and banked does (PlayerDataService:AddChest with Banked); after the steal, opening any pack (this one
+--    too) counts for the open step. The notice comes Rules.NoticeDelay (4 s) later, after the title screen. (R158d gave it when the tutorial was finished.) The grant is retried every 5 s (6 times) while a Bag is full or data cannot save, on every later spawn of the session, and on the next join.
+--  * THE GRANT (Grant, never yields, one step like VoidGiveaway152:_grant): the flag is 'Owed', the event runs, the player has spawned, the profile is loaded and can save (Studio may not), room in the Bag
 --    (the 200 cap) -> AddChest (a REAL Verity pack, not TestGrant: it announces when opened; GiftLocked; Floor = 'Mythic') -> flag 'Given' + Premium.StarterRolls158d = 2 -> 2 READY treadmill bonus rolls
 --    (TreadmillBonusService:GrantReady) -> MarkDirty + QueueGardenSave -> SyncTools -> ONE notice, a moment later. A profile gets at most one pack however many paths run: the flag check and the pack are one step.
 --  * The 2 rolls are ordinary bonus rolls (normal odds). Ready rolls live in the session only; the unused ones are kept in Premium.StarterRolls158d and come back after a rejoin (TreadmillBonusService).
@@ -43,7 +43,7 @@ function S:_notify(player)
  end)
 end
 -- Gives the gift. NEVER yields. Returns the pack record, or nil and why:
--- 'loading' / 'notowed' / 'given' / 'ended' (the event is over) / 'tutorial' / 'cannotsave' / 'room' / 'add'.
+-- 'loading' / 'notowed' / 'given' / 'ended' (the event is over) / 'spawn' (no character yet) / 'cannotsave' / 'room' / 'add'.
 function S:Grant(player)
  local data=self.Data
  if not player or not player.Parent or not data:IsLoaded(player)then return nil,'loading'end
@@ -52,7 +52,7 @@ function S:Grant(player)
  if state==Rules.Given then return nil,'given'end
  if state~=Rules.Owed then return nil,'notowed'end
  if not self:_active()then return nil,'ended'end
- if not Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))then return nil,'tutorial'end
+ if not player.Character then return nil,'spawn'end -- (R158e: at the first spawn; CharacterAdded tries again)
  if not data.CanSave[player]and not self.Studio then return nil,'cannotsave'end
  if not self:_room(player)then return nil,'room'end
  local records=data:GetChestRecords(player);local before=#records
@@ -78,21 +78,23 @@ function S:_try(player,n)
  if self.Dead or not player.Parent then return end
  local record,why=self:Grant(player)
  if record or why=='given'or why=='ended'or why=='notowed'then return end
- if why=='tutorial'then return end -- (the attribute's own signal tries again)
+ if why=='spawn'then return end -- (the CharacterAdded signal tries again)
  if n<Rules.Retries then self.Delay(Rules.RetryEvery,function()self:_try(player,n+1)end)end
 end
--- A player whose profile is loaded: a brand-new one is marked 'Owed' (while the event runs); an owed one gets the gift when the tutorial is done.
+-- A player whose profile is loaded: a brand-new one is marked 'Owed' (while the event runs); an owed one gets the gift at once if spawned, else at the next spawn (R158e).
 function S:Setup(player)
  local premium=self:_premium(player);if not premium then return false end
  if premium[Rules.Flag]==nil and self:_fresh(player)and self:_active()then
   premium[Rules.Flag]=Rules.Owed;self.Data:MarkDirty(player)
  end
  if Rules.CleanState(premium[Rules.Flag])~=Rules.Owed then return false end
- if self.Watching[player]or self.Opts.NoWatch then return true end
- self.Watching[player]=player:GetAttributeChangedSignal(Rules.TutorialAttr):Connect(function()
-  if Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))then self.Delay(.2,function()self:_try(player,0)end)end -- (a moment later: the tutorial's own free pack is given in the same request)
- end)
- if Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))then self:_try(player,0)end
+ if not self.Watching[player]and not self.Opts.NoWatch then
+  local spawned=player.CharacterAdded
+  if spawned then self.Watching[player]=spawned:Connect(function()
+   if Rules.CleanState((self:_premium(player)or{})[Rules.Flag])==Rules.Owed then self.Delay(.2,function()self:_try(player,0)end)end -- (a moment later: the character is in place)
+  end)end
+ end
+ if player.Character then self:_try(player,0)end
  return true
 end
 -- Waits for a joined player's profile (it loads a moment after they join), then Setup.
@@ -127,10 +129,10 @@ function S:StatusText(player)
  local state=Rules.CleanState(premium[Rules.Flag])
  local packs=0;for _,r in ipairs(self.Data:GetChestRecords(player))do if Rules.PackFloor(r)then packs+=1 end end
  local left=Limited.Left(self.Time())
- return string.format('Starter gift (R158d): %s. Event: %s. Tutorial: %s. Gift packs in the Bag: %d. Starter bonus rolls not used: %d. Fresh profile this session: %s.',
-  state==Rules.Given and'GIVEN (flag Given)'or state==Rules.Owed and'OWED (waits for the finished tutorial and a running event)'or'not set (an older player, or a new one after the event ended)',
+ return string.format('Starter gift (R158d): %s. Event: %s. Spawned: %s. Gift packs in the Bag: %d. Starter bonus rolls not used: %d. Fresh profile this session: %s.',
+  state==Rules.Given and'GIVEN (flag Given)'or state==Rules.Owed and'OWED (given at the next spawn while the event runs)'or'not set (an older player, or a new one after the event ended)',
   self:_active()and('running ('..Limited.Text(left)..' left)')or'ENDED (new players get nothing)',
-  Rules.TutorialDone(player:GetAttribute(Rules.TutorialAttr))and'finished'or'not finished',packs,Rules.CleanRolls(premium[Rules.RollsField]),self:_fresh(player)and'yes'or'no')
+  player.Character and'yes'or'no',packs,Rules.CleanRolls(premium[Rules.RollsField]),self:_fresh(player)and'yes'or'no')
 end
 function S:_command(player,a)
  local sub=a[1]and tostring(a[1]):lower()
@@ -142,7 +144,7 @@ function S:_command(player,a)
  self.Data:MarkDirty(player)
  local record,why=self:Grant(player)
  if record then return true,'The flag was reset and the gift is given again (the pack and rolls you got before stay). '..self:StatusText(player)end
- self:Setup(player) -- (owed again: it waits for the finished tutorial)
+ self:Setup(player) -- (owed again: given at the next spawn)
  return true,'The flag was reset: the gift is owed ('..tostring(why)..'). '..self:StatusText(player)
 end
 -- OwnerUpdateCommands82 -> here (`starterverity @name [reset]`): the service running in this server.

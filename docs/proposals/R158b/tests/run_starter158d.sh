@@ -4,7 +4,8 @@
 #  wiring               - the files, src/MANIFEST.tsv, the main script's one guarded line, the owner command (Actions, dispatcher, per-player, F4 help, docs/COMMANDS.md), ProfileVersion 22, the frozen files
 #                         byte-identical, the saved fields are optional Premium fields / optional record fields, the floor is set by server code only (no remote, no test command knows it), the
 #                         Void giveaway files and the odds files are untouched, no new client script / sound / remote;
-#  test_starter158d     - on the real player data (the R123 world): see the header of that file (new profile once, second join nothing, old profile nothing, interrupted grants, event ended, 2,000 floored
+#  test_starter158d     - on the real player data (the R123 world): see the header of that file (new profile once, R158e: at the FIRST SPAWN, while the tutorial runs, the notice a few seconds later,
+#                         the gift never ticks the tutorial's steal step; second join nothing, old profile nothing, interrupted grants, event ended, 2,000 floored
 #                         opens never below Mythic and the renormalised tier mix, ordinary Verity odds unchanged, floor not settable, not giftable, own stack, owner tool).
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

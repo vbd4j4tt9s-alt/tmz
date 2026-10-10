@@ -172,7 +172,7 @@ function S:SeedBlocked(p,id)
   return 'Bring your pack back to your base first!'
  end
  local step=tonumber(p:GetAttribute('TutorialStep'))or 0
- if p:GetAttribute('TutorialDone')~=true and step>=1 and step<=4 then return 'Finish the tutorial first.'end
+ if p:GetAttribute('TutorialDone')~=true and step>=1 and step<=6 then return 'Finish the tutorial first.'end -- (R158e: the steps up to planting are 1 - 6)
  local opening=self.Chests.Openings and self.Chests.Openings[p]
  if opening and(opening.Committed or(opening.Tool and opening.Tool:GetAttribute('SeedInventoryId')~=id))then return 'Wait for your pack to finish opening!'end
  return nil

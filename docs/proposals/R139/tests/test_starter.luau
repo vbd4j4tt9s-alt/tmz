@@ -43,7 +43,7 @@ end
 local A=makePlayer(401,'Ava');local B=makePlayer(402,'Ben')
 local function finishTutorial(p)
  local s=Data:GetPremium(p).Tutorial or Guide.Read();Data:GetPremium(p).Tutorial=s
- s.Mask=bit32.bor(s.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);Data:PublishTutorial(p)
+ s.Mask=bit32.bor(s.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant,Guide.Bits.Harvest,Guide.Bits.Sell);Data:PublishTutorial(p) -- (R158e: the treadmill is step 10, after the harvest and the sale)
  if Data:TutorialAction(p,'TreadmillInfo')then Data:PublishTutorial(p)end
  return p:GetAttribute('TutorialDone')==true and Data:GrantStarterPack(p)or nil
 end
@@ -61,7 +61,7 @@ local function scan(v,path)
 end
 scan(Guide,'BeginnerGuide')
 check(#words==0,'no tutorial text mentions luck or 2x'..(#words>0 and(': '..table.concat(words,' | '))or''))
-check(Guide.Finished.Chip.Label=='🎁 FREE PACK!','the finish card says 🎁 FREE PACK!')
+check(Guide.Finished.Icon=='🏆'and Guide.Finished.Row[1]=='🎁'and Guide.Finished.Chip==nil,'the finish card shows 🏆 + 🎁 (R158e: no words, the free pack as a picture)')
 -- (R152: the notice is in the owner's words; it still names it a Forest pack, like any other)
 check(Guide.StarterPack.Notice=='🎁 FREE Forest pack!! check your Bag','the notice: '..Guide.StarterPack.Notice)
 -- The pack tool and its hold tooltip (ChestService) read exactly like a normal Forest pack's.

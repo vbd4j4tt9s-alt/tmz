@@ -266,9 +266,9 @@ do
  check(P:GetAttribute('TutorialStep')==0,'R158c: ... and the step stays 0 (nothing restarted)')
  -- one pack per player, with the real data: a second claim is refused as "claimed"
  local ok2b,why2b=svc1:Claim(P);check(ok2b==false and why2b=='claimed'and #D1:GetChestRecords(P)==1 and lastText(P):find('already grabbed',1,true)~=nil,'R158c: a second claim is refused ("already grabbed"): still one pack')
- -- finishing the tutorial the normal way (the three steps, then the treadmill slide) opens it too
+ -- finishing the tutorial the normal way (its steps, then the treadmill step: R158e has ten, the treadmill after the harvest and the sale) opens it too
  local P7=makePlayer(D1,2107,'Walker',false);svc1:Step()
- local st=D1:GetPremium(P7).Tutorial;local Guide=W.module('BeginnerGuide');st.Mask=bit32.bor(st.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant);D1:PublishTutorial(P7)
+ local st=D1:GetPremium(P7).Tutorial;local Guide=W.module('BeginnerGuide');st.Mask=bit32.bor(st.Mask,Guide.Bits.Pack,Guide.Bits.Seed,Guide.Bits.Plant,Guide.Bits.Harvest,Guide.Bits.Sell);D1:PublishTutorial(P7)
  check(svc1:Claim(P7)==false and lastText(P7)==REFUSAL,'R158c: on the last slide but not finished: refused')
  check(D1:TutorialAction(P7,'TreadmillInfo')==true and P7:GetAttribute('TutorialDone')==true and svc1:Claim(P7)==true and #D1:GetChestRecords(P7)>=1,'R158c: finishing it the normal way (the treadmill slide) opens the claim')
  -- the play-time counter is kept: the real server counts it, marks the profile dirty, a save writes it (a harmless field; no rule reads it)

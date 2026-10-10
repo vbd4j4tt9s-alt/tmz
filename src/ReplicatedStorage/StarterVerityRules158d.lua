@@ -3,7 +3,7 @@
 -- PlayerDataService (the save / load / open of the marked pack), ChestService (the pack's name) and TreadmillBonusService (the 2 rolls come back after a rejoin). No Instances: pure.
 --  * The gift (one time per player, ever): ONE real Verity Pack marked Floor = 'Mythic' (a new OPTIONAL field of the pack's inventory record, next to GiftLocked) and 2 treadmill bonus rolls.
 --    Saved state: Premium.StarterVerity158d = absent (not set: every older save, every player who was not new while the event ran) / 'Owed' (a brand-new profile while the event runs:
---    the gift waits for the finished tutorial) / 'Given' (the pack is in the Bag). Premium.StarterRolls158d = the starter rolls not used yet (0 - 2; absent = none). ProfileVersion stays 22.
+--    R158e: given at the first spawn, at once) / 'Given' (the pack is in the Bag). Premium.StarterRolls158d = the starter rolls not used yet (0 - 2; absent = none). ProfileVersion stays 22.
 --  * The floor is decided by the server only: it lives in the saved record (set by StarterVerity158d through AddChest) and PlayerDataService:OpenSeedPack reads it. Nothing a client sends
 --    can set or change it. Only a Verity pack (stage 7) can carry it; a seed made from it does not.
 --  * On open: the pack's OWN odds for that open (SeedPackRules.SeedOdds: the Verity pack's table, the 4 Leaf Clover, the pity's lucky x1.5, the 80% rule) keep only the seeds of the floor's rarity
@@ -15,12 +15,12 @@ R.RollsField='StarterRolls158d';R.Rolls=2
 R.Floor='Mythic'
 -- The owner's words, exactly (one notice, shown once, a moment after the gift is given).
 R.Notice="Thanks for playing! Here's a gift"
-R.NoticeSeconds=5;R.NoticeDelay=1.5
+-- R158e (owner: "the verity gift is given instantly to all new players"): the gift comes at the first spawn; its notice a few seconds later, so it is read after the title screen (a brand-new
+-- player's title closes about 1.2 s after it shows, TitleScreen.client.lua).
+R.NoticeSeconds=5;R.NoticeDelay=4
 R.ToolName='Gift Verity Pack' -- the hotbar / Bag name: a different name is a different stack (InventoryStacks155.Key), so the gift pack never joins a stack of ordinary Verity Packs
 R.ToolTip='Guaranteed Mythic or better • Click / tap / RT 5 times to open'
 R.TooltipLine='Guaranteed Mythic or better'
-R.TutorialAttr='TutorialDone'
-function R.TutorialDone(v)return v==true end
 -- Gifting: the pack is saved GiftLocked (FruitGiftService refuses; the seed, plant and fruit made from it stay locked).
 R.Locked=true
 R.RetryEvery=5;R.Retries=6 -- a refused grant (a full Bag, data that cannot save) is tried again every 5 s, 6 times; the next join tries again

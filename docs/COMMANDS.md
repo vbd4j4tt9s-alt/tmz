@@ -156,8 +156,8 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 ## New-player gift (R158d)
 | Command | What it does |
 |---|---|
-| `starterverity @name` | R158d: the new-player gift: one Verity Pack guaranteed Mythic or better + 2 treadmill bonus rolls, given ONCE to a brand-new player when they finish (or skip) the tutorial, and only while the Verity event runs. Shows whether it is owed / given (saved as `Premium.StarterVerity158d`), whether the event is running, whether the tutorial is finished, how many gift packs are in the Bag (the pack's record has `Floor = Mythic`) and how many starter rolls are not used yet (`Premium.StarterRolls158d`) |
-| `starterverity @name reset` (**Studio only**) | Marks that player as owed the gift again and gives it at once if the tutorial is done and the event runs. The pack and rolls they already got stay. `starterverity reset @name` works too. A live server refuses |
+| `starterverity @name` | R158d: the new-player gift: one Verity Pack guaranteed Mythic or better + 2 treadmill bonus rolls, given ONCE to a brand-new player at their first spawn (R158e; it was the end of the tutorial in R158d), and only while the Verity event runs. Shows whether it is owed / given (saved as `Premium.StarterVerity158d`), whether the event is running, whether the player has spawned, how many gift packs are in the Bag (the pack's record has `Floor = Mythic`) and how many starter rolls are not used yet (`Premium.StarterRolls158d`) |
+| `starterverity @name reset` (**Studio only**) | Marks that player as owed the gift again and gives it at once if they have spawned and the event runs. The pack and rolls they already got stay. `starterverity reset @name` works too. A live server refuses |
 
 ## Free Void Pack pedestal
 | Command | What it does |
@@ -284,7 +284,7 @@ listed separately any more because each one is the same as a command above.
 18. **R133:**
    - Market: fruit sits on the crates and steps (no floating), all 4 shelves are full of mixed packs, soil in the planters and flower boxes, a wall behind the front sign, no MARKET text from inside, lamps hang from a ceiling beam, pots and a barrel at the back.
    - Fruit of the Hour: big fruit, small two-line label above it. `fruithour apple 3` to switch it.
-   - Tutorial: a brand-new profile (R158c: the tutorial can't be replayed any more, the Settings button is gone): casual lines with emojis.
+   - Tutorial: a brand-new profile (R158c: the tutorial can't be replayed any more, the Settings button is gone; R158e: no words at all, only arrows, rings, hands, icons and key caps, see docs/proposals/R158e/tutorial158e.md).
 19. **R134:**
    - `seeds all`, open the Bag: every seed looks different, no side wings. Hold Diamond Vine, Prism Pepper, Ash Tomato, Iceberry, Venom Vine, Prism Monarch.
    - Hold a Legendary+ seed: flames/crystals/glows animate; `give prism monarch seed`: crown and golden rays.

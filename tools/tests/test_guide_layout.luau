@@ -1,18 +1,10 @@
 local G=require('./new_Guide');local L=require('./Hud')
 local fails=0;local function check(c,msg)if not c then fails+=1;print('FAIL',msg)end end
 -- 1) state machine: see test_guide_flow.luau
--- 2) formatting: every look, every device, a name that needs escaping
-local looks={G.TravelTrack,G.TravelBase,G.PickSeed,G.Waiting,G.Nice,G.Finished,{Title=G.Finished.Title,Chip=G.FinishedAgain}}
-for _,st in ipairs(G.Steps)do looks[#looks+1]=st;if st.EquippedTitle then looks[#looks+1]={Title=st.EquippedTitle,Chip=st.EquippedChip}end end
+-- 2) R158e: no words to fill any more; Format still escapes a {name} (kept for older callers)
 for _,d in ipairs({'Mouse','Touch','Gamepad','???'})do
- for i,s in ipairs(looks)do
-  for _,t in ipairs({s.Title,s.Chip and s.Chip.Key,s.Chip and s.Chip.Label})do
-   local f=G.Format(t,d,'Bob<3&Co')
-   check(not f:find('{',1,true),'placeholder left '..d..' '..i..': '..f)
-   check(f:find('Bob&lt;3&amp;Co',1,true)or not tostring(t):find('{name}',1,true),'escape '..i)
-   check(G.Plain(f):find('Bob<3&Co',1,true)or not tostring(t):find('{name}',1,true),'plain '..i)
-  end
- end
+ local f=G.Format('{name}',d,'Bob<3&Co')
+ check(f:find('Bob&lt;3&amp;Co',1,true)and G.Plain(f)=='Bob<3&Co','escape '..d)
 end
 -- 3) placement never overlaps HUD
 local function ov(a,b)return a.X<b.X+b.W and a.X+a.W>b.X and a.Y<b.Y+b.H and a.Y+a.H>b.Y end
@@ -27,8 +19,9 @@ for _,v in ipairs(views)do
  local w,h,touch=v[1],v[2],v[3]
  for _,ctl in ipairs({false,true})do
   local m=L.Read({X=w,Y=h},touch,ctl and touch and controls(w,h)or nil)
-  -- The card has a fixed height (icon, title, chip, step row) + the 12px name tag (BeginnerTutorial.place).
-  local function heightFor(width)return(m.Phone and 100 or 112)+12 end
+  -- The card has a fixed height (icon, one picture row, step row) + the 12px face above it (BeginnerTutorial.place); step 10 has two picture rows (they stand beside the icon: + 6 / 8 px).
+  for _,rows in ipairs({1,2})do
+  local function heightFor(width)return(m.Phone and 100 or 112)+(rows==2 and(m.Phone and 6 or 8)or 0)+12 end
   local c=G.Card(w,h,m,heightFor)
   local relaxed=nil
   if not c.Clear then relaxed=1;c=G.Card(w,h,m,heightFor,1)end
@@ -37,7 +30,7 @@ for _,v in ipairs(views)do
   local box={X=c.X-c.Width/2,Y=c.Top,W=c.Width,H=c.Height}
   local hits={}
   for i,b in ipairs(G.Obstacles(m,w,h,relaxed))do if ov(box,b)then hits[#hits+1]=i end end
-  check(c.Clear and #hits==0 and box.Y>=0 and box.X>=0 and box.X+box.W<=w and box.Y+box.H<=h,('placement %dx%d'):format(w,h))
+  check(c.Clear and #hits==0 and box.Y>=0 and box.X>=0 and box.X+box.W<=w and box.Y+box.H<=h,('placement %dx%d (%d rows)'):format(w,h,rows))
   -- R152: with the TRACK / BASE button ringed (top bar row, above the safe area) the card starts below the pressing hand.
   -- R152: the card hugs its words (the shortest card is 300 / 360 wide): it never grows past them and still clears the HUD.
   for _,want in ipairs({m.Phone and 300 or 360,m.Phone and 380 or 460})do
@@ -54,7 +47,8 @@ for _,v in ipairs(views)do
    for _,b in ipairs(G.Obstacles(m,w,h))do if ov(pb,b)then hit=true end end
    check(not hit and pb.Y>=(m.Phone and 26 or 34),('pushed placement %dx%d'):format(w,h))
   end
-  if not ctl or touch then print(string.format('%s %4dx%-4d %s card x=%4d y=%4d w=%3d h=%3d %s',touch and'TOUCH'or'PC   ',w,h,ctl and'ctl'or'   ',box.X,box.Y,box.W,box.H,c.Clear and #hits==0 and'ok'or'OVERLAP'))end
+  if not ctl or touch then print(string.format('%s %4dx%-4d %s %d row card x=%4d y=%4d w=%3d h=%3d %s',touch and'TOUCH'or'PC   ',w,h,ctl and'ctl'or'   ',rows,box.X,box.Y,box.W,box.H,c.Clear and #hits==0 and'ok'or'OVERLAP'))end
+  end
  end
 end
 print(fails==0 and'ALL PASS'or('FAILURES '..fails))
