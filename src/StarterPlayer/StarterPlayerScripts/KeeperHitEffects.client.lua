@@ -71,7 +71,7 @@ local connection=remote.OnClientEvent:Connect(function(hit)
  local distance=(camera.CFrame.Position-hit.Position).Magnitude
  if distance>260 then return end
  local batHit=hit.Cause=='Bat';local veiled=hit.Veiled==true and not batHit
- if batHit and Burst.IsOwnHit(hit.VictimUserId)then return end -- R158: your own bat hit: already shown on your screen at once (BatClient)
+ if batHit and Burst.IsOwnPacket(hit,player.UserId)then return end -- R158: your own bat hit (the packet names its hitter): already shown on your screen at once (BatClient)
  -- R124: a ground-smash keeper's slam sound already played at the visual impact (KeeperFx.Slam, in range), so the
  -- generic snap is skipped there; The Darkened has its own catch sound instead of the snap and voice.
  local move=not batHit and not veiled and Signature.Moves[hit.Stage]

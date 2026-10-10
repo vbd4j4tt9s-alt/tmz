@@ -7,7 +7,9 @@
 --  2. the sweep: a player crossing in front is claimed once with {Kind=Hit, Id, Victim, ViewTime inside the strike, Own, Look}; nobody in reach, a
 --     ForceField, a knocked-down player, a player behind the base line, a swinger in the hub: no claim.
 --  3. your hit at once: the slap (once), the pooled star, the sparks, HitBurstFx.IsOwnHit; the 0.05 s hit-stop (the pose holds, then runs 0.05 s late);
---     NO camera shake for you, also when the server's packet arrives (KeeperHitEffects skips it: no second slap); the victim and bystanders keep theirs.
+--     NO camera shake for you, also when the server's packet arrives (KeeperHitEffects skips it: no second slap); the victim and bystanders keep theirs;
+--     (R158 review) someone else's hit on the player you swung at is shown to you. A slow device (60 down to 10 fps): every claim's moment is inside
+--     the strike.
 --  4. the trail: white, made once per bat on its barrel, on only from .21 to .40 s of the swing (cleared first), off in Fast Mode and far away.
 --  5. nothing per frame: no instance is made during a swing's frames (the trail, the star pool and the spark emitter are made once).
 --  6. upper body only: R15 writes Waist + right arm + left arm, R6 its RootJoint + both shoulders; legs / root / neck keep the Animator's pose.
@@ -171,10 +173,16 @@ if claimed then
  check(held>=2 and held<=4,'the hit-stop: your swing holds '..held..' frames (0.05 s at 60 fps)')
  -- the server's packet for that hit arrives a ping later: skipped on your screen (no second slap, no star, no camera shake)
  local slaps=sfx.count(C.SlapSoundId)
- hitRemote.OnClientEvent:Fire({Id=1,At=W.workspace:GetServerTimeNow(),Position=vRoot.Position,VictimUserId=V.UserId,Direction=V3(1,0,0),Cause='Bat'})
+ hitRemote.OnClientEvent:Fire({Id=1,At=W.workspace:GetServerTimeNow(),Position=vRoot.Position,VictimUserId=V.UserId,AttackerUserId=player.UserId,Direction=V3(1,0,0),Cause='Bat'})
  frames(20)
- check(sfx.count(C.SlapSoundId)==slaps,'the server\'s packet of your own hit: no second slap')
+ check(sfx.count(C.SlapSoundId)==slaps,'the server\'s packet of your own hit (it names you as the hitter): no second slap')
  check((camera.CFrame.Position-camBefore.Position).Magnitude<1e-9,'NO camera shake for the hitter (the owner\'s choice), at the hit nor at the server\'s packet')
+ -- R158 review (finding 6): your claim on V was refused, and another player bats V a moment later: that real hit is shown to you as to anyone near
+ local base=camera.CFrame;slaps=sfx.count(C.SlapSoundId)
+ hitRemote.OnClientEvent:Fire({Id=2,At=W.workspace:GetServerTimeNow(),Position=V3(2,3,6),VictimUserId=V.UserId,AttackerUserId=777,Direction=V3(1,0,0),Cause='Bat'})
+ local star=false;for _,o in ipairs(W.workspace:GetChildren())do if o.Name=='KeeperHitBurst'and o.ContactStar.Enabled then star=true end end
+ local moved=false;for _=1,6 do frame();if (camera.CFrame.Position-base.Position).Magnitude>1e-6 then moved=true end end
+ check(Burst.IsOwnHit(V.UserId)and sfx.count(C.SlapSoundId)==slaps+1 and star and moved,'review 6: someone else\'s bat hit on the player you just swung at (your claim refused) is shown to you: the slap, the star and the small shake of a player close by')
 end
 frames(40)
 -- 5. nothing per frame: the swing above made only the one-time pieces (the trail + its 2 attachments, the first star and the spark emitter)
@@ -316,6 +324,30 @@ do
  end end end
  local list={};for k in pairs(changed)do list[#list+1]=k end;table.sort(list)
  check(table.concat(list,',')=='LeftShoulder,RightShoulder,RootJoint','R6: the swing writes its RootJoint and both shoulders only ('..table.concat(list,',')..')')
+end
+-- 2c. R158 review (finding 3, the reviewer's repro_lowfps): a slow device. The claim's moment is always inside the strike (Start + HitFrom .. Start +
+-- HitTo, which the server takes +- StrikeSlack), at any frame rate: a frame that starts before the strike or ends after it is swept only over its part
+-- inside. A player standing straight in front, 20 click phases per frame rate.
+do
+ vRoot.CFrame=CF(0,3,7)
+ local lo,hi,claims,swings,bad=math.huge,-math.huge,0,0,{}
+ for _,fps in ipairs({60,30,20,15,12,10})do
+  for phase=1,20 do
+   R.advance(3);frames(2);table.clear(sent)
+   local s0=W.workspace:GetServerTimeNow();bat.Activated:Fire()
+   frame(phase/20/fps) -- (the click lands anywhere inside a frame)
+   for _=1,math.ceil(1.0*fps)do frame(1/fps)end
+   swings+=1;local n=0
+   for _,p in ipairs(sent)do if p.Kind=='Hit'then
+    n+=1;claims+=1;local v=p.ViewTime-s0;lo=math.min(lo,v);hi=math.max(hi,v)
+    if v<C.HitFrom-1e-9 or v>C.HitTo+1e-9 then bad[#bad+1]=string.format('%d fps: %.3f',fps,v)end
+   end end
+   if n~=1 then bad[#bad+1]=string.format('%d fps: %d claims',fps,n)end
+  end
+ end
+ check(#bad==0 and claims==swings,string.format('review 3: at 60, 30, 20, 15, 12 and 10 fps every swing at a player straight in front claims once, its moment inside the strike %.2f-%.2f s (%d claims, seen %.3f-%.3f s%s)',
+  C.HitFrom,C.HitTo,claims,lo,hi,#bad>0 and '; outside: '..table.concat(bad,', ',1,math.min(#bad,8))or''))
+ vRoot.CFrame=CF(300,3,7);frames(30)
 end
 -- 8. no SMACK word on screen --------------------------------------------------------------------------------------------------------------------------
 do

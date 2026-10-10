@@ -146,7 +146,7 @@ function X.Execute(ctx,p,action,a)
   local k=event.Guardian;local state=k:GetAttribute('GuardianBehavior');local awake=k:GetAttribute('VeiledAwakeAt')
   local at=workspace:GetServerTimeNow();k:SetAttribute('VeiledAwakeAt',at-1);k:SetAttribute('KeeperAttackAt',at);k:SetAttribute('GuardianBehavior','ATTACKING')
   task.delay(.85,function()if k.Parent and k:GetAttribute('KeeperAttackAt')==at and (k:GetAttribute('TargetUserId')or 0)==0 then k:SetAttribute('KeeperAttackAt',nil);k:SetAttribute('GuardianBehavior',state);k:SetAttribute('VeiledAwakeAt',awake)end end)
-  return true,'Smack pose preview. No player is hit.'
+  return true,'Hit pose preview. No player is hit.'
  elseif action=='routes'then
   local r=require(RS.RouteBalance83);local lines={'R84 route: '..(r.End-r.Start)..' studs | special keeper '..r.EventSpeed}
   for _,id in ipairs(r.Order)do table.insert(lines,ctx.Config.BiomeNames[id]..': '..r.Lengths[id]..' studs | keeper '..table.concat(r.KeeperSpeeds[id],'/'))end

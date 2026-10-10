@@ -14,9 +14,21 @@ local Art=require(script.Parent.BatArt)
 local Lag=require(script.Parent.BatLagComp)
 local M={};M.__index=M
 function M.new(chase)
- return setmetatable({Chase=chase,Tools={},Characters={},Connections={},Swings={},NextSwing={},NextRequest={},LastStart={},SpawnAt={},Serial=0,
+ return setmetatable({Chase=chase,Tools={},Characters={},Connections={},Swings={},NextSwing={},NextRequest={},LastStart={},StartHeld={},StartEarly={},SpawnAt={},Serial=0,
   History={},LastRecord=-math.huge,Counts={},Check={}},M)
 end
+-- R158 review: the swinger's lag as the SERVER measures it (Player:GetNetworkPing; 0 when it is missing or fails), never under PingFloor, + PingSlack,
+-- at most StartBack. Everything the client says about time is held to it (the swing's start, a claim's travel time, how far back the victim is looked up).
+local function networkPing(player)return player:GetNetworkPing()end
+function M.LagOf(player)
+ local ok,ping=pcall(networkPing,player)
+ if not ok or type(ping)~='number'or ping~=ping or ping<0 then ping=0 end
+ return math.min(C.StartBack,math.max(C.PingFloor,ping)+C.PingSlack)
+end
+-- the walk speed the server gave this player (its humanoid's WalkSpeed on the server, set from the earned speed points; PhysicalWalkSpeed is the same
+-- earned speed before a zone slows it): a client cannot raise either. How far a swinger can get from where the server had it at the request: today's rule.
+local function walkSpeed(player,hum)return math.max(hum and hum.WalkSpeed or 0,tonumber(player:GetAttribute('PhysicalWalkSpeed'))or 0)end
+local function maxDrift(speed)return math.max(18,speed*C.Windup*1.8)end
 function M:_eligible(player,swingOnly)
  local character,hum,root=self.Chase:_validCharacter(player)
  if not character or root.Anchored or hum.PlatformStand or self.Chase.Map.Refreshing
@@ -38,16 +50,20 @@ function M:Request(player,payload)
  local character,_,root=self:_eligible(player,true);local tool=self.Tools[player]
  if not character or not tool or tool.Parent~=character or not tool.Enabled
   or self.Chase.Chests:IsOpening(player)then return false end
- -- R158: the swing starts when the swinger clicked (its own clock, synced to the server's), never earlier than StartBack before it arrived nor in the
- -- future; the cooldown counts between those starts (the swinger's clicks), so network jitter cannot eat a swing it was allowed.
+ -- R158: the swing starts when the swinger clicked (its own clock, synced to the server's), never earlier than its measured lag before it arrived
+ -- (R158 review: it was StartBack, .5 s, for everyone) nor in the future; the cooldown counts between those starts (the swinger's clicks), so network
+ -- jitter cannot eat a swing it was allowed. When the server had to hold a start to that window (this one or the last: a client clock a little off),
+ -- a start may come early by up to CooldownSlack IN ALL (StartEarly keeps the sum, a later start pays it back), so swings still average one per Cooldown.
  local server=workspace:GetServerTimeNow()
- local start=type(payload)=='table'and payload.Start
- if type(start)~='number'or start~=start then start=server end
- start=math.clamp(start,server-C.StartBack,server+C.StartAhead)
- if start<(self.LastStart[player]or-math.huge)+C.Cooldown-1e-3 then return false end
+ local asked=type(payload)=='table'and payload.Start
+ if type(asked)~='number'or asked~=asked then asked=server end
+ local start=math.clamp(asked,server-M.LagOf(player),server+C.StartAhead)
+ local held=math.abs(start-asked)>1e-3
+ local early=(self.LastStart[player]or-math.huge)+C.Cooldown-start;local owed=self.StartEarly[player]or 0
+ if early>1e-3 and not((held or self.StartHeld[player])and owed+early<=C.CooldownSlack)then return false end
  local id=type(payload)=='table'and payload.Id
  if type(id)~='number'or id~=id then id=nil end
- self.NextSwing[player]=now+C.Cooldown;self.LastStart[player]=start;self.Serial+=1
+ self.NextSwing[player]=now+C.Cooldown;self.LastStart[player]=start;self.StartHeld[player]=held;self.StartEarly[player]=math.max(0,owed+early);self.Serial+=1
  local swing={Character=character,Tool=tool,At=start,Start=start,Id=id,Serial=self.Serial,Origin=root.Position,
   Expires=start+C.HitTo+C.StrikeSlack+C.MaxClaimDelay,Resolved=false}
  self.Swings[player]=swing
@@ -83,6 +99,9 @@ function M:Claim(player,payload)
  local c=self.Check
  c.Start=swing.Start;c.Resolved=resolved;c.ViewTime=payload.ViewTime
  c.OwnX,c.OwnY,c.OwnZ,c.LookX,c.LookZ=own.X,own.Y,own.Z,look.X,look.Z
+ -- R158 review: the lag the server measures, where it had the swinger at the request and how far its earned walk speed carries it in a swing
+ local speed=walkSpeed(player,swing.Character:FindFirstChildOfClass('Humanoid'));local origin=swing.Origin
+ c.Lag=M.LagOf(player);c.WalkSpeed=speed;c.MaxDrift=maxDrift(speed);c.OriginX,c.OriginY,c.OriginZ=origin.X,origin.Y,origin.Z
  c.Swinger=self.History[player];c.Victim=self.History[victim];c.SwingerCharacter=swing.Character;c.VictimCharacter=victim.Character
  local ok,why=Lag.Validate(c,workspace:GetServerTimeNow(),blocked)
  c.SwingerCharacter=nil;c.VictimCharacter=nil;c.Swinger=nil;c.Victim=nil
@@ -118,7 +137,7 @@ function M:Step()
   local character,hum,root=self:_eligible(player,true)
   if character~=swing.Character or self.Tools[player]~=swing.Tool or swing.Tool.Parent~=character
    or not swing.Tool.Enabled or not root or server>swing.Expires
-   or server<=swing.Start+C.HitTo+C.StrikeSlack and (root.Position-swing.Origin).Magnitude>math.max(18,hum.WalkSpeed*C.Windup*1.8)then
+   or server<=swing.Start+C.HitTo+C.StrikeSlack and (root.Position-swing.Origin).Magnitude>maxDrift(walkSpeed(player,hum))then
    self.Swings[player]=nil -- (no claim by Expires: a miss)
   end
  end
@@ -133,6 +152,7 @@ function M:Give(player,character)
 end
 function M:CleanupPlayer(player)
  self.Swings[player]=nil;self.NextSwing[player]=nil;self.NextRequest[player]=nil;self.SpawnAt[player]=nil;self.LastStart[player]=nil;self.History[player]=nil
+ self.StartHeld[player]=nil;self.StartEarly[player]=nil
  local tool=self.Tools[player];self.Tools[player]=nil;if tool then tool:Destroy()end
  local links=self.Characters[player];self.Characters[player]=nil
  for _,link in ipairs(links or{})do link:Disconnect()end

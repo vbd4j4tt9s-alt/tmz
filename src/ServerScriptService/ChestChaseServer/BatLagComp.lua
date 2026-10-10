@@ -6,6 +6,8 @@
 --    facing). The claimed spot must lie on the swinger's OWN server path; the victim is looked up at the time the swinger's screen was showing (rewound
 --    by the claim's measured travel time + the client's interpolation delay, capped); in reach (plus a small capped bonus along fast relative motion),
 --    in front, no wall, one claim per swing. Every refusal has a reason (BatService counts them).
+--    R158 review: every time the client sends is bounded by the lag the SERVER measures (BatService: the network ping), the whole look back from now is
+--    capped, a teleport sample is never the swinger's position, and its spot stays within what its earned walk speed covers since the swing's request.
 local RS=game:GetService('ReplicatedStorage')
 local C=require(RS:WaitForChild('BatConfig'))
 local Hitbox=require(RS:WaitForChild('BatHitbox'))
@@ -47,14 +49,13 @@ function L.Sample(h,t)
  end
  local o=idx(h,h.Count-1);return h.X[o],h.Y[o],h.Z[o],h.LX[o],h.LZ[o]
 end
--- flat velocity around t (studs/s), from the samples one history step either side
+-- flat velocity around t (studs/s): over VelocityWindow s centred on t, or the last VelocityWindow s of the history when t is near its newest sample.
+-- (R158 review: it was one 1/30 s step either side; a 20 Hz character stream sampled at 30 Hz repeats positions, which read as standing still.)
 function L.Velocity(h,t)
- local d=1/C.HistoryHz
- local ax,_,az=L.Sample(h,t-d);local bx,_,bz=L.Sample(h,t+d)
- if not ax then return 0,0 end
- local newest=h.T[idx(h,0)];local span=math.min(t+d,newest)-(t-d)
- if span<=1e-6 then span=2*d end
- return (bx-ax)/span,(bz-az)/span
+ if h.Count==0 then return 0,0 end
+ local w=C.VelocityWindow;local b=math.min(t+w*.5,h.T[idx(h,0)])
+ local ax,_,az=L.Sample(h,b-w);local bx,_,bz=L.Sample(h,b)
+ return (bx-ax)/w,(bz-az)/w
 end
 -- distance from p to the segment a-b, and the nearest point
 local function pointSegment(px,py,pz,ax,ay,az,bx,by,bz)
@@ -73,19 +74,30 @@ local function piece(c,blocked,ox,oy,oz,fx,fz,reach,cosHalf,ax,ay,az,at,bx,by,bz
  return at+(bt-at)*u,false
 end
 -- The server's check of one claim. c = {Start (the swing's start, server time), Resolved (a claim was already handled for this swing), ViewTime,
--- OwnX, OwnY, OwnZ, LookX, LookZ, Swinger (the swinger's history), Victim (the victim's history)}; now = the server time it is handled;
--- blocked(c, ax,ay,az, bx,by,bz) -> true when a wall is between (optional). Returns ok, reason, matched victim time, rewind used.
+-- OwnX, OwnY, OwnZ, LookX, LookZ, Swinger (the swinger's history), Victim (the victim's history), and from BatService (R158 review; each optional
+-- here, BatService always sets them): Lag (the swinger's lag as the server measures it, BatConfig PingFloor / PingSlack), OriginX / OriginY /
+-- OriginZ + MaxDrift (where the server had the swinger at the swing's request, and how far its earned walk speed can carry it in a swing),
+-- WalkSpeed (its earned walk speed)}; now = the server time it is handled; blocked(c, ax,ay,az, bx,by,bz) -> true when a wall is between (optional).
+-- Returns ok, reason, matched victim time, how far back from now the victim was looked up.
 function L.Validate(c,now,blocked)
  local view=c.ViewTime
  if type(view)~='number'or view~=view then return false,'bad time'end
  if c.Resolved then return false,'one claim per swing'end
  if view<c.Start+C.HitFrom-C.StrikeSlack or view>c.Start+C.HitTo+C.StrikeSlack then return false,'outside the strike'end
  if view>now+C.FutureSlack then return false,'from the future'end
- if now-view>C.MaxClaimDelay then return false,'too late'end
+ -- (R158 review) the claim's travel time is what the client says (now - its ViewTime): it may not be longer than the measured lag + one slow frame
+ local lag=math.min(C.MaxClaimDelay,c.Lag or C.MaxClaimDelay);local travel=math.max(0,now-view)
+ if travel>math.min(C.MaxClaimDelay,lag+C.FrameSlack)then return false,'too late'end
  local ox,oy,oz,fx,fz=c.OwnX,c.OwnY,c.OwnZ,c.LookX,c.LookZ
  if bad(ox)or bad(oy)or bad(oz)or bad(fx)or bad(fz)then return false,'bad numbers'end
  local fl=math.sqrt(fx*fx+fz*fz);if fl<.5 or fl>1.5 then return false,'bad facing'end;fx/=fl;fz/=fl
- -- 1. the swinger: the claimed spot lies on its own server path (ViewTime - OwnBack .. now, plus OwnAhead s of its newest velocity), facing that way
+ -- (R158 review) the claimed spot is never further from where the server had the swinger at its request than its earned walk speed carries it
+ if c.MaxDrift then
+  local dx,dy,dz=ox-c.OriginX,oy-c.OriginY,oz-c.OriginZ
+  if dx*dx+dy*dy+dz*dz>c.MaxDrift*c.MaxDrift then return false,'too far from the swing\'s start'end
+ end
+ -- 1. the swinger: the claimed spot lies on its own server path (ViewTime - OwnBack .. now, plus OwnAhead s of its newest velocity), facing that way.
+ -- (R158 review) A sample the history marked as a jump (a teleport) is never one of its positions, and starts no path.
  local s=c.Swinger;if not s or s.Count<2 then return false,'no swinger history'end
  local best,bestLook=math.huge,-2;local nx,ny,nz=ox,oy,oz
  local from=view-C.OwnBack-1/C.HistoryHz
@@ -93,15 +105,20 @@ function L.Validate(c,now,blocked)
  for k=s.Count-1,0,-1 do
   local i=idx(s,k)
   if s.T[i]>=from then
-   local x,y,z=s.X[i],s.Y[i],s.Z[i]
-   local d,ax,ay,az
-   if px and not s.J[i]then d,ax,ay,az=pointSegment(ox,oy,oz,px,py,pz,x,y,z)else d,ax,ay,az=pointSegment(ox,oy,oz,x,y,z,x,y,z)end
-   if d<best then best,nx,ny,nz=d,ax,ay,az end
-   px,py,pz=x,y,z;bestLook=math.max(bestLook,s.LX[i]*fx+s.LZ[i]*fz)
+   if s.J[i]then px=nil
+   else
+    local x,y,z=s.X[i],s.Y[i],s.Z[i]
+    local d,ax,ay,az
+    if px then d,ax,ay,az=pointSegment(ox,oy,oz,px,py,pz,x,y,z)else d,ax,ay,az=pointSegment(ox,oy,oz,x,y,z,x,y,z)end
+    if d<best then best,nx,ny,nz=d,ax,ay,az end
+    px,py,pz=x,y,z;bestLook=math.max(bestLook,s.LX[i]*fx+s.LZ[i]*fz)
+   end
   end
  end
- if px then
+ if px then -- (px = the newest sample, unless it was a jump) ahead along its velocity, never faster than its earned walk speed x SpeedSlack
   local vx,vz=L.Velocity(s,s.T[idx(s,0)])
+  local cap=c.WalkSpeed and c.WalkSpeed*C.SpeedSlack;local sp=math.sqrt(vx*vx+vz*vz)
+  if cap and sp>cap then vx,vz=vx*cap/sp,vz*cap/sp end
   local d,ax,ay,az=pointSegment(ox,oy,oz,px,py,pz,px+vx*C.OwnAhead,py,pz+vz*C.OwnAhead)
   if d<best then best,nx,ny,nz=d,ax,ay,az end
  end
@@ -109,11 +126,15 @@ function L.Validate(c,now,blocked)
  if bestLook<math.cos(math.rad(C.LookSlack))then return false,'swinger not facing that way'end
  -- (the claimed spot's few studs of slack may not reach through a wall either)
  if blocked and best>.25 and blocked(c,nx,ny+1.5,nz,ox,oy+1.5,oz)then return false,'through a wall'end
- -- 2. the victim, at the time the swinger's screen was showing: ViewTime - (the claim's travel time + the client's buffer), capped; +- TimeSlack
+ -- 2. the victim, at the time the swinger's screen was showing: ViewTime - (the claim's travel time, at most Lag, + the client's buffer), capped at
+ -- MaxRewind; +- TimeSlack. (R158 review) The whole look back from NOW is capped too: at most MaxRewind + RewindSlack, and at most 2 x Lag + Buffer
+ -- (one way for the claim, one way for what the swinger's screen showed, plus its buffer), so holding a claim or faking a time never reaches further back.
  local v=c.Victim;if not v or v.Count<1 then return false,'no victim history'end
- local back=math.min(C.MaxRewind,math.max(0,now-view)+C.Buffer)
- local t0,t1=view-back-C.TimeSlack,view-back+C.TimeSlack
- local vvx,vvz=L.Velocity(v,view-back);local svx,svz=L.Velocity(s,view)
+ local back=math.min(C.MaxRewind,math.min(travel,lag)+C.Buffer)
+ local at=math.max(view-back,now-math.min(C.MaxRewind+C.RewindSlack,2*lag+C.Buffer))
+ local t0,t1=at-C.TimeSlack,at+C.TimeSlack
+ back=now-at
+ local vvx,vvz=L.Velocity(v,at);local svx,svz=L.Velocity(s,view)
  local rx,rz=vvx-svx,vvz-svz
  local reach=C.Reach+math.min(C.MaxBonus,C.BonusPerSpeed*math.sqrt(rx*rx+rz*rz))
  local cosHalf=math.cos(math.rad(C.HalfAngle+C.AngleSlack))

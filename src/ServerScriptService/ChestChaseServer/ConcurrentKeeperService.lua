@@ -232,7 +232,7 @@ return function(Legacy)
             self:_returnPackToOrigin(run.Chest)
         end
         -- R123: TrackHoleService shows its own 'fell in a hole' toast.
-        if not(hit and hit.Cause=='Hole')then self.Notifications:Show(run.Player,hit and hit.Cause=='Bat'and 'SMACK! PACK DROPPED'or hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3) end
+        if not(hit and(hit.Cause=='Hole'or hit.Cause=='Bat'))then self.Notifications:Show(run.Player,hit and hit.Cause=='Lightning'and 'ZAP! PACK DROPPED'or 'CAUGHT! PACK DROPPED',Color3.fromRGB(255,130,92),3) end -- R158 (owner): a bat hit shows no notice
         -- Drop timers are handled in the shared heartbeat, with no stale delayed reset.
     end
 
@@ -327,7 +327,7 @@ return function(Legacy)
         if not hit then return false end
         self.HitSerial+=1
         self.HitRemote:FireAllClients({Id=self.HitSerial,At=workspace:GetServerTimeNow(),Position=root.Position,
-            VictimUserId=player.UserId,Direction=direction,Cause='Bat'})
+            VictimUserId=player.UserId,AttackerUserId=attacker.UserId,Direction=direction,Cause='Bat'}) -- R158 review: AttackerUserId (only the hitter's own hit is skipped on its screen)
         if run then self:Finish(false,true,run,{Cause='Bat',ImpactApplied=true})end
         return true
     end

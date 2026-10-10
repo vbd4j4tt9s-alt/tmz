@@ -13,7 +13,7 @@ World.clock=clock
 local function now()return clock.T end
 function World.new(variant,opts)
  opts=opts or{}
- local w=setmetatable({Variant=variant,Hits={},Fired={},Down={},Walls={},Players={},LineZ=opts.LineZ or-100,Inside=opts.Inside},World)
+ local w=setmetatable({Variant=variant,Hits={},Fired={},Down={},Walls={},Players={},Ping={},LineZ=opts.LineZ or-100,Inside=opts.Inside},World)
  local suffix=variant=='base'and'_base'or''
  local game=R.new('DataModel')
  local services={}
@@ -86,10 +86,13 @@ function World.new(variant,opts)
  w.Service=Service.new(chase);w.Service:Start()
  return w
 end
--- a player with an R15-ish character (root + humanoid) at (x,3,z) facing (fx,fz); the bat is given and equipped
+-- a player with an R15-ish character (root + humanoid) at (x,3,z) facing (fx,fz); the bat is given and equipped.
+-- (R158 review) Player:GetNetworkPing() answers w.Ping[player] (seconds; 0 when unset; 'fail' makes it error; p.GetNetworkPing=nil removes it)
 function World:player(name,x,z,fx,fz,id)
  local p=R.new('Player');p.Name=name;p.UserId=id or(#self.Players+1)
  p.CharacterAdded=R.signal();p.CharacterRemoving=R.signal()
+ local w=self
+ p.GetNetworkPing=function(q)local v=w.Ping[q];if v=='fail'then error('GetNetworkPing failed')end;return v or 0 end
  local bag=R.new('Backpack');bag.Name='Backpack';bag.Parent=p
  p.Parent=self.PlayersService;table.insert(self.Players,p)
  self:character(p,x,z,fx,fz,true)

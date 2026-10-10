@@ -8,12 +8,18 @@
 --     the victim / NaN / a swing that ran out / a tool put away / a teleport during the strike / a back-dated or future swing start / a wall /
 --     someone who cannot be hit (ForceField, behind the base line, knocked down, just spawned) or a swinger in the hub: all refused, HitByBat never runs;
 --     an honest claim runs HitByBat(swinger, victim, the victim's character) once. Every refusal is counted by reason.
+--  3. R158 review (hitbox.md "Review fixes"): the reviewer's exploits, each of which passed on the code before the fixes: a zero-ping swinger that
+--     back-dates its start and holds its claim (the times are held to the lag the server measures, GetNetworkPing; the whole look back is capped), a
+--     blip after the strike (the spot must stay near the swing's start; a jump sample is never the swinger's position), a stretched extrapolation (never
+--     faster than the walk speed), a 20 Hz stream that repeats samples (velocity over .10 s), and a client clock a little ahead (no swing refused).
 local World=require('./bat_world158')
 local R=World.R;local V3=R.Vector3.new;local clock=World.clock
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
 local w=World.new('now')
 local L,C=w.Lag,w.Config
+-- (R158 review) the review's BatConfig numbers (NaN on a build without them, so its checks fail there instead of erroring)
+local PingFloor,PingSlack,RewindSlack,SpeedSlack=C.PingFloor or 0/0,C.PingSlack or 0/0,C.RewindSlack or 0/0,C.SpeedSlack or 0/0
 -- 1. Validate ------------------------------------------------------------------------------------------------------------------------------------
 local function history(path,t0,t1)
  local h=L.History();local t=t0
@@ -60,7 +66,10 @@ do -- the rewind cap
  expect(claim({Victim=history(v,-1,.60)}),.55,false,'out of reach','a victim in front only .55 s before the frame (rewind is capped at .30)')
  local wv=running(0,12,0,100) -- z = 7 at t = -.05; the claim's own lag is .05 -> rewinds .15 (+-.08): z >= 19 there
  expect(claim({Victim=history(wv,-1,.60)}),.35,false,'out of reach','a short lag cannot rewind further than lag + buffer (+- slack)')
- expect(claim({Victim=history(wv,-1,.60)}),.60,true,'hit','the same claim arriving .30 s late: rewinds .30 (the cap) +- .08: inside')
+ -- (R158 review, on purpose: this case was "the same claim arriving .30 s late: rewinds .30 (the cap) +- .08: inside", i.e. .60 s before now; the whole
+ -- look back from now is capped at MaxRewind + RewindSlack = .40 now, so a 300 ms ping still counts and a .30 s one-way trip no longer does)
+ expect(claim({Victim=history(wv,-1,.60),Lag=.30}),.45,true,'hit','the same claim arriving .15 s late (a measured 300 ms ping): rewinds .25 from the frame, .40 from now, +- .08: inside')
+ expect(claim({Victim=history(wv,-1,.60),Lag=.30}),.60,false,'out of reach','the same claim arriving .30 s late: never looked up more than .40 s before now (+- .08)')
  expect(claim({Victim=history(running(0,32,0,100),-1,.80)}),.79,false,'out of reach','a victim in front only .55 s before the frame: never (cap .30 + slack .08)')
 end
 do -- fast players
@@ -113,7 +122,10 @@ do
 end
 -- 2. BatService:Claim ------------------------------------------------------------------------------------------------------------------------------
 local function frames(n)for _=1,n do clock.T+=1/60;w:step()end end
+-- (R158 review) the swinger's lag as the server measures it (BatService.LagOf; NaN when a build has none, so the checks below fail instead of erroring)
+local function lagOf(world,p)local f=world.Service.LagOf;return type(f)=='function'and f(p)or 0/0 end
 local A=w:player('A',0,0,0,1);local V=w:player('V',0,7,1,0);local X=w:player('X',40,40,0,1)
+w.Ping[A]=.10 -- (R158 review: the swinger's network ping as the server measures it, Player:GetNetworkPing)
 clock.T+=5;frames(40)
 local id=0
 local function swing(p,start)id+=1;local ok=w:request(p or A,start or clock.T,id);return ok,id,start or clock.T end
@@ -192,8 +204,8 @@ do -- the swing ran out / the tool was put away / a teleport during the strike
 end
 do -- the swing's start: back-dated or from the future
  local ok,sid=w:request(A,clock.T-10,id+1);id+=1
- local p=w.Fired[#w.Fired]
- check(ok and math.abs(p.At-(clock.T-C.StartBack))<1e-9,'a start 10 s in the past is held to receipt - '..C.StartBack..' s ('..tostring(p.At-clock.T)..')')
+ local p=w.Fired[#w.Fired];local lag=lagOf(w,A)
+ check(ok and math.abs(lag-(.10+PingSlack))<1e-9 and math.abs(p.At-(clock.T-lag))<1e-9,'a start 10 s in the past is held to receipt - the swinger\'s measured lag (ping .10 + '..PingSlack..' s; R158 review: it was StartBack '..C.StartBack..' s for everyone) ('..tostring(p.At-clock.T)..')')
  frames(18)
  expectClaim(honest(id,clock.T-10),'outside the strike','a claim timed to the faked start')
  rest()
@@ -236,6 +248,116 @@ do
  check(w.Service.Counts.hit==1 and (w.Service.Counts['no such swing']or 0)>=5 and (w.Service.Counts['cannot be hit']or 0)==5 and n>=20,'every claim is counted by its reason (hit 1, no such swing '..tostring(w.Service.Counts['no such swing'])..', total '..n..')')
  check(w.Remote:GetAttribute('Claims_hit')==1 and w.Remote:GetAttribute('Claims_cannot_be_hit')==5 and w.Remote:GetAttribute('Claims_no_such_swing')==w.Service.Counts['no such swing']
   and w.Remote:GetAttribute('Claims_refused_by_SecurityGate')==w.Service.Counts['refused by SecurityGate'],'... and shown live as attributes of the BatSwing remote (Claims_hit, Claims_cannot_be_hit, ...)')
+end
+-- 3. R158 review: the reviewer's repros (review158a: repro_server A / B, repro_ahead, repro_cooldown), now permanent; each one passed its exploit on the
+-- code before the review fixes. A fresh world (its own BatService), the same clock.
+do
+ local r=World.new('now')
+ local function rframes(n,each)for _=1,n do clock.T+=1/60;if each then each()end;r:step()end end
+ local RA=r:player('A',0,0,0,1);local RV=r:player('V',0,7,1,0)
+ clock.T+=5;rframes(60)
+ local rid=0
+ -- 3a. finding 1, "fake lag" (repro_server A): a ZERO-ping swinger back-dates its start by .5 s and holds its claim .48 s; V runs across at 141 studs/s
+ r.Ping[RA]=0
+ do
+  local speed=141;local Tpass=clock.T+0.6
+  local function vAt()return speed*(clock.T-Tpass)end
+  local function place()r:place(RV,vAt(),3,7,1,0)end
+  rframes(math.floor((Tpass+0.31-clock.T)*60),place) -- V passed x = 0 .31 s ago (44 studs away)
+  rid+=1;local R0=clock.T
+  local ok=r:request(RA,R0-0.5,rid);local start=r.Service.Swings[RA]and r.Service.Swings[RA].Start;local lag=lagOf(r,RA)
+  check(ok and start and math.abs(lag-(PingFloor+PingSlack))<1e-9 and math.abs(start-(R0-lag))<1e-9,
+   string.format('review 1: a zero-ping swinger\'s start back-dated .5 s is held to receipt - its measured lag (%.2f s: the floor %.2f + %.2f), not receipt - .5 (start = receipt %+.2f)',lag,PingFloor,PingSlack,(start or R0)-R0))
+  local view=start+0.40
+  rframes(math.floor((view+0.48-clock.T)*60),place)
+  local hits=#r.Hits
+  local okc,why=r:claim(RA,{Id=rid,Victim=RV,ViewTime=view,Own=V3(0,3,0),Look=V3(0,0,1)})
+  check(not okc and why=='too late'and #r.Hits==hits,string.format('review 1: ... and its claim held %.2f s is refused "too late" (%s), V %.0f studs away: HitByBat did not run',clock.T-view,tostring(why),vAt()))
+ end
+ -- the measured lag: the floor for a 0 ping, a missing or failing GetNetworkPing; the ping + slack; never more than StartBack
+ do
+  local floor=PingFloor+PingSlack
+  r.Ping[RA]='fail';local a=lagOf(r,RA)
+  local f=RA.GetNetworkPing;RA.GetNetworkPing=nil;local b=lagOf(r,RA);RA.GetNetworkPing=f
+  r.Ping[RA]=.25;local c1=lagOf(r,RA);r.Ping[RA]=0/0;local d=lagOf(r,RA);r.Ping[RA]=3;local e=lagOf(r,RA)
+  check(math.abs(a-floor)<1e-9 and math.abs(b-floor)<1e-9 and math.abs(d-floor)<1e-9 and math.abs(c1-(.25+PingSlack))<1e-9 and math.abs(e-C.StartBack)<1e-9,
+   string.format('review 1: the lag the server measures: GetNetworkPing failing / missing / NaN -> the floor %.2f; a .25 ping -> %.2f; a 3 s ping -> StartBack %.2f (%.2f %.2f %.2f %.2f %.2f)',floor,.25+PingSlack,C.StartBack,a,b,c1,d,e))
+  r.Ping[RA]=0
+ end
+ -- 3b. finding 1 on Validate: the whole look back from now is capped by the measured lag (2 x lag + Buffer) and by MaxRewind + RewindSlack
+ do
+  local cross=function(t)return 500*t,3,7,1,0 end -- a victim crossing 7 studs in front at 500 studs/s, straight in front at t = 0 (in reach for +-.04 s)
+  expect(claim({Victim=history(cross,-1,.60),Lag=PingFloor+PingSlack}),.49,false,'out of reach','review 1: a zero-ping swinger (lag .10) holding its claim .19 s: never looked up more than 2 x .10 + .10 = .30 s (+- .08) back; a victim in front .49 s ago does not count')
+  expect(claim({Victim=history(cross,-1,.60),Lag=.30}),.49,true,'hit','review 1: the same claim from a swinger whose measured ping is .25 s (lag .30) counts')
+  expect(claim({Lag=PingFloor+PingSlack}),.52,false,'too late','review 1: a zero-ping swinger\'s claim may travel at most its lag + one slow frame (.20 s)')
+  expect(claim({Lag=PingFloor+PingSlack}),.48,true,'hit','... a standing victim claimed .18 s after the frame (a 10 fps frame + the trip) still counts')
+  local _,_,_,back=L.Validate(claim({Victim=history(cross,-1,.80)}),.79)
+  check(back and math.abs(back-(C.MaxRewind+RewindSlack))<1e-9,'review 1: whatever the lag, the victim is looked up at most MaxRewind + RewindSlack = '..(C.MaxRewind+RewindSlack)..' s before now (+- '..C.TimeSlack..') ('..tostring(back)..')')
+ end
+ -- 3c. finding 2, the blip (repro_server B): after the strike the swinger blips 52 studs forward for 50 ms (MovementGuard checks every .1 s) and claims from there
+ clock.T+=4;rframes(60);r:place(RV,0,3,60,1,0);rframes(60)
+ do
+  local hits=#r.Hits
+  rid+=1;local T=clock.T;local ok=r:request(RA,T,rid)
+  rframes(math.floor(0.43*60))                     -- the strike passes, nobody in reach (V is 60 studs in front)
+  r:place(RA,0,3,52,0,1);rframes(3)                -- 50 ms at (0,3,52): one history sample or more
+  r:place(RA,0,3,0,0,1);rframes(3)
+  local h=r.Service.History[RA];local jumps=0;for i=1,h.N do if h.J[i]then jumps+=1 end end
+  local okc,why=r:claim(RA,{Id=rid,Victim=RV,ViewTime=T+0.40,Own=V3(0,3,52),Look=V3(0,0,1)})
+  check(ok and jumps>=2 and not okc and why=='too far from the swing\'s start'and #r.Hits==hits,
+   string.format('review 2: a claim from a 52-stud blip after the strike is refused "too far from the swing\'s start" (walk speed 24: at most 18 studs) (%s, %d jump samples); HitByBat did not run',tostring(why),jumps))
+ end
+ -- ... and a sample the history marked as a jump is never one of the swinger's positions (even with no distance rule)
+ do
+  local blip=function(t)if t>.35 and t<.39 then return 0,3,60,0,1 end;return 0,3,0,0,1 end -- one sample at z = 60 (a 60-stud step in 1/30 s: a jump), then back
+  local s=history(blip,-1,.42);local marks=0;for i=1,s.N do if s.J[i]then marks+=1 end end
+  expect(claim({Swinger=s,OwnZ=60,Victim=history(standing(0,67),-1,.42)}),.42,false,'swinger not where it claims','review 2: the claimed spot is a jump sample of the swinger\'s history ('..marks..' marked): never accepted')
+ end
+ -- 3d. finding 2, the extrapolation (repro_ahead): the newest sample is one 45-stud step (under the jump mark); OwnAhead may not stretch it
+ do
+  local step=function(t)if t>=.39 then return 0,3,45,0,1 end;return 0,3,0,0,1 end
+  local s=history(step,-1,.40)
+  expect(claim({Swinger=s,OwnZ=80,WalkSpeed=24,Victim=history(standing(0,87),-1,.40)}),.42,false,'swinger not where it claims','review 2: a spot 35 studs past the newest sample: the extrapolation is never faster than the walk speed (24 x '..SpeedSlack..')')
+  expect(claim({Swinger=history(running(0,-0.30*575,0,575),-1,.40),Victim=history(standing(3,7),-1,.40),WalkSpeed=575}),.36,true,'hit','... a 575 studs/s swinger (walk speed 575) still passes a standing victim')
+  -- the same exploit on the service (repro_ahead): refused, HitByBat never runs
+  clock.T+=4;r:place(RV,0,3,130,1,0);rframes(60)
+  local hits=#r.Hits
+  rid+=1;local T=clock.T;local ok=r:request(RA,T,rid)
+  rframes(math.floor(0.44*60))
+  local hh=r.Service.History[RA];r:place(RA,0,3,45,0,1)
+  local head=hh.Head;repeat rframes(1)until hh.Head~=head
+  local okc,why=r:claim(RA,{Id=rid,Victim=RV,ViewTime=T+0.40,Own=V3(0,3,123),Look=V3(0,0,1)})
+  check(ok and hh.J[hh.Head]==false and not okc and #r.Hits==hits,'review 2: on the service: a claim from z = 123 after a 45-stud step to z = 45 is refused ('..tostring(why)..'); HitByBat did not run')
+  r:place(RA,0,3,0,0,1);clock.T+=3;rframes(30)
+ end
+ -- 3e. finding 4: a 20 Hz character stream sampled at 30 Hz repeats positions; the velocity is measured over .10 s, not one repeated step
+ do
+  local stair=function(t)return 0,3,500*math.floor(t*20+1e-6)/20,0,1 end -- a 500 studs/s swinger, its server copy moved 20 times a second
+  local s=history(stair,-1,.3334)
+  local n=s.Head;local p=(n-2)%s.N+1
+  check(s.Z[n]==s.Z[p],'review 4: (the history\'s newest sample repeats the one before: '..s.Z[p]..', '..s.Z[n]..')')
+  expect(claim({Swinger=s,ViewTime=.32,OwnZ=160,WalkSpeed=500,Victim=history(standing(0,167),-1,.34)}),.34,true,'hit','review 4: a 500 studs/s swinger 10 studs past its repeated newest sample (its real spot at the frame) counts')
+ end
+ -- 3f. finding 5 (repro_cooldown): the client's clock 60 ms ahead, a 30 ms trip, +-10 ms jitter: every swing the client allowed itself counts
+ do
+  r.Ping[RA]=.06;clock.T+=3;rframes(10)
+  local refused=0
+  for k=1,20 do
+   local click=clock.T;local jitter=(k%2==0)and -0.01 or 0.01
+   clock.T=click+0.03+jitter
+   if not r:request(RA,click+0.06,500+k)then refused+=1 end
+   clock.T=click+1.0
+  end
+  check(refused==0,'review 5: a client clock 60 ms ahead with 30 ms lag and jitter: '..refused..' of 20 swings refused (the client played all 20)')
+  -- a cheater sending far-future starts (always held) every .86 s gains no swings over time: the early starts add up to CooldownSlack at most
+  clock.T+=3
+  local first,last,allowed=nil,nil,0;local t0=clock.T
+  for k=0,23 do
+   clock.T=t0+.86*k
+   if r:request(RA,clock.T+50,700+k)then allowed+=1;local at=r.Fired[#r.Fired].At;first=first or at;last=at end
+  end
+  check(allowed>=2 and last-first>=(allowed-1)*C.Cooldown-C.CooldownSlack-1e-9,string.format('review 5: requests every .86 s with starts held to the window: %d of 24 allowed, %.2f s between the first and the last start (>= %d x %.1f - %.2f)',allowed,last-first,allowed-1,C.Cooldown,C.CooldownSlack))
+ end
 end
 -- the cost: one Validate on full histories (Luau CLI, not the Roblox VM)
 do

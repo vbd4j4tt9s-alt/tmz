@@ -139,28 +139,35 @@ local function claim(other,view,ox,oy,oz,fx,fz,vx,vy,vz,now)
  local p=poses[sweep.Character]
  if p and not p.StopUntil then p.StopAt=now-p.At;p.StopUntil=now+C.HitStop end
 end
--- once per frame of your swing: every other player's path since the last frame (relative to you, as your screen shows it) against the bat's sector
+-- once per frame of your swing: every other player's path since the last frame (relative to you, as your screen shows it) against the bat's sector.
+-- R158 review: only the part of the frame inside the strike (Start + HitFrom .. Start + HitTo) is swept: at a low frame rate one frame can start
+-- before the strike or end after it, and a claim from outside it would be refused (the server takes the strike +- StrikeSlack). Every frame of the
+-- swing notes where the others are, so even the first strike frame of a slow device has a path to sweep.
 local function sweepFrame(now)
  local s=sweep;local character=s.Character
  local root=character and character.Parent and character:FindFirstChild('HumanoidRootPart')
  if not root or s.Tool.Parent~=character or not s.Tool.Enabled or character:GetAttribute('ChestChaseRagdollActive')or now-s.Start>C.HitTo+.25 then
   s.Active=false;return
  end
- if now<s.Start+C.HitFrom-.1 then return end
  local frame=root.CFrame;local p=frame.Position;local look=frame.LookVector
  local ox,oy,oz=p.X,p.Y,p.Z;local fx,fz=Hitbox.Flat(look.X,look.Z)
- local prevT=s.PrevT
- local strike=prevT~=nil and fx~=nil and prevT<s.Start+C.HitTo and now>=s.Start+C.HitFrom and not character:FindFirstChildOfClass('ForceField')
+ local prevT=s.PrevT;local from,to=s.Start+C.HitFrom,s.Start+C.HitTo
+ local strike=prevT~=nil and fx~=nil and prevT<to and now>=from and not character:FindFirstChildOfClass('ForceField')
   and os.clock()-(bornAt[player]or-math.huge)>=C.SpawnGrace and Hitbox.OnTrack(ox,oz,s.LineZ,s.CX,s.Half,s.EndZ)
+ -- the swept part of this frame, as fractions of it: a (from) .. b (to)
+ local a,b=0,1
+ if strike then local span=math.max(1e-6,now-prevT);a=math.max(0,(from-prevT)/span);b=math.min(1,(to-prevT)/span)end
  for _,other in ipairs(others)do
   local oc=other.Character;local r=oc and oc:FindFirstChild('HumanoidRootPart')
   if r then
    local q=r.Position;local rx,ry,rz=q.X-ox,q.Y-oy,q.Z-oz
    if strike and prevAt[other]==prevT and hittable(other,oc)and Hitbox.OnTrack(q.X,q.Z,s.LineZ,s.CX,s.Half,s.EndZ)then
-    local u=Hitbox.ClientFrame(prevX[other],prevY[other],prevZ[other],rx,ry,rz,fx,fz)
+    local px,py,pz=prevX[other],prevY[other],prevZ[other];local dx,dy,dz=rx-px,ry-py,rz-pz
+    local u=Hitbox.ClientFrame(px+dx*a,py+dy*a,pz+dz*a,px+dx*b,py+dy*b,pz+dz*b,fx,fz)
     if u then
+     u=a+(b-a)*u
      local ax,ay,az=s.OX+(ox-s.OX)*u,s.OY+(oy-s.OY)*u,s.OZ+(oz-s.OZ)*u
-     claim(other,prevT+(now-prevT)*u,ax,ay,az,fx,fz,ax+prevX[other]+(rx-prevX[other])*u,ay+prevY[other]+(ry-prevY[other])*u,az+prevZ[other]+(rz-prevZ[other])*u,now)
+     claim(other,prevT+(now-prevT)*u,ax,ay,az,fx,fz,ax+px+dx*u,ay+py+dy*u,az+pz+dz*u,now)
      return
     end
    end

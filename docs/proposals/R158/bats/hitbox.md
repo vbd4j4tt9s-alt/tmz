@@ -1,6 +1,7 @@
 # R158 bats: hit detection today, why fast players are not hit, and the proposed fix
 
-**BUILT (R158, 10 Oct): see `bats.md` section 6 (the built suite: `../tests/run_bats158.sh`, its results: `../tests/results158.txt`). The text below is the plan as approved.**
+**BUILT (R158, 10 Oct): see `bats.md` section 6 (the built suite: `../tests/run_bats158.sh`, its results: `../tests/results158.txt`). The text below is the plan as approved;
+section 7 lists what the code review changed.**
 
 PREVIEW, nothing in `src/` changes until the owner approves. Owner: "improve hitbox consistency especially with fast moving players".
 Checkout: `V150 R157`. Numbers come from the code, from `tests/sim_bat_hits.luau` (offline mock; today's side runs the real
@@ -198,3 +199,71 @@ the new effects), `BatHitbox.lua` (the sector test replaces the box), `BatConfig
 - The mock moves players in straight lines at constant speed; turning players and jumps only add to RC1 / RC2 today.
 - Fairness: at 500+ studs/s a victim can be launched ~0.3 s of its own run after it passed you (it sees itself ~150 studs away). That is the price
   of counting what the swinger saw; the knockback still pushes away from the swinger.
+
+## 7. Review fixes (after the code review of the built bats, 10 Oct)
+
+A review found ways a cheater could stretch the rules, and two cases where honest hits were refused. All are fixed. Each one has a test that
+failed on the code before the fix (`../tests/test_bat_anticheat158.luau` section 3, `test_bat_client158.luau`, `test_hit_effects158.luau`,
+`test_bat_pyramid158_tail.luau`, the sim at 20 Hz) and a "break it on purpose" check in `../tests/run_bats158.sh` (38 now, all caught).
+
+1. **The server looked too far back.** It trusted two times from the swinger's game: when the swing started and when its screen showed the hit.
+   A player with no lag could say "I started 0.5 s ago" and send the claim 0.5 s late; the server then looked for the victim almost 0.9 s in the
+   past (in the test, a victim already 94 studs away was hit).
+   **Now** the server measures the lag itself: `Player:GetNetworkPing()`, never less than 0.05 s, plus 0.05 s (`BatConfig.PingFloor`,
+   `PingSlack`; if the ping cannot be read, the 0.05 s floor is used). The start may be at most that lag before the request arrived. A claim
+   may take at most that lag + one slow frame (0.1 s, `FrameSlack`) to arrive. The victim is never looked up more than 0.40 s before now
+   (`MaxRewind` + `RewindSlack`), nor more than 2 x lag + 0.10 s. A swinger with a ping over about 380 ms has to lead fast runners again
+   (the plan said about 400 ms).
+2. **Blips and stretched spots.** After the strike a cheater could jump 52 studs forward for a moment and claim from there, or make one big step
+   so the server's "a little ahead of your newest spot" stretched 80 studs. **Now** your claimed spot must be within what your walk speed carries
+   you since your swing request (at least 18 studs; the same rule the server already used during the strike), a spot the history marked as a
+   teleport is never one of your positions, and the stretch never goes faster than your walk speed x 1.2 (`SpeedSlack`). The walk speed is the
+   one the server gave you (your Humanoid's speed on the server, or `PhysicalWalkSpeed`), not a number your game sends.
+3. **Slow devices (under about 20 fps).** One frame could start before the strike or end after it, so the claimed moment fell outside the
+   server's window and an honest hit was refused. **Now** your game sweeps only the part of each frame that is inside the strike (0.24 to 0.36 s);
+   the server takes 0.19 to 0.41 s. Tested at 60, 30, 20, 15, 12 and 10 fps.
+4. **Fast swingers when positions arrive 20 times a second.** The server's 30-a-second history then repeats positions, and the speed it
+   measured over one step read as 0 ("swinger not where it claims"). **Now** speed is measured over 0.10 s (`VelocityWindow`) and the stretch
+   ahead is 0.10 s (`OwnAhead`). The sim now runs every box at 30 Hz and at 20 Hz.
+5. **Cooldown with a clock a little off.** With your game's clock 60 ms ahead, the server had to move your start, and the 1.0 s cooldown then
+   refused every other swing you played. **Now** a moved start may come up to 0.15 s early (`CooldownSlack`), but these early bits add up to
+   0.15 s at most, so nobody swings more than once a second over time.
+6. **Your hit and someone else's.** The hit packet now names the hitter (`AttackerUserId`). Your screen skips only your own hits (you already saw
+   them, and you never shake). If your claim was refused and another player hits the same player right after, you now see that hit (and feel
+   the small shake when you are close).
+
+Unchanged on purpose: what you see is what you get (a refused claim has already shown its slap and star; there is no take-back), contact at
+0.30 s, the 0.85 s swing, no shake for the hitter, no "SMACK", the white trail, upper body only, R15 and R6. And (the owner, same day) no "SMACK"
+anywhere: a bat hit that makes someone drop a pack shows no message ("ZAP!" and "CAUGHT!" stay), the pyramid pack says "THE PACK WENT BACK IN THE
+PYRAMID", the owner test text says "hit pose".
+
+**The sim after the fixes** (`../tests/results158.txt`, 1,500 swings per box, victim ping 120 ms): of the hits the swinger saw, the share the
+server counted, before R158 / now.
+
+| how they run (swinger ping 120 ms) | 24 | 141 | 285 | 500 | 575 studs/s |
+|---|---|---|---|---|---|
+| runs across in front, 30 Hz | 77 / 100 | 0 / 100 | 0 / 100 | 0 / 100 | 0 / 100 |
+| runs across in front, 20 Hz | 86 / 100 | 1 / 100 | 0 / 100 | 0 / 100 | 0 / 100 |
+| you run past them, 30 Hz | 84 / 100 | 11 / 100 | 0 / 100 | 0 / 100 | 0 / 100 |
+| you run past them, 20 Hz | 81 / 100 | 14 / 100 | 0 / 100 | 0 / 100 | 0 / 100 |
+| you chase them, 30 Hz / 20 Hz | 61 / 100, 61 / 100 | 0 / 100, 0 / 100 | 0 / 100, 0 / 100 | 0 / 100, 0 / 100 | 0 / 100, 0 / 100 |
+
+Every box at 30 Hz and at 20 Hz, swinger pings 50 / 120 / 250 ms, all five ways of running: 100 % now (the suite requires 90 %). The 30 Hz
+numbers are the same as before the review. Before the fixes, at 20 Hz 32 of the 75 boxes were under 90 % (44 % at worst; a 100-swings-per-box run).
+Still to measure in Studio (section 5): if the real screen delay is 0.05 s instead of the assumed 0.10 s AND positions come only 20 times a
+second, a runner at 500 studs/s counts 77-80 % (93-96 % at 30 Hz). `BatConfig.Buffer` should be set from that measurement.
+
+### Tests changed on purpose (review and "no SMACK")
+- `test_bat_anticheat158.luau`: the prototype case "a claim arriving 0.30 s late rewinds 0.30 s: inside" is now two cases: "arriving 0.15 s late
+  (a measured 300 ms ping): inside" and "arriving 0.30 s late: never looked up more than 0.40 s before now: out of reach" (the new whole-look-back
+  cap). "A start 10 s in the past is held to receipt - 0.5 s" is now "- the measured lag". Section 2's swinger has a 100 ms ping.
+- `run_bats158.sh`: the unchanged-files check uses `tools/tests/r152_real_diff.sh` (the R158 release commit's `Config.Version` and the exact R158
+  lines below are allowed), the registration check accepts the walls suite between bats and the pyramid on line 6 (both checks failed on the
+  branch before the review for those two reasons), `no_rewind_cap` now removes the whole-look-back cap (the old cap on the rewind from the frame
+  alone is always inside it), `own_hit_not_skipped` follows the new line; 13 new mutations; a new static check: no "SMACK" in any string of `src`.
+- `sim_bat_hits158.luau`: runs every box at 30 and 20 Hz; the swinger's `GetNetworkPing` reads its one-way trip (the stricter reading).
+- `bat_world158.luau`: players answer `GetNetworkPing` (`w.Ping`).
+- `tools/tests/r152_real_diff.sh`: also puts back three exact R158 lines before comparing (ConcurrentKeeperService's pack-drop notice without
+  SMACK and the bat packet's `AttackerUserId`, PyramidRules156's `Text.Bat`). `R149/tests/run_tiger_gear.sh` and `R156/tests/run_pyramid156.sh`
+  check ConcurrentKeeperService with it instead of `git diff` (so R152 `run_keepers`, R153 `run_fling_swoosh` / `run_track_walls`, which already
+  use it, accept the same three lines and nothing else).

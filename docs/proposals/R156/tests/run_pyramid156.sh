@@ -77,7 +77,8 @@ grep -q "self.Chase.Pyramid156=self;self.Chests.Pyramid156=self;M.HookChase(self
 grep -q "local ok,err=pcall(self.Pyramid156.RefreshReturns,self.Pyramid156)" "$SS/SecretPyramid156.lua" && grep -q "pcall(chase.Finish,chase,false,false,run)" "$SS/SecretPyramid156.lua" || bad "the biome refresh does not send the secret carries back first (Finish(false,false,run))"
 grep -q "if self:RefreshNear(now)then say(self,player,Rules.Text.RefreshSoon,AMBER);return refuse(self,'refresh')end" "$SS/SecretPyramid156.lua" || bad "Trigger does not refuse near the biome refresh"
 # the chase hooks sit on the chase service object: ConcurrentKeeperService itself (frozen by R149's run_tiger_gear) is not touched
-git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua || bad "ConcurrentKeeperService.lua changed (R149 freezes it: the pyramid hooks the chase service object instead)"
+# (R158, on purpose: apart from the owner's "no SMACK" pack-drop notice and the bat packet's AttackerUserId, exact lines: tools/tests/r152_real_diff.sh)
+sh "$T/r152_real_diff.sh" "$REPO" "$BASE" src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua >/dev/null || bad "ConcurrentKeeperService.lua changed (R149 freezes it: the pyramid hooks the chase service object instead)"
 grep -q "require(modules.SecretPyramid156).new(Config,playerData,chestService,chaseService,notifications,mapService):Start()" "$S/ServerScriptService/ChestChaseServerMain.server.lua" || bad "the server does not start the pyramid"
 grep -q "^X.Actions.pyramid=true" "$SS/OwnerUpdateCommands82.lua" && grep -q "action=='pyramid'then return require(script.Parent.SecretPyramid156).Command" "$SS/OwnerUpdateCommands82.lua" || bad "/test pyramid is not dispatched"
 grep -q "'/test pyramid @username reset'" "$RS/StudioTestHelp.lua" || bad "/test pyramid is not in the F4 help"

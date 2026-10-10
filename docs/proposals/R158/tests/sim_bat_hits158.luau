@@ -6,17 +6,21 @@
 --          HitByBat), on bat_world158.luau.
 --  TODAY = the base commit's BatService + BatHitbox + BatConfig (git), run the same way: the request reaches the server, Step judges the hit once at
 --          request + Windup on the server's copies (the box), and the swinger's screen "hit" is the box at its contact frame.
--- Network model (hitbox.md): each client owns its character and sends it at 30 Hz; the server's copy of a player is its latest packet (sent ping/2
--- earlier); a client draws other players (its ping/2 + the other's ping/2 + Bc) behind the truth; 60 Hz frames, random phases per swing; straight
--- lines at constant speed. COUNTED = of the swings whose bat visibly hit on the swinger's own screen, the share the server counted.
--- Usage: luau sim_bat_hits158.luau -a <swings per cell> [quick]   (prints the tables; exits with an error when a NEW cell counts under 90 %)
+-- Network model (hitbox.md): each client owns its character and sends it at 30 Hz, and (R158 review) again at 20 Hz (the real character stream
+-- can be that slow: the server's 30 Hz history then repeats samples); the server's copy of a player is its latest packet (sent ping/2 earlier); a
+-- client draws other players (its ping/2 + the other's ping/2 + Bc) behind the truth; 60 Hz frames, random phases per swing; straight lines at
+-- constant speed. The swinger's Player:GetNetworkPing() reads its one-way trip (ping/2: the stricter reading of that number for the server's lag
+-- bounds). COUNTED = of the swings whose bat visibly hit on the swinger's own screen, the share the server counted.
+-- Usage: luau sim_bat_hits158.luau -a <swings per cell> [quick]   (prints the tables; exits with an error when a NEW cell counts under 90 % at
+-- either packet rate)
 local World=require('./bat_world158')
 local R=World.R;local V3=R.Vector3.new;local clock=World.clock
 local args={...}
 local N=tonumber(args[1])or 300
 local QUICK=args[2]=='quick'
 math.randomseed(158)
-local HB,CL,PK=1/60,1/60,1/30
+local HB,CL=1/60,1/60
+local PK=1/30 -- (the character packet interval: 1/30, then 1/20 s)
 local new=World.new('now',{LineZ=-1e6});local old=World.new('base',{LineZ=-1e6})
 local Hit=new.Hitbox;local OldHit=old.Hitbox;local C=new.Config;local OC=old.Config
 local nA,nV=new:player('A',0,0,0,1,1),new:player('V',0,7,1,0,2)
@@ -50,6 +54,7 @@ local function swing(sc,c,pingA,pingV,bc)
  local function view(t)return pos(V,t-dView)end
  local speedA=math.sqrt(A.vx*A.vx+A.vz*A.vz)
  nA.Character.Humanoid.WalkSpeed=math.max(24,speedA);oA.Character.Humanoid.WalkSpeed=math.max(24,speedA)
+ new.Ping[nA]=pingA/2 -- (R158 review: what the server measures; the one-way trip, the stricter reading)
  -- TODAY ----------------------------------------------------------------------------------------------------------------------------------------
  local at=nextFrame(c+pingA/2,hb,HB)
  local before=#old.Hits
@@ -118,36 +123,40 @@ local function cell(sc,v,pingA,pingV,bc,n)
 end
 local function fmt(x)return x and string.format('%g%%',x)or'-'end
 local worst,fails=101,0
-print('# R158 bat hits, BUILT: counted (of the hits the swinger SAW, the share the server COUNTED), today / new; victim ping 120 ms; Bc 0.10 s')
-print(string.format('swings per cell: %d',N))
-for _,sc in ipairs(scenarios)do
- print('');print('## '..sc.Name..': '..sc.Text)
- local head={};for _,p in ipairs(pings)do table.insert(head,string.format('swinger ping %d ms: today / new',p*1000))end
- print('| speed (studs/s) | '..table.concat(head,' | ')..' |');print('|---|'..string.rep('---|',#pings))
- for _,v in ipairs(speeds)do
-  local row={tostring(v)}
-  for _,p in ipairs(pings)do
-   local r=cell(sc,v,p,.12,.10,N)
-   table.insert(row,fmt(r.Today)..' / '..fmt(r.New)..string.format(' (%d seen)',r.Seen2))
-   if r.New then worst=math.min(worst,r.New);if r.New<90 then fails+=1;print(string.format('FAIL: %s at %d studs/s, ping %d ms: only %g%% of the seen hits counted',sc.Name,v,p*1000,r.New))end
-   elseif r.Seen2==0 then fails+=1;print('FAIL: no swing hit on the screen at all in '..sc.Name..' '..v)end
-  end
-  print('| '..table.concat(row,' | ')..' |')
- end
-end
-if not QUICK then
- print('');print('## sensitivity (report only): the real client interpolation delay is not the assumed 0.10 s (swinger ping 120 ms), new counted')
- print('| scenario | speed | Bc 0.05 s | Bc 0.15 s |');print('|---|---|---|---|')
- for _,name in ipairs({'crossing','chase','both-head-on'})do
-  local sc;for _,s in ipairs(scenarios)do if s.Name==name then sc=s end end
-  for _,v in ipairs({141,500})do
-   local row={name,tostring(v)}
-   for _,bc in ipairs({.05,.15})do local r=cell(sc,v,.12,.12,bc,math.max(100,math.floor(N/2)));table.insert(row,fmt(r.New))end
+for pass,hz in ipairs({30,20})do
+ PK=1/hz;new.Reasons={}
+ if pass>1 then print('');print('')end
+ print(string.format('# R158 bat hits, BUILT, character packets %d Hz: counted (of the hits the swinger SAW, the share the server COUNTED), today / new; victim ping 120 ms; Bc 0.10 s',hz))
+ print(string.format('swings per cell: %d',N))
+ for _,sc in ipairs(scenarios)do
+  print('');print('## '..sc.Name..': '..sc.Text..string.format(' (%d Hz)',hz))
+  local head={};for _,p in ipairs(pings)do table.insert(head,string.format('swinger ping %d ms: today / new',p*1000))end
+  print('| speed (studs/s) | '..table.concat(head,' | ')..' |');print('|---|'..string.rep('---|',#pings))
+  for _,v in ipairs(speeds)do
+   local row={tostring(v)}
+   for _,p in ipairs(pings)do
+    local r=cell(sc,v,p,.12,.10,N)
+    table.insert(row,fmt(r.Today)..' / '..fmt(r.New)..string.format(' (%d seen)',r.Seen2))
+    if r.New then worst=math.min(worst,r.New);if r.New<90 then fails+=1;print(string.format('FAIL: %s at %d studs/s, ping %d ms, %d Hz: only %g%% of the seen hits counted',sc.Name,v,p*1000,hz,r.New))end
+    elseif r.Seen2==0 then fails+=1;print('FAIL: no swing hit on the screen at all in '..sc.Name..' '..v)end
+   end
    print('| '..table.concat(row,' | ')..' |')
   end
  end
+ if not QUICK then
+  print('');print(string.format('## sensitivity (report only, %d Hz): the real client interpolation delay is not the assumed 0.10 s (swinger ping 120 ms), new counted',hz))
+  print('| scenario | speed | Bc 0.05 s | Bc 0.15 s |');print('|---|---|---|---|')
+  for _,name in ipairs({'crossing','chase','both-head-on'})do
+   local sc;for _,s in ipairs(scenarios)do if s.Name==name then sc=s end end
+   for _,v in ipairs({141,500})do
+    local row={name,tostring(v)}
+    for _,bc in ipairs({.05,.15})do local r=cell(sc,v,.12,.12,bc,math.max(100,math.floor(N/2)));table.insert(row,fmt(r.New))end
+    print('| '..table.concat(row,' | ')..' |')
+   end
+  end
+ end
+ local t={};for k,v in pairs(new.Reasons or{})do table.insert(t,k..' '..v)end;table.sort(t)
+ print('');print(string.format('new, %d Hz: why the server refused a seen hit (all cells): ',hz)..(#t>0 and table.concat(t,', ')or'none'))
 end
-local t={};for k,v in pairs(new.Reasons or{})do table.insert(t,k..' '..v)end;table.sort(t)
-print('');print('new: why the server refused a seen hit (all cells): '..(#t>0 and table.concat(t,', ')or'none'))
-print(string.format('sim: worst new cell %g%% counted (must be >= 90%%), %d failing cells',worst,fails))
+print(string.format('sim: worst new cell %g%% counted at 30 and 20 Hz (must be >= 90%%), %d failing cells',worst,fails))
 if fails>0 then error('hit-rate sim failed')end

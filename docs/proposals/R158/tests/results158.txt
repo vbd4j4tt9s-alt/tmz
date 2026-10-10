@@ -1,7 +1,7 @@
-# R158 bat hits, BUILT: counted (of the hits the swinger SAW, the share the server COUNTED), today / new; victim ping 120 ms; Bc 0.10 s
+# R158 bat hits, BUILT, character packets 30 Hz: counted (of the hits the swinger SAW, the share the server COUNTED), today / new; victim ping 120 ms; Bc 0.10 s
 swings per cell: 1500
 
-## crossing: victim runs across in front of a standing swinger
+## crossing: victim runs across in front of a standing swinger (30 Hz)
 | speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
 |---|---|---|---|
 | 24 | 82.6% / 100% (495 seen) | 76.8% / 100% (500 seen) | 72.2% / 100% (459 seen) |
@@ -10,7 +10,7 @@ swings per cell: 1500
 | 500 | 0% / 100% (158 seen) | 0% / 100% (172 seen) | 0% / 100% (173 seen) |
 | 575 | 0% / 100% (148 seen) | 0% / 100% (164 seen) | 0% / 100% (167 seen) |
 
-## head-on: victim runs straight at a standing swinger (passes 0-6 studs to the side)
+## head-on: victim runs straight at a standing swinger (passes 0-6 studs to the side) (30 Hz)
 | speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
 |---|---|---|---|
 | 24 | 88.3% / 100% (305 seen) | 78.5% / 100% (327 seen) | 62.2% / 100% (330 seen) |
@@ -19,7 +19,7 @@ swings per cell: 1500
 | 500 | 0% / 100% (152 seen) | 0% / 100% (166 seen) | 0% / 100% (142 seen) |
 | 575 | 0% / 100% (153 seen) | 0% / 100% (150 seen) | 0% / 100% (149 seen) |
 
-## drive-by: swinger runs past a standing victim (0-6 studs to the side)
+## drive-by: swinger runs past a standing victim (0-6 studs to the side) (30 Hz)
 | speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
 |---|---|---|---|
 | 24 | 94.2% / 100% (311 seen) | 83.6% / 100% (301 seen) | 75.6% / 100% (314 seen) |
@@ -28,7 +28,7 @@ swings per cell: 1500
 | 500 | 0% / 100% (161 seen) | 0% / 100% (154 seen) | 0% / 100% (172 seen) |
 | 575 | 0% / 100% (163 seen) | 0% / 100% (181 seen) | 0% / 100% (187 seen) |
 
-## both-head-on: both run at each other at that speed
+## both-head-on: both run at each other at that speed (30 Hz)
 | speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
 |---|---|---|---|
 | 24 | 90.4% / 100% (276 seen) | 89.9% / 100% (287 seen) | 92.3% / 100% (273 seen) |
@@ -37,7 +37,7 @@ swings per cell: 1500
 | 500 | 7.7% / 100% (136 seen) | 0% / 100% (144 seen) | 0% / 100% (156 seen) |
 | 575 | 0% / 100% (147 seen) | 0% / 100% (142 seen) | 0% / 100% (169 seen) |
 
-## chase: swinger chases the victim at the same speed (any gap)
+## chase: swinger chases the victim at the same speed (any gap) (30 Hz)
 | speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
 |---|---|---|---|
 | 24 | 73.2% / 100% (627 seen) | 60.9% / 100% (587 seen) | 40.6% / 100% (590 seen) |
@@ -46,7 +46,7 @@ swings per cell: 1500
 | 500 | 0% / 100% (80 seen) | 0% / 100% (94 seen) | 0% / 100% (89 seen) |
 | 575 | 0% / 100% (81 seen) | 0% / 100% (89 seen) | 0% / 100% (71 seen) |
 
-## sensitivity (report only): the real client interpolation delay is not the assumed 0.10 s (swinger ping 120 ms), new counted
+## sensitivity (report only, 30 Hz): the real client interpolation delay is not the assumed 0.10 s (swinger ping 120 ms), new counted
 | scenario | speed | Bc 0.05 s | Bc 0.15 s |
 |---|---|---|---|
 | crossing | 141 | 100% | 100% |
@@ -56,5 +56,66 @@ swings per cell: 1500
 | both-head-on | 141 | 100% | 100% |
 | both-head-on | 500 | 93.3% | 100% |
 
-new: why the server refused a seen hit (all cells): out of reach 12
-sim: worst new cell 100% counted (must be >= 90%), 0 failing cells
+new, 30 Hz: why the server refused a seen hit (all cells): out of reach 12
+
+
+# R158 bat hits, BUILT, character packets 20 Hz: counted (of the hits the swinger SAW, the share the server COUNTED), today / new; victim ping 120 ms; Bc 0.10 s
+swings per cell: 1500
+
+## crossing: victim runs across in front of a standing swinger (20 Hz)
+| speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
+|---|---|---|---|
+| 24 | 83% / 100% (493 seen) | 85.9% / 100% (477 seen) | 70.1% / 100% (501 seen) |
+| 141 | 21.6% / 100% (218 seen) | 1.1% / 100% (244 seen) | 0% / 100% (276 seen) |
+| 285 | 0% / 100% (193 seen) | 0% / 100% (182 seen) | 0% / 100% (191 seen) |
+| 500 | 0% / 100% (178 seen) | 0% / 100% (165 seen) | 0% / 100% (179 seen) |
+| 575 | 0% / 100% (159 seen) | 0% / 100% (164 seen) | 0% / 100% (169 seen) |
+
+## head-on: victim runs straight at a standing swinger (passes 0-6 studs to the side) (20 Hz)
+| speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
+|---|---|---|---|
+| 24 | 82.2% / 100% (319 seen) | 76.1% / 100% (333 seen) | 70.6% / 100% (339 seen) |
+| 141 | 10.8% / 100% (197 seen) | 0% / 100% (190 seen) | 0% / 100% (187 seen) |
+| 285 | 0% / 100% (191 seen) | 0% / 100% (172 seen) | 0% / 100% (164 seen) |
+| 500 | 0% / 100% (172 seen) | 0% / 100% (152 seen) | 0% / 100% (164 seen) |
+| 575 | 0% / 100% (148 seen) | 0% / 100% (159 seen) | 0% / 100% (157 seen) |
+
+## drive-by: swinger runs past a standing victim (0-6 studs to the side) (20 Hz)
+| speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
+|---|---|---|---|
+| 24 | 88.8% / 100% (305 seen) | 81.4% / 100% (324 seen) | 74.6% / 100% (340 seen) |
+| 141 | 41.2% / 100% (174 seen) | 13.8% / 100% (210 seen) | 0% / 100% (193 seen) |
+| 285 | 16.3% / 100% (152 seen) | 0% / 100% (150 seen) | 0% / 100% (198 seen) |
+| 500 | 0% / 100% (148 seen) | 0% / 100% (168 seen) | 0% / 100% (174 seen) |
+| 575 | 0% / 100% (166 seen) | 0% / 100% (174 seen) | 0% / 100% (146 seen) |
+
+## both-head-on: both run at each other at that speed (20 Hz)
+| speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
+|---|---|---|---|
+| 24 | 93.3% / 100% (274 seen) | 93.7% / 100% (258 seen) | 95.1% / 100% (299 seen) |
+| 141 | 60% / 100% (158 seen) | 68.9% / 100% (167 seen) | 56.1% / 100% (158 seen) |
+| 285 | 31.3% / 100% (166 seen) | 52% / 100% (144 seen) | 31.8% / 100% (132 seen) |
+| 500 | 42.9% / 100% (150 seen) | 16.7% / 100% (130 seen) | 23.1% / 100% (157 seen) |
+| 575 | 45.5% / 100% (144 seen) | 0% / 100% (138 seen) | 21.4% / 100% (161 seen) |
+
+## chase: swinger chases the victim at the same speed (any gap) (20 Hz)
+| speed (studs/s) | swinger ping 50 ms: today / new | swinger ping 120 ms: today / new | swinger ping 250 ms: today / new |
+|---|---|---|---|
+| 24 | 72.1% / 100% (569 seen) | 60.7% / 100% (591 seen) | 41.4% / 100% (597 seen) |
+| 141 | 0% / 100% (250 seen) | 0% / 100% (242 seen) | 0% / 100% (267 seen) |
+| 285 | 0% / 100% (147 seen) | 0% / 100% (158 seen) | 0% / 100% (143 seen) |
+| 500 | 0% / 100% (81 seen) | 0% / 100% (85 seen) | 0% / 100% (81 seen) |
+| 575 | 0% / 100% (81 seen) | 0% / 100% (74 seen) | 0% / 100% (74 seen) |
+
+## sensitivity (report only, 20 Hz): the real client interpolation delay is not the assumed 0.10 s (swinger ping 120 ms), new counted
+| scenario | speed | Bc 0.05 s | Bc 0.15 s |
+|---|---|---|---|
+| crossing | 141 | 98.3% | 100% |
+| crossing | 500 | 79.6% | 100% |
+| chase | 141 | 93.7% | 100% |
+| chase | 500 | 78.9% | 100% |
+| both-head-on | 141 | 100% | 100% |
+| both-head-on | 500 | 76.9% | 100% |
+
+new, 20 Hz: why the server refused a seen hit (all cells): out of reach 58
+sim: worst new cell 100% counted at 30 and 20 Hz (must be >= 90%), 0 failing cells

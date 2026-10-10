@@ -4,22 +4,31 @@
 # Roblox mock (/opt/luau/luau) with the REAL code of this checkout. "Today" = the base commit BATS_BASE (default e9c0900, V150 R157b + notes), read with git.
 #  0. static        the changed scripts compile at -O0 and are in src/MANIFEST.tsv, the client scripts' line 1 is the R152 load guard, no model names; what a
 #                   hit does is untouched (ConcurrentKeeperService's HitByBat, the ragdoll, knockback, MovementGuard, the pyramid, the chase, Config, the
-#                   Hotbar and SeedPackClient are byte-identical to today); the hit time (Windup .30) and the cooldown (1.0) as before; SecurityGate BatHit
-#                   2/s burst 3; no "SMACK" and no camera write in the new client code; nothing made per frame in the per-frame functions; registered in
-#                   tools/tests/run_all_suites.sh
+#                   Hotbar and SeedPackClient are identical to today apart from Config.Version and R158's exact lines: tools/tests/r152_real_diff.sh); the hit
+#                   time (Windup .30) and the cooldown (1.0) as before; SecurityGate BatHit 2/s burst 3; no "SMACK" and no camera write in the new client
+#                   code, and (the owner) no "SMACK" in any string of src players can see (comments and the keepersmack command name only); nothing made
+#                   per frame in the per-frame functions; registered in tools/tests/run_all_suites.sh (before the pyramid suite)
 #  1. test_bat_anticheat158.luau  BatHitbox (the sector, paths not points), BatLagComp.Validate (the prototype's 32 cases + teleports + the slack
 #                   through a wall + the bonus cap), BatService:Claim (no swing, wrong swing, one claim per swing, claim spam, bad victims, NaN, expired,
-#                   tool put away, a teleport mid-strike, faked starts, the cooldown, walls, who cannot be hit), the refusal counters, the cost
+#                   tool put away, a teleport mid-strike, faked starts, the cooldown, walls, who cannot be hit), the refusal counters, the cost; (R158 review)
+#                   the reviewer's exploits: a zero-ping "fake lag" (back-dated start + held claim), a blip after the strike, a jump sample, a stretched
+#                   extrapolation, a 20 Hz stream that repeats samples, a client clock a little ahead (and a cheater's held starts gain nothing over time)
 #  2. sim_bat_hits158.luau  the hit-rate mock on the REAL code, honest swings at 24 / 141 / 285 / 500 / 575 studs/s and swinger pings 50 / 120 / 250 ms
-#                   in 5 scenarios: every NEW cell must count >= 90 % of the hits the swinger saw; today's code (git) for comparison
+#                   in 5 scenarios, with character packets at 30 Hz and (R158 review) at 20 Hz: every NEW cell must count >= 90 % of the hits the swinger
+#                   saw at both rates; today's code (git) for comparison
 #  3. test_bat_pose158.luau  the swing: contact at .30 = Windup, .85 s, the keys, = the approved preview, upper body only, R6 60 % twist / no lean, smooth
 #  4. test_bat_client158.luau + test_hit_effects158.luau  the click (no wait), the sweep and the claim, your hit at once (slap, pooled star, sparks,
 #                   hit-stop), NO hitter shake (the victim / bystanders keep theirs), the white trail on the strike only, Fast Mode, nothing made per frame,
-#                   upper body only R15 / R6, the carrier (right arm only, order of the two scripts does not matter), no SMACK word; the star pool, sparks
-#  5. test_bat_pyramid158  R156's pyramid server world (its own set-up), then a REAL bat claim on the secret-pack carrier: back in the pyramid ('Bat')
+#                   upper body only R15 / R6, the carrier (right arm only, order of the two scripts does not matter), no SMACK word; the star pool, sparks;
+#                   (R158 review) a slow device's claims stay inside the strike (60 to 10 fps), someone else's hit on the player you swung at is shown
+#  5. test_bat_pyramid158  R156's pyramid server world (its own set-up), then a REAL bat claim on the secret-pack carrier: back in the pyramid ('Bat');
+#                   the real KeeperHit packet names the hitter; the real pack drop shows no notice for a bat hit (ZAP / CAUGHT as before)
 #  6. mutations     broken copies (no rewind cap, no path check, no once-per-swing, no wall ray, no BatHit limit, an uncapped bonus, teleports swept,
 #                   points not paths, no history, no HitByBat, the swing waits for the server, a hitter shake, the own hit not skipped, a SMACK word, no
-#                   star pool, a coloured trail, the carry pose takes the bat's arm, contact moved, a leg in the swing, no hit-stop): each must fail a test
+#                   star pool, a coloured trail, the carry pose takes the bat's arm, contact moved, a leg in the swing, no hit-stop; R158 review: the start
+#                   or the claim's travel not held to the measured lag, no drift rule, a jump sample as a position, an unclamped extrapolation, a one-step
+#                   velocity, no cooldown slack or an unpaid one, the whole frame swept, own hits by victim only, no hitter in the packet, the SMACK notice
+#                   back): each must fail a test
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};N=${2:-400};mkdir -p "$OUT"
@@ -27,7 +36,8 @@ BASE=${BATS_BASE:-e9c0900}
 T=$REPO/tools/tests;P=$REPO/docs/proposals;S=$REPO/src;SS=$S/ServerScriptService/ChestChaseServer;SP=$S/StarterPlayer/StarterPlayerScripts;RSD=$S/ReplicatedStorage
 RC=0;fail(){ echo "FAIL: $1";RC=1; }
 echo "== 0. static"
-for f in "$RSD/BatConfig.lua" "$RSD/BatHitbox.lua" "$RSD/BatSwingPose.lua" "$RSD/HitBurstFx.lua" "$RSD/SeedCarryPose.lua" "$SS/BatLagComp.lua" "$SS/BatService.lua" "$SS/SecurityGate.lua" "$SP/BatClient.client.lua" "$SP/KeeperHitEffects.client.lua";do
+for f in "$RSD/BatConfig.lua" "$RSD/BatHitbox.lua" "$RSD/BatSwingPose.lua" "$RSD/HitBurstFx.lua" "$RSD/SeedCarryPose.lua" "$SS/BatLagComp.lua" "$SS/BatService.lua" "$SS/SecurityGate.lua" "$SP/BatClient.client.lua" "$SP/KeeperHitEffects.client.lua" \
+ "$SS/ConcurrentKeeperService.lua" "$RSD/PyramidRules156.lua" "$RSD/StudioTestHelp.lua" "$SS/OwnerUpdateCommands82.lua";do
  /opt/luau/luau-compile -O0 --binary "$f" >/dev/null 2>&1 || fail "$f does not compile at -O0"
 done
 echo "ok: the changed scripts compile at -O0"
@@ -40,12 +50,52 @@ echo "ok: BatClient and KeeperHitEffects start with the R152 load guard (line 1,
 if grep -rniE "cla[u]de|op[u]s|sonn[e]t|haik[u]|gp[t]-?[0-9]" "$RSD/BatConfig.lua" "$RSD/BatHitbox.lua" "$RSD/BatSwingPose.lua" "$RSD/HitBurstFx.lua" "$SS/BatLagComp.lua" "$SS/BatService.lua" "$SP/BatClient.client.lua" "$HERE"/*bat* "$HERE"/*hit* "$P/R158/bats"/*.md >/dev/null 2>&1;then fail "a model name in the R158 bat files";else echo "ok: no model names in the bat files";fi
 if git -C "$REPO" cat-file -e "$BASE^{commit}" 2>/dev/null;then
  FROZEN="src/ServerScriptService/ChestChaseServer/ConcurrentKeeperService.lua src/ServerScriptService/ChestChaseServer/RagdollService.lua src/ReplicatedStorage/KnockbackConfig.lua src/ServerScriptService/ChestChaseServer/MovementGuard.lua src/ServerScriptService/ChestChaseServer/SecretPyramid156.lua src/ReplicatedStorage/PyramidRules156.lua src/ServerScriptService/ChestChaseServer/ChaseService.lua src/ServerScriptService/ChestChaseServer/Config.lua src/ServerScriptService/ChestChaseServer/BatArt.lua src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua src/StarterPlayer/StarterPlayerScripts/SeedPackClient.client.lua src/StarterPlayer/StarterPlayerScripts/RagdollClient.client.lua src/StarterPlayer/StarterPlayerScripts/FlingSwoosh153.client.lua src/ReplicatedStorage/LocalSfx.lua"
- if git -C "$REPO" diff --quiet "$BASE" -- $FROZEN;then echo "ok: what a hit does is untouched: HitByBat (ConcurrentKeeperService), the ragdoll, knockback, MovementGuard, the pyramid, the chase, Config, BatArt, the Hotbar, SeedPackClient, the ragdoll / fling clients, LocalSfx are byte-identical to $BASE"
- else fail "a file that must not change changed against $BASE:";git -C "$REPO" diff --stat "$BASE" -- $FROZEN;fi
+ # (R158 release + review, on purpose: Config.Version, the owner's "no SMACK" pack-drop notice and pyramid text, and the bat packet's AttackerUserId are the only
+ # differences allowed, each an exact line: tools/tests/r152_real_diff.sh)
+ if sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN >/dev/null;then echo "ok: what a hit does is untouched: HitByBat (ConcurrentKeeperService), the ragdoll, knockback, MovementGuard, the pyramid, the chase, Config, BatArt, the Hotbar, SeedPackClient, the ragdoll / fling clients, LocalSfx are identical to $BASE (apart from Config.Version, no SMACK, the hitter in the bat packet)"
+ else fail "a file that must not change changed against $BASE:";sh "$T/r152_real_diff.sh" "$REPO" "$BASE" $FROZEN || true;fi
 else echo "skip: $BASE is not in this checkout (the unchanged-files check and today's side of the sim need it)";fi
 grep -q "Windup=.30,Recovery=.55,Cooldown=1.0," "$RSD/BatConfig.lua" && echo "ok: the hit time (Windup .30) and the cooldown (1.0 s) as before; the swing is .85 s" || fail "BatConfig Windup / Cooldown changed"
 grep -q "BatHit={Rate=2,Burst=3}" "$SS/SecurityGate.lua" && echo "ok: SecurityGate BatHit = 2 a second, 3 at once" || fail "no SecurityGate BatHit policy"
-if grep -niE "smack" "$SP/BatClient.client.lua" "$RSD/HitBurstFx.lua" "$SS/BatService.lua" "$SS/BatLagComp.lua" "$RSD/BatHitbox.lua" | grep -vE '^[^:]+:[0-9]+: *--';then fail "a SMACK word in the new bat code";else echo "ok: no SMACK word in the new bat code (the server's notices are unchanged)";fi
+if grep -niE "smack" "$SP/BatClient.client.lua" "$RSD/HitBurstFx.lua" "$SS/BatService.lua" "$SS/BatLagComp.lua" "$RSD/BatHitbox.lua" | grep -vE '^[^:]+:[0-9]+: *--';then fail "a SMACK word in the new bat code";else echo "ok: no SMACK word in the new bat code";fi
+# R158 (the owner: "SMACK" must be gone everywhere players see it): no string in src says it; only comments and the keepersmack command's name may
+python3 - "$S" <<'EOF' || fail "a SMACK word in a string players can see"
+import os, re, sys
+LONG = re.compile(r'\[(=*)\[')
+def code(src):  # the source without its comments (-- line, --[[ block ]]); strings kept (also [[ long ]] ones)
+    out, i, n = [], 0, len(src)
+    while i < n:
+        if src.startswith('--', i):
+            m = LONG.match(src, i + 2)
+            if m:
+                end = src.find(']' + m.group(1) + ']', m.end()); i = n if end < 0 else end + len(m.group(1)) + 2
+            else:
+                j = src.find('\n', i); i = n if j < 0 else j
+            continue
+        m = LONG.match(src, i)
+        if m:
+            end = src.find(']' + m.group(1) + ']', m.end()); end = n if end < 0 else end + len(m.group(1)) + 2
+            out.append(src[i:end]); i = end; continue
+        c = src[i]
+        if c in '\'"':
+            j = i + 1
+            while j < n and src[j] != c and src[j] != '\n': j += 2 if src[j] == '\\' else 1
+            out.append(src[i:j + 1]); i = j + 1; continue
+        out.append(c); i += 1
+    return ''.join(out)
+bad, seen = [], 0
+for root, _, files in os.walk(sys.argv[1]):
+    for f in sorted(files):
+        if not f.endswith('.lua'): continue
+        path = os.path.join(root, f); src = open(path, encoding='utf-8', errors='replace').read()
+        if 'smack' not in src.lower(): continue
+        seen += 1
+        for line in code(src).split('\n'):
+            if 'smack' in re.sub('keepersmack', '', line, flags=re.I).lower(): bad.append(os.path.relpath(path, sys.argv[1]) + ': ' + line.strip()[:140])
+for b in bad: print('SMACK players can see:', b)
+print('ok: no SMACK in any string of src (%d files mention it: in comments or the keepersmack command name only)' % seen if not bad else 'FAIL')
+sys.exit(1 if bad else 0)
+EOF
 if grep -nE "CurrentCamera\.CFrame *=|camera\.CFrame *=|Camera\.CFrame *\*=" "$SP/BatClient.client.lua" "$RSD/HitBurstFx.lua";then fail "the new bat code writes the camera (the hitter must not shake)";else echo "ok: BatClient / HitBurstFx never write the camera (no hitter shake)";fi
 python3 - "$SP/BatClient.client.lua" "$RSD/HitBurstFx.lua" "$SS/BatService.lua" "$SS/BatLagComp.lua" "$RSD/BatHitbox.lua" <<'EOF' || fail "something is made per frame"
 import re, sys
@@ -69,7 +119,8 @@ for path, heads in want.items():
 print('ok: nothing is made per frame in %d per-frame functions (no table, no closure, no instance)' % sum(len(v) for v in want.values()) if not bad else 'FAIL')
 sys.exit(1 if bad else 0)
 EOF
-sed -n 6p "$T/run_all_suites.sh" | grep -q "docs/proposals/R158/tests/run_bats158.sh docs/proposals/R156/tests/run_pyramid156.sh" && echo "ok: registered in tools/tests/run_all_suites.sh (before the pyramid suite)" || fail "not registered on line 6 of run_all_suites.sh"
+# (R158 review: the walls suite now sits between the two on that line, so the check is "bats somewhere before the pyramid", not "right before")
+sed -n 6p "$T/run_all_suites.sh" | grep -q " docs/proposals/R158/tests/run_bats158.sh .* docs/proposals/R156/tests/run_pyramid156.sh; do" && echo "ok: registered in tools/tests/run_all_suites.sh (before the pyramid suite)" || fail "not registered on line 6 of run_all_suites.sh (before the pyramid suite)"
 # -- the worlds ----------------------------------------------------------------------------------------------------------------------------------------------
 basefiles(){ # $1 dir: today's bat files from git
  git -C "$REPO" show "$BASE:src/ReplicatedStorage/BatConfig.lua" > "$1/BatConfig_base.lua"
@@ -137,7 +188,9 @@ mutate(){ # $1 name, $2 source file, $3 sed expression, $4 kind (srv / sim / pos
  else echo "killed $1: $(grep -c '^FAIL' "$d/$t.log") failing checks, e.g. $(grep -m1 '^FAIL' "$d/$t.log" | cut -c1-110)";fi
  rm -rf "$d"
 }
-mutate no_rewind_cap "$SS/BatLagComp.lua" "s/local back=math.min(C.MaxRewind,/local back=math.min(1e9,/" srv BatLagComp
+# (R158 review: the rewind cap is now the cap on the whole look back from now, MaxRewind + RewindSlack and 2 x lag + Buffer; the old cap on the rewind from
+# the frame alone is always inside it, so this mutation takes the whole-look-back cap away)
+mutate no_rewind_cap "$SS/BatLagComp.lua" "s/local at=math.max(view-back,now-math.min(C.MaxRewind+C.RewindSlack,2\*lag+C.Buffer))/local at=view-back/" srv BatLagComp
 mutate no_path_check "$SS/BatLagComp.lua" "s/if best>C.OwnSlack then return false,'swinger not where it claims'end//" srv BatLagComp
 mutate no_once_per_swing "$SS/BatService.lua" "s/local resolved=swing.Resolved;swing.Resolved=true/local resolved=false/" srv BatService
 mutate no_wall_ray "$SS/BatService.lua" "s/ return workspace:Raycast(Vector3.new(ax,ay,az),Vector3.new(bx-ax,by-ay,bz-az),params)~=nil/ return false/" srv BatService
@@ -151,7 +204,7 @@ mutate today_buffer "$RSD/BatConfig.lua" "s/Buffer=.10,MaxRewind=.30/Buffer=0,Ma
 mutate no_hitbybat "$SS/BatService.lua" "s/if not self.Chase:HitByBat(player,victim,character)then/if true then/" pyr BatService
 mutate waits_for_server "$SP/BatClient.client.lua" "s/^ begin(character,tool,handle,start)$//" cli BatClient
 mutate hitter_shake "$SP/BatClient.client.lua" "s/^ Sfx.Play(C.SlapSoundId,at,C.SlapVolume,1,2);/ workspace.CurrentCamera.CFrame=workspace.CurrentCamera.CFrame*CFrame.new(0,.3,0);Sfx.Play(C.SlapSoundId,at,C.SlapVolume,1,2);/" cli BatClient
-mutate own_hit_not_skipped "$SP/KeeperHitEffects.client.lua" "s/ if batHit and Burst.IsOwnHit(hit.VictimUserId)then return end.*//" cli KeeperHitEffects
+mutate own_hit_not_skipped "$SP/KeeperHitEffects.client.lua" "s/ if batHit and Burst.IsOwnPacket(hit,player.UserId)then return end.*//" cli KeeperHitEffects
 mutate smack_word "$SP/BatClient.client.lua" "s/^ Burst.NoteOwnHit(other.UserId)$/ Burst.NoteOwnHit(other.UserId);local g=Instance.new('TextLabel');g.Text='SMACK!';g.Parent=workspace/" cli BatClient
 mutate no_hit_stop "$SP/BatClient.client.lua" "s/^ if p and not p.StopUntil then p.StopAt=now-p.At;p.StopUntil=now+C.HitStop end$//" cli BatClient
 mutate trail_colour "$RSD/BatConfig.lua" "s/TrailRGB={255,255,255}/TrailRGB={255,120,40}/" cli BatConfig
@@ -162,5 +215,19 @@ mutate no_star_pool "$RSD/HitBurstFx.lua" "s/if not pick and #stars<Fx.PoolSize 
 mutate sparks_in_fast_mode "$RSD/HitBurstFx.lua" "s/if typeof(position)~='Vector3'or Fx.Low()then return false end/if typeof(position)~='Vector3'then return false end/" fx HitBurstFx
 mutate contact_moved "$RSD/BatSwingPose.lua" "s/P.Keys={A=.07,A2=.22,B=.26,C=.30,/P.Keys={A=.07,A2=.22,B=.26,C=.32,/" pose BatSwingPose
 mutate leg_in_swing "$RSD/BatSwingPose.lua" "s/^ LeftElbow={a(20,0,0)/ RightHip={a(20,0,0)/" pose BatSwingPose
+# R158 review: the new guards (hitbox.md "Review fixes")
+mutate start_not_lag_bound "$SS/BatService.lua" "s/local start=math.clamp(asked,server-M.LagOf(player),server+C.StartAhead)/local start=math.clamp(asked,server-C.StartBack,server+C.StartAhead)/" srv BatService
+mutate travel_not_lag_bound "$SS/BatLagComp.lua" "s/if travel>math.min(C.MaxClaimDelay,lag+C.FrameSlack)then/if travel>C.MaxClaimDelay then/" srv BatLagComp
+mutate no_drift_rule "$SS/BatLagComp.lua" "s/ if c.MaxDrift then/ if false then/" srv BatLagComp
+mutate jump_as_position "$SS/BatLagComp.lua" "s/   if s.J\[i\]then px=nil/   if false then px=nil/" srv BatLagComp
+mutate unclamped_ahead "$SS/BatLagComp.lua" "s/if cap and sp>cap then/if false then/" srv BatLagComp
+mutate one_step_velocity "$RSD/BatConfig.lua" "s/VelocityWindow=.10,/VelocityWindow=.0334,/" srv BatConfig
+mutate no_cooldown_slack "$SS/BatService.lua" "s/if early>1e-3 and not((held or self.StartHeld\[player\])and owed+early<=C.CooldownSlack)then return false end/if early>1e-3 then return false end/" srv BatService
+mutate unpaid_cooldown_slack "$SS/BatService.lua" "s/and owed+early<=C.CooldownSlack)/and early<=C.CooldownSlack)/" srv BatService
+mutate whole_frame_swept "$SP/BatClient.client.lua" "s/a=math.max(0,(from-prevT)\/span);b=math.min(1,(to-prevT)\/span)end/a=0;b=1 end/" cli BatClient
+mutate own_hit_by_victim "$RSD/HitBurstFx.lua" "s/if type(by)=='number'then return by==userId end/if false then return by==userId end/" fx HitBurstFx
+mutate no_hitter_in_packet "$SS/ConcurrentKeeperService.lua" "s/AttackerUserId=attacker.UserId,//" pyr ConcurrentKeeperService
+mutate smack_notice_back "$SS/ConcurrentKeeperService.lua" "s/if not(hit and(hit.Cause=='Hole'or hit.Cause=='Bat'))then self.Notifications:Show(run.Player,hit and hit.Cause=='Lightning'/if not(hit and hit.Cause=='Hole')then self.Notifications:Show(run.Player,hit and hit.Cause=='Bat'and 'SMACK! PACK DROPPED'or hit and hit.Cause=='Lightning'/" pyr ConcurrentKeeperService
+mutate smack_pyramid_text "$RSD/PyramidRules156.lua" "s/ Bat='THE PACK WENT BACK IN THE PYRAMID',/ Bat='SMACK! THE PACK WENT BACK IN THE PYRAMID',/" pyr PyramidRules156
 [ $RC = 0 ] && echo "R158 bats: all passed" || echo "R158 bats: FAILED"
 exit $RC

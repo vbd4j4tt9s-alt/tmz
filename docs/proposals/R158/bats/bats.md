@@ -87,14 +87,19 @@ Of the hits you **see** on your screen, how many count. Other player's ping 120 
 
 The same with your ping at 50 ms and at 250 ms: now 100 of 100 in every box (before, from 141 speed up: 0 in most boxes, 55 at most).
 If the real screen delay is 0.05 or 0.15 seconds instead of the 0.10 we assume: 93 to 100 of 100.
+After the code review the test also sends positions 20 times a second (some devices do): 100 of 100 in every box too (77 to 100 if the
+screen delay is 0.05 seconds: measure it in Studio, item 5 below).
 
 ### How the server checks a hit (for builders; numbers in `BatConfig.lua`)
 - One claim per swing; at most 2 claims a second (3 at once). The claim's moment must be inside the sweep (0.19 to 0.41 s after the
-  click) and reach the server within 0.5 s. The click time itself is taken only within 0.5 s before the request arrived.
-- Your claimed spot must be within 4 studs of your own path on the server, your facing within 45 degrees of one the server saw.
-- The other player is looked up where they were when your screen showed them: back by your measured delay + 0.10 s, never more than
-  0.30 s (and 0.08 s either side). Reach 14 studs + a little for fast players (at most +6), 90 degrees to each side, 5 studs up or down,
+  click) and reach the server within your lag + 0.1 s (never more than 0.5 s). Your lag is what the SERVER measures (your ping, at least
+  0.05 s, + 0.05 s), not a number your game sends. The click time itself is taken only within that lag before the request arrived.
+- Your claimed spot must be within 4 studs of your own path on the server, your facing within 45 degrees of one the server saw, and no
+  further from where you were at the click than your walk speed takes you (at least 18 studs). A teleport is never one of your spots.
+- The other player is looked up where they were when your screen showed them: back by your measured delay + 0.10 s, and never more than
+  0.40 s before now (and 0.08 s either side). Reach 14 studs + a little for fast players (at most +6), 90 degrees to each side, 5 studs up or down,
   or within 4 studs all round. No wall in between. A teleport is never treated as a run.
+- (After the code review, 10 Oct: `hitbox.md` section 7 in simple words.)
 - Then the old rules: both of you on the track past the base line, no shield (ForceField), not just spawned, not already knocked down.
 - The server counts every answer by its reason. You can see the counts in Studio on `ReplicatedStorage > ChestChaseRemotes > BatSwing`
   (attributes `Claims_hit`, `Claims_out_of_reach`, ...). If one reason grows a lot for honest hits, that number needs a look.
@@ -102,8 +107,8 @@ If the real screen delay is 0.05 or 0.15 seconds instead of the 0.10 we assume: 
 ### Small differences from the plan (builders)
 - A claim names its swing by the client's own swing number (`Id`, sent with the request), not the server's `Serial` (the claim can leave
   before the server's echo arrives).
-- A click time from too far back / ahead is held to the window (0.5 s back, 0.02 s ahead), not refused. The 1.0 s cooldown counts between
-  click times; a request may arrive up to 0.15 s "early" (network jitter), never a click.
+- A click time from too far back / ahead is held to the window (your measured lag back, 0.02 s ahead), not refused. The 1.0 s cooldown counts
+  between click times; a request may arrive up to 0.15 s "early" (network jitter), and a click the server had to hold may too, 0.15 s in all.
 - The second wall ray goes from the nearest point of your server path to your claimed spot (at most 4 studs), not from your current spot
   (a long ray could hit the track's own walls for a fast runner).
 - A step faster than 1,200 studs a second in the history (a respawn, a teleport) is never swept as a path.
@@ -114,7 +119,11 @@ If the real screen delay is 0.05 or 0.15 seconds instead of the 0.10 we assume: 
   shown twice). Its sound order is still tested.
 - `R158/bats/tests/run_bat_hits.sh` and `R158/bats/preview/run_swing_preview158.sh`: "today" is read from git now (src holds the new code).
   They still give the same results as before.
-- New suite: `R158/tests/run_bats158.sh` (in `run_all_suites.sh`), with 25 "break it on purpose" checks that must all fail.
+- New suite: `R158/tests/run_bats158.sh` (in `run_all_suites.sh`), with 25 "break it on purpose" checks that must all fail (38 after the
+  code review: `hitbox.md` section 7 lists the tests changed then).
+- **No "SMACK" anywhere (your extra wish, 10 Oct):** a bat hit that makes someone drop a pack shows **no** message now (the "ZAP!" and
+  "CAUGHT!" ones stay); the secret pyramid pack says "THE PACK WENT BACK IN THE PYRAMID"; the owner test text says "hit pose". The suite
+  checks that no text players can see says SMACK (only the `/test keepersmack` command keeps its name).
 
 ### To check in Studio
 1. **Feel:** swing a few times standing, running and jumping, R15 and R6. Is the hip-height sweep right? Is the tiny freeze at a hit

@@ -72,7 +72,7 @@ return {
  {'/test event status','server: The Darkened’s state, packs left and unstolen refreshes (reroll at 3).'},
  {'/test event go @username','Teleport next to a Void Pack.'},
  {'/test eventpack 7.5 diamond','server: Change the size/material of the waiting Void Pack.'},
- {'/test keepersmack','server: Preview The Darkened’s smack pose (hits nobody).'},
+ {'/test keepersmack','server: Preview The Darkened’s hit pose (hits nobody).'},
  {'/test keepermodels','R152 new keeper models: bake status and which model each keeper shows. keepermodels off = today’s keepers again (each when idle), auto = the new ones. Needs "Allow Mesh / Image APIs".'},
  {'/test notice event @username','Preview a notice: event, legendary, mythic or giant. Spawns nothing.'},
 

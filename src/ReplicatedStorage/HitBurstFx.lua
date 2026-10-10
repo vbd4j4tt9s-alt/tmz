@@ -2,8 +2,9 @@
 --  * Star(position, color): the 8-ray contact star KeeperHitEffects showed at every keeper / bat hit (same look and timing), now from a pool of
 --    PoolSize made on first use (it was a new Part + BillboardGui + 8 Frames per hit). When all are busy the oldest is reused.
 --  * Sparks(position): one shared ParticleEmitter (Emit(SparkCount)) for a bat hit; off in Fast Mode / low graphics.
---  * NoteOwnHit / IsOwnHit: the hitter's client shows its own hit at once (BatClient: the slap, the star, the sparks). The server's packet for that
---    hit arrives a moment later; KeeperHitEffects then skips it on the hitter's screen (no second slap or star, and no camera shake for the hitter).
+--  * NoteOwnHit / IsOwnHit / IsOwnPacket: the hitter's client shows its own hit at once (BatClient: the slap, the star, the sparks). The server's packet
+--    for that hit arrives a moment later, naming its hitter; KeeperHitEffects then skips it on the hitter's screen (no second slap or star, and no
+--    camera shake for the hitter). Someone else's hit on the same player is shown as usual.
 -- Nothing is created per frame: the stars are animated by one RenderStepped connection (made with the first star) that returns at once when idle.
 local Players=game:GetService('Players')
 local Run=game:GetService('RunService')
@@ -82,5 +83,13 @@ function Fx.Sparks(position)
 end
 function Fx.NoteOwnHit(userId)if type(userId)=='number'then own[userId]=os.clock()end end
 function Fx.IsOwnHit(userId)local at=type(userId)=='number'and own[userId];return at~=nil and at~=false and os.clock()-at<=Fx.OwnHitSeconds end
+-- R158 review: is this KeeperHit packet (a bat hit) YOUR own hit? The server names the hitter (AttackerUserId): only your own hits are skipped, so
+-- when your claim on someone was refused and another player bats them, you see (and, close by, feel) that hit. A packet without the name falls back
+-- to "you hit that player in the last OwnHitSeconds".
+function Fx.IsOwnPacket(hit,userId)
+ local by=type(hit)=='table'and hit.AttackerUserId
+ if type(by)=='number'then return by==userId end
+ return type(hit)=='table'and Fx.IsOwnHit(hit.VictimUserId)
+end
 function Fx.Clear()for _,s in ipairs(stars)do hide(s)end end
 return Fx
