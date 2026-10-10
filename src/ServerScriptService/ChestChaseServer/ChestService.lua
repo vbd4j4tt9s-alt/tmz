@@ -999,6 +999,8 @@ function ChestService:_packTooltip(player,record)
     if self.PlayerData.PackPityTooltip then lucky,before,after=self.PlayerData:PackPityTooltip(player,record,function(luck,passLuck)return PackRules.SeedOdds(self.Config,record.Stage,record.BagVariant,luck,record.OddsVersion or 0,nil,passLuck)end)end
     if lucky then odds=lucky end
     local rows={PackRules.PackLabel(record.Stage,record.BagVariant,record.PackSize,record.PackMutation)}
+    local Starter=require(ReplicatedStorage.StarterVerityRules158d)
+    if Starter.PackFloor(record)then table.insert(rows,Starter.TooltipLine)end -- R158d: the new-player gift pack says what it is
     for _,line in ipairs(before)do table.insert(rows,line)end
     for _,seed in ipairs(PackRules.OddsRows(self.Config,record.Stage,record.BagVariant,odds))do -- R148: by rarity rank, then name
         table.insert(rows,seed.Name..': '..require(ReplicatedStorage.OddsText85).Format(odds[seed.Id]))
@@ -1119,6 +1121,10 @@ function ChestService:_createPackTool(record,backpack)
     if expected then
         local rarity=PackRules.GetRarity(expected);tool.Name='TEST '..rarity..' Pack'
         tool.ToolTip='Guaranteed '..rarity..' reveal • Click / tap / RT 5 times to open'
+    end
+    do -- R158d: the new-player gift pack (Floor = Mythic) has its own name, so it never shares a hotbar slot / Bag stack with ordinary Verity Packs (the stack key holds the name)
+        local Starter=require(ReplicatedStorage.StarterVerityRules158d)
+        if Starter.PackFloor(record)and not expected then tool.Name=Starter.ToolName;tool.ToolTip=Starter.ToolTip end
     end
     tool.RequiresHandle=false;tool.CanBeDropped=false;tool.ManualActivationOnly=false;tool.Enabled=true
     tool:SetAttribute("SeedPackTool",true);tool:SetAttribute("SeedInventoryId",record.Id)

@@ -12,6 +12,7 @@ local Points=require(game:GetService('ReplicatedStorage').SpeedPoints)
 local Progression=require(game:GetService('ReplicatedStorage').Progression81)
 local PackRules = require(game:GetService("ReplicatedStorage"):WaitForChild("SeedPackRules"))
 local VerityCatalog = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityCatalog")) -- R147
+local StarterVerity = require(game:GetService("ReplicatedStorage"):WaitForChild("StarterVerityRules158d")) -- R158d: the new-player gift pack's floor (Floor = Mythic)
 local VerityReasons = require(game:GetService("ReplicatedStorage"):WaitForChild("VerityConfig")).Reasons -- R152: what Verity says when a hand-in is refused (CheckVoidPack / ConvertVoidPack)
 local PackShapes = require(game:GetService("ReplicatedStorage"):WaitForChild("PackShapes151")) -- R151: a pack's chip-bag shape (an optional field of its record)
 -- R151: the optional PackShape of a saved / gifted Pack row: 1-6, or nil (absent, 0, or anything else = the default shape).
@@ -430,6 +431,7 @@ function PlayerDataService:AddChest(player, chest, options)
         RateBoost = PackRules.SanitizeRateBoost(chest.RateBoost), -- R138: the free starter pack's 2x rates
         TestGrant = (type(options) == "table" and options.TestGrant == true) or nil, -- R151: made by an owner command (never announced when opened)
         GiftLocked = chest.GiftLocked == true or nil, -- R152: a free giveaway pack (VoidGiveaway152): it can't be gifted (an optional field, like PackShape)
+        Floor = StarterVerity.PackFloor({Kind = "Pack", BagVariant = PackRules.VariantKey(chest.BagVariant), Stage = chest.Stage, Floor = chest.Floor}), -- R158d: the new-player gift pack rolls Mythic or better (an optional field, only a Verity pack; set by server code only)
 	}
 	do local shape = chest.PackShape;if shape == nil then shape = PackShapes.Roll(chest.BagVariant) end;shape = PackShapes.Sanitize(shape);if shape > 0 and PackShapes.Applies(chest.BagVariant) then record.PackShape = shape end end
 	table.insert(self:GetChestRecords(player), record)
@@ -459,7 +461,12 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         -- and on the pass luck below, and the luck cap x1.5 for this roll only. A TEST open neither counts nor is lucky. The count moves only once the open went through.
         local pity=self:PlanPackPity(player,pack,testSeed~=nil or pack.TestGrant==true or luckTest)
         local luck,passLuck=self:PackPityLuck(pity,player:GetAttribute("ChestLuckMultiplier"),self:PassLuck(player)) -- R154: passLuck = the luck passes alone (the 4 Leaf Clover's x2): the only luck the Void, Verity and Mech packs take
-        local seed, rarity = self:PackPityRoll(pity,PackRules.Roll,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
+        -- R158d: the new-player gift pack (record.Floor = Mythic, a Verity pack only) rolls its OWN odds for this open (the same luck, clover and pity), kept to Mythic and above and rolled again over what is
+        -- left (StarterVerityRules158d.RollFloored); an owner TEST reveal still wins below. Every other pack rolls exactly as before.
+        local floor = testSeed == nil and StarterVerity.PackFloor(pack) or nil
+        local seed, rarity
+        if floor then seed, rarity = self:PackPityRoll(pity,StarterVerity.RollFloored,PackRules,floor,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck)
+        else seed, rarity = self:PackPityRoll(pity,PackRules.Roll,self.Config,pack.Stage,unitRoll,luck,pack.BagVariant,pack.OddsVersion,pack.RateBoost,passLuck) end
         if testSeed then seed=self.Config.GetSeedById(testSeed);rarity=PackRules.GetRarity(testSeed)end
         if not seed then return nil, "REJOIN TO OPEN THIS PACK!" end
         local rewardCash,reason=self:SeedCollectReward(player,seed.Id)
@@ -881,6 +888,7 @@ function PlayerDataService:_decodeSavedSeedRecord(player, savedChest, fallbackNu
                 TestGrant=savedChest.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: on a Seed record too (an owner-given seed, or the seed of a TEST opening)
                 PackShape=savedPackShape(savedChest), -- R151 (optional chip-bag shape 1-6; absent / anything else = the default shape)
                 GiftLocked=savedChest.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: on a Seed row as well (a seed opened from a gift-locked pack)
+                Floor=savedChest.Kind=="Pack" and StarterVerity.CleanFloor(savedChest.Floor) or nil, -- R158d (optional; an older server drops it: the pack then rolls like any Verity pack)
                 BagVariant = PackRules.VariantKey(savedChest.BagVariant),OddsVersion=PackRules.ValidOddsVersion(savedChest.OddsVersion)and savedChest.OddsVersion or nil, -- R137: 81, 112 and 137 all load
             PackSize=PackRules.SanitizePackSize(savedChest.PackSize),PackMutation=PackRules.MutationKey(savedChest.PackMutation),Weather=Weather.Key(savedChest.Weather),WeatherCheckedEvent=Weather.CheckedEvent(savedChest.WeatherCheckedEvent),
                 SeedScale = PackRules.SanitizeSeedScale(savedChest.SeedScale),
@@ -1001,6 +1009,7 @@ function PlayerDataService:Load(player)
     end
     self.Gardens[player] = garden
     self.SaveHeads[player] = getSaveHead(storedData)
+    self.FreshProfile = self.FreshProfile or {};self.FreshProfile[player] = storedData == nil -- R158d: a brand-new profile (nothing was saved before this join); StarterVerity158d reads it for the whole session
 	local speedValue = self:GetOrCreateSpeedValue(player)
 	local cashValue = self:GetOrCreateCashValue(player)
 	local lootInventory = self:GetOrCreateLootInventory(player)
@@ -1235,6 +1244,7 @@ function PlayerDataService:SerializeSeedRecord(chestRecord)
             TestGrant=chestRecord.TestGrant==true or nil, -- R151 (optional; an older server drops it); R152: Seed records too
             PackShape=savedPackShape(chestRecord), -- R151 (optional chip-bag shape 1-6)
             GiftLocked=chestRecord.GiftLocked==true or nil, -- R152 (optional; an R151 server drops it); R153: Seed records too (an R152 server drops it from a seed)
+            Floor=chestRecord.Kind=="Pack" and StarterVerity.CleanFloor(chestRecord.Floor) or nil, -- R158d (optional; the new-player gift pack: Mythic or better on open)
             BagVariant = PackRules.VariantKey(chestRecord.BagVariant),OddsVersion=chestRecord.OddsVersion,
             PackSize=PackRules.SanitizePackSize(chestRecord.PackSize),PackMutation=PackRules.MutationKey(chestRecord.PackMutation),Weather=Weather.Key(chestRecord.Weather),WeatherCheckedEvent=Weather.CheckedEvent(chestRecord.WeatherCheckedEvent),
             SeedScale = PackRules.SanitizeSeedScale(chestRecord.SeedScale),
@@ -1481,6 +1491,7 @@ function PlayerDataService:CleanupPlayer(player)
 	self.Dirty[player] = nil
 	self.Saving[player] = nil
 	self.SaveHeads[player] = nil
+	if self.FreshProfile then self.FreshProfile[player] = nil end -- R158d
 	self.Gardens[player] = nil
 	self.GardenSaveQueued[player] = nil
 	self.Revision[player] = nil

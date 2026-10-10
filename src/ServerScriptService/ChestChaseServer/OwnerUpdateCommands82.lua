@@ -39,6 +39,8 @@ X.Actions.keepermodels=true
 X.Actions.voidgift=true
 -- R157: playtime [<minutes>] (per player, Studio only to set): the play time counter (VoidGiveaway152; since R158c the free Void Pack's claim needs a finished tutorial, not play time): /test playtime @name <minutes>.
 X.Actions.playtime=true
+-- R158d: starterverity [reset] (per player, Studio only to reset): the new-player gift (a Verity Pack guaranteed Mythic or better + 2 bonus rolls): /test starterverity @name (StarterVerity158d).
+X.Actions.starterverity=true
 -- R156: pyramid [@username] (status), pyramid @username reset (clears the secret pyramid pack's claim; saved): SecretPyramid156.
 X.Actions.pyramid=true
 function X.Execute(ctx,p,action,a)
@@ -47,6 +49,7 @@ function X.Execute(ctx,p,action,a)
  if action=='trampoline'then return require(script.Parent.HubTrampoline153).Command(ctx,p,a)end
  if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
  if action=='playtime'then return require(script.Parent.VoidGiveaway152).PlaytimeCommand(ctx,p,a)end
+ if action=='starterverity'then return require(script.Parent.StarterVerity158d).Command(ctx,p,a)end
  if action=='pyramid'then return require(script.Parent.SecretPyramid156).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end

@@ -106,6 +106,10 @@ return {
  {'/test playtime @username','R157: how long that player has played in total (saved; only a counter now: the free Void Pack needs a finished tutorial, not play time). voidgift shows yours too.'},
  {'/test playtime @username 12','Studio only: sets that player\'s play time to 12 minutes (0 to 180; /test playtime 12 @username works too). A live server refuses: it never changes play time.'},
 
+ {'— NEW-PLAYER GIFT (R158d) —',''},
+ {'/test starterverity @username','R158d: the new-player gift (one Verity Pack guaranteed Mythic or better + 2 bonus rolls, given once to a brand-new player when they finish the tutorial, only while the Verity event runs): is it owed / given, is the event running, gift packs in the Bag, starter rolls left.'},
+ {'/test starterverity @username reset','Studio only: marks that player as owed the gift again and gives it at once if their tutorial is done and the event runs (the pack and rolls they got before stay). A live server refuses.'},
+
  {'— DESERT PYRAMID (R157) —',''},
  {'/test pyramid @username','R156 the Desert pyramid\'s secret Mythic pack: does the player have it (saved), are they carrying it now, the pyramid\'s spot, size and Hold E reach.'},
  {'/test pyramid @username reset','R156: clears the claim (saved), so the secret pack is back in the pyramid for that player. Packs they already have stay in their Bag.'},

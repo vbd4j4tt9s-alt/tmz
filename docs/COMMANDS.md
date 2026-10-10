@@ -153,6 +153,12 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | `gifts @name` | Gifts they sent that are still finishing |
 | `gifts recover @name` | Finish stuck gifts now (normally automatic within a minute) |
 
+## New-player gift (R158d)
+| Command | What it does |
+|---|---|
+| `starterverity @name` | R158d: the new-player gift: one Verity Pack guaranteed Mythic or better + 2 treadmill bonus rolls, given ONCE to a brand-new player when they finish (or skip) the tutorial, and only while the Verity event runs. Shows whether it is owed / given (saved as `Premium.StarterVerity158d`), whether the event is running, whether the tutorial is finished, how many gift packs are in the Bag (the pack's record has `Floor = Mythic`) and how many starter rolls are not used yet (`Premium.StarterRolls158d`) |
+| `starterverity @name reset` (**Studio only**) | Marks that player as owed the gift again and gives it at once if the tutorial is done and the event runs. The pack and rolls they already got stay. `starterverity reset @name` works too. A live server refuses |
+
 ## Free Void Pack pedestal
 | Command | What it does |
 |---|---|

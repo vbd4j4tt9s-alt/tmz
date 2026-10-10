@@ -5,6 +5,8 @@ function T.Split(text)
  text=text:match('^%s*(.-)%s*$')
  -- R156: "/test pyramid @name reset" (the owner's order) is "/test pyramid reset @name"
  do local head,who,tail=text:match('^(.-[Pp][Yy][Rr][Aa][Mm][Ii][Dd])%s+@([%w_]+)%s+(%a+)$');if head and head:lower():match('pyramid$')then return head..' '..tail,who end end
+ -- R158d: "/test starterverity @name reset" is "/test starterverity reset @name"
+ do local head,who,tail=text:match('^(.-[Ss][Tt][Aa][Rr][Tt][Ee][Rr][Vv][Ee][Rr][Ii][Tt][Yy])%s+@([%w_]+)%s+(%a+)$');if head and head:lower():match('starterverity$')then return head..' '..tail,who end end
  local body,target=text:match('^(.-)%s+@([%w_]+)$')
  if body then return body,target end
  -- R157: "playtime @name 12" (the name before the minutes) means "playtime 12 @name": the one command that is typed that way

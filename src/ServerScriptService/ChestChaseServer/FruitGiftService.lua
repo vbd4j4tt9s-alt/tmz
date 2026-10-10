@@ -183,6 +183,15 @@ end
 S.LockedText="Free Void Packs can't be gifted"
 S.LockedSeedText="Seeds from a free Void Pack can't be gifted"
 S.LockedFruitText="Fruit from a free Void Pack can't be gifted"
+-- R158d: the new-player gift is a Verity pack (GiftLocked too): its text says so (a pack, or a seed opened from it).
+S.LockedVerityText="Free Verity Packs can't be gifted"
+S.LockedVeritySeedText="Seeds from a free Verity Pack can't be gifted"
+local function lockedText(record)
+ local okVariant,variant=pcall(function()return require(RS.VerityCatalog).Variant end)
+ local verity=okVariant and record.BagVariant==variant
+ if record.Kind=='Seed'then return verity and S.LockedVeritySeedText or S.LockedSeedText end
+ return verity and S.LockedVerityText or S.LockedText
+end
 function S:SeedPaidBlocked(record,from,to)
  if not record.PaidRandom then return false end
  if from:GetAttribute('PaidTradingAllowed')~=true or to:GetAttribute('PaidTradingAllowed')~=true then return true end
@@ -198,7 +207,7 @@ function S:OfferSeed(from,userId,itemId)
  if not record or(record.Kind~='Pack'and record.Kind~='Seed')or not self:HeldSeed(from,itemId,record.Kind)then return end
  local blocked=self:SeedBlocked(from,itemId);if blocked then self.Remote:FireClient(from,'Status',blocked);return end
  local noun=record.Kind=='Pack'and'pack'or'seed'
- if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
+ if record.GiftLocked then self.Remote:FireClient(from,'Status',lockedText(record));return end
  if self:SeedPaidBlocked(record,from,to)then self.Remote:FireClient(from,'Status','This bought '..noun..' can\'t be gifted to that account.');return end
  if #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests or not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  for id,o in pairs(self.Offers)do if o.From==from or o.To==to then self.Offers[id]=nil end end
@@ -211,7 +220,7 @@ function S:AcceptSeed(to,id,offer)
  if os.clock()>offer.Expires or not record or not self:Available(from)or not self:Available(to)or not self:Near(from,to)or not self:HeldSeed(from,offer.ItemId,record.Kind)or self:SeedBlocked(from,offer.ItemId)then
   self.Remote:FireClient(to,'Status','Gift timed out. Ask them to offer it again!');return
  end
- if record.GiftLocked then self.Remote:FireClient(from,'Status',record.Kind=='Seed'and S.LockedSeedText or S.LockedText);return end
+ if record.GiftLocked then self.Remote:FireClient(from,'Status',lockedText(record));return end
  local garden=self.Data.Gardens[from];garden.OutgoingSeedGifts=garden.OutgoingSeedGifts or{}
  if not S.Room(self,to)then self.Remote:FireClient(from,'Status','Their bag is full.');return end -- R155: the 200 cap
  if count(garden.OutgoingSeedGifts)>=32 or #self.Data:GetChestRecords(to)>=self.Data.Config.MaxSavedChests then self.Remote:FireClient(from,'Status','Finish your pending gifts or make room in your bag first.');return end
