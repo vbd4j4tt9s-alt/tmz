@@ -4,7 +4,7 @@
 -- Pure Luau (no Roblox API, no randomness from the engine): every builder returns a list of part SPECS and TrackWalls158 turns each into an Instance. So the same data can be
 -- counted, checked and drawn in the offline suites (docs/proposals/R158/tests) exactly as the server builds it.
 --   {Group=, Name=, Shape='Block'|'Wedge'|'Cylinder'|'Ball', Size={x,y,z}, CF={x,y,z, R00,R01,R02, R10,R11,R12, R20,R21,R22}, Color={r,g,b}, Material='Slate'|..., Transparency=0,
---    Mesh='Sphere' (a SpecialMesh: an egg / dune / snow pillow shape), Shadow=false, Bay=true}
+--    Mesh='Sphere' (a SpecialMesh; the walls make none: no ball, egg or sphere is built for any wall), Shadow=false, Bay=true}
 --   CF is CFrame:GetComponents() order, so CFrame.new(table.unpack(spec.CF)) rebuilds it. Shadow=false: only parts 20+ studs long cast a shadow. Bay=true: a small extra (vines, faces,
 --   suns, doors, icicles, cracks, bolts, ...) the lite version (D.TrackWalls({Lite=true})) leaves out.
 --   EVERY part is Anchored, CanCollide false, CanQuery false, CanTouch false (TrackWalls158 sets that): nothing new to stand on, nothing the runner sweep, the camera, the pack placement
@@ -89,11 +89,10 @@ end
 local function block(name,size,frame,color,material,opt)return part(name,'Block',size,frame,color,material,opt)end
 local function cyl(name,len,d,frame,color,material,opt)return part(name,'Cylinder',{len,d,d},frame,color,material,opt)end
 local function vcyl(name,x,z,y0,y1,d,color,material,opt)return cyl(name,y1-y0,d,cf(x,(y0+y1)/2,z,UPRIGHT),color,material,opt)end
-local function ball(name,d,x,y,z,color,material,opt)return part(name,'Ball',{d,d,d},cf(x,y,z),color,material,opt)end
-local function egg(name,size,x,y,z,color,material,opt)
- local o={};for k,v in pairs(opt or{})do o[k]=v end;o.mesh='Sphere' -- (a copy: the shared option tables stay as they are)
- return block(name,size,cf(x,y,z),color,material,o)
-end
+-- (Owner: "remove those leaf balls, don't have plain balls or anything that might reduce the look of the walls": no ball, egg or sphere is made here any more, for any wall, and the
+-- "Lava drip" pieces are gone; docs/proposals/R158/tests checks that no wall part is round or named like a ball / blob / leaf / drip. Every wall draws its pieces from its own fixed seed,
+-- so the draws the removed pieces used to make are still made (spend): every piece that stays is exactly where and what it was.)
+local function spend(R,n)for _=1,n do R.f()end end
 -- A box between two corners (axis-aligned).
 local function box(name,x0,x1,y0,y1,z0,z1,color,material,opt)
  return block(name,{math.abs(x1-x0),y1-y0,math.abs(z1-z0)},cf((x0+x1)/2,(y0+y1)/2,(z0+z1)/2),color,material,opt)
@@ -150,31 +149,34 @@ function D.Extent(spec)
  for i=1,3 do e[i]=(math.abs(c[3*i+1])*sz[1]+math.abs(c[3*i+2])*sz[2]+math.abs(c[3*i+3])*sz[3])/2 end
  return {c[1]-e[1],c[2]-e[2],c[3]-e[3]},{c[1]+e[1],c[2]+e[2],c[3]+e[3]}
 end
--- The refresh cover (ReplicatedStorage.TrackBlackout: |x| <= 94, up to Y 55) hides the track while it refreshes. A wall piece that stands over its roof (above Y 55, inside |x| 95)
--- would show as a dark outline over the black box: TrackWalls158 hides those pieces for as long as the track refreshes.
+-- The refresh cover (ReplicatedStorage.TrackBlackout: |x| <= 94, up to Y 55) hides the track while it refreshes. A wall piece that stands over its roof (above Y 55) or sticks out of
+-- its sides (past |x| 94: the top bands, pillows and temple tops reach up to a stud beyond the wall's outer face), inside |x| 95, would show as a dark outline against the black box:
+-- TrackWalls158 hides those pieces for as long as the track refreshes.
 D.CoverTop=55
+D.CoverSide=94
 function D.OverCover(spec)
  local lo,hi=D.Extent(spec)
- return hi[2]>D.CoverTop and math.max(math.abs(lo[1]),math.abs(hi[1]))<=95 and hi[3]>-99
+ local reach=math.max(math.abs(lo[1]),math.abs(hi[1]))
+ return(hi[2]>D.CoverTop or reach>D.CoverSide+1e-6)and reach<=95 and hi[3]>-99
 end
 
 -------------------------------------------------------------------------------------------------------------------------------- biomes
 -- Colours are RGB 0-255. Materials are Roblox Enum.Material names. Key colours: KeyboardTrack's palettes (HubDecorKit151.Biomes).
 D.Biomes={
  {Stage=1,Id='forest',Name='Forest',Z0=-100,Z1=80,Key={96,186,90},Ground={{92,150,70},'Grass'},
-  Wall={Color={78,58,40},Material='Wood'},Look='Log fort: a row of round logs with sharp tips along the whole wall (no two alike), two log rails across them, moss at the foot, ivy here and there.'},
+  Wall={Color={78,58,40},Material='Wood'},Look='Log fort: a row of round logs with sharp tips along the whole wall (no two alike), two log rails across them, a mossy bank at the foot, ivy strands here and there.'},
  {Stage=6,Id='jungle',Name='Jungle',Z0=80,Z1=530,Key={44,146,100},Ground={{70,120,62},'Grass'},
-  Wall={Color={104,120,96},Material='Cobblestone'},Look='Temple ruins: mossy stone, stepped temple tops, carved stone faces, a glyph band, leafy pillars, vines and bushes spilling over.'},
+  Wall={Color={104,120,96},Material='Cobblestone'},Look='Temple ruins: mossy stone, stepped temple tops, carved stone faces, a glyph band, stone pillars and vines hanging down.'},
  {Stage=2,Id='desert',Name='Desert',Z0=530,Z1=1180,Key={228,192,112},Ground={{224,190,120},'Sand'},
   Wall={Color={226,198,140},Material='Sandstone'},Look='Sandstone temple: a big flared top lip, painted bands, pilasters with small gold-tipped obelisks, golden winged suns and carved doors.'},
  {Stage=3,Id='snow',Name='Snow',Z0=1180,Z1=2030,Key={170,208,232},Ground={{236,242,248},'Snow'},
-  Wall={Color={168,204,226},Material='Brick'},Look='Ice bricks: pale blue brick, ice pillars, a soft lumpy snow cap, icicles under it and snow drifts at the foot.'},
+  Wall={Color={168,204,226},Material='Brick'},Look='Ice bricks: pale blue brick, ice pillars, a snow cap, icicles under it and snow drifts at the foot.'},
  {Stage=4,Id='lava',Name='Lava',Z0=2030,Z1=3080,Key={236,108,34},Ground={{52,44,46},'Basalt'},
-  Wall={Color={56,48,50},Material='Basalt'},Look='Volcano rock: dark basalt, a jagged rocky top, glowing cracks, a glowing seam at the foot and lava dripping under the top.'},
+  Wall={Color={56,48,50},Material='Basalt'},Look='Volcano rock: dark basalt, a jagged rocky top, glowing cracks and a glowing seam at the foot.'},
  {Stage=5,Id='crystal',Name='Crystal',Z0=3080,Z1=4380,Key={150,108,208},Ground={{86,68,120},'Slate'},
   Wall={Color={98,78,134},Material='Slate'},Look='Crystal cave stone: deep purple stone, crystal clusters growing on top, glowing pillar stripes and a glow line, crystals in the wall.'},
  {Stage=7,Id='storm',Name='Storm Peaks',Z0=4380,Z1=5980,Key={108,118,156},Ground={{60,66,80},'Slate'},
-  Wall={Color={68,78,98},Material='Slate'},Look='Storm fort: dark slate, broken teeth on top, buttresses with copper lightning rods and glowing tips, big lightning bolts.'},
+  Wall={Color={68,78,98},Material='Slate'},Look='Storm fort: dark slate, broken teeth on top, buttresses with copper lightning rods, big lightning bolts.'},
 }
 D.ByStage={};for i,b in ipairs(D.Biomes)do b.Order=i;D.ByStage[b.Stage]=b end
 D.EndZ=5980
@@ -190,14 +192,10 @@ local BORDER=5.8 -- half the border tower (cap) width: the pieces of a biome sta
 -- "Bay" pieces (vines, faces, suns, doors, icicles, cracks, studs, bolts) are tagged; the lite version (phones on low) leaves them out.
 local BAY={bay=true}
 local function inside(z,z0,z1,m)return z>=z0+BORDER+m and z<=z1-BORDER-m end
--- An egg standing on the foot of the wall (nothing under Y 5.3: the keys), reaching `reach` studs into the track at most.
-local function lowEgg(R,name,s,z,sx,sy,sz,reach,color,material,opt)
- return egg(name,{sx,sy,sz},s*(IN-(reach-sx/2)),5.35+sy/2+R.r(0,.8),z,color,material,opt)
-end
 
 local W={} -- per-biome wall builders: W[id](s, z0, z1, R)
 -- FOREST: a log fort. Logs of uneven thickness stand in an uneven row (a few gaps, a few short broken ones, tops rolling up and down, each leaning a little), most with a sharp
--- tip (some chisel-cut, some flat), two log rails in pieces, a bank of moss in patches, ivy in a few places.
+-- tip (some chisel-cut, some flat), two log rails in pieces, a bank of moss in patches, ivy strands in a few places.
 function W.forest(s,z0,z1,R)
  local woods={{116,82,52},{104,74,48},{126,92,60},{110,78,50},{98,70,46},{122,88,56}}
  local cuts={{176,134,90},{168,126,84},{184,142,98},{96,70,48}}
@@ -236,36 +234,28 @@ function W.forest(s,z0,z1,R)
    cyl('Log rail',b-a,R.r(1.4,1.9),cf(s*(IN-2.9+R.r(-.2,.2)),y+R.r(-.5,.5),(a+b)/2,mul(Rx(t),ALONG_Z)),tint(R,{88,62,40},5),'Wood')
   end)
  end
- -- a mossy bank over the log feet, in patches of different height, with an occasional tuft
+ -- a mossy bank over the log feet, in patches of different height
  runs(R,za-1,zb,10,38,0,7,function(a,b)
   face('Moss bank',s,a,b,5.3,5.3+R.r(1.6,3.2),R.r(1.9,3.0),tint(R,{82,132,62},9),'Grass')
-  if R.chance(.3)then
-   local m=R.r(.7,1.3)
-   lowEgg(R,'Moss tuft',s,R.r(a,b),R.r(3,5)*m,R.r(2,3.4)*m,R.r(5,9)*m,R.r(2.2,3.1),tint(R,{90,146,66},8),'Grass')
-  end
+  if R.chance(.3)then spend(R,10)end -- (the moss tufts are gone)
  end)
- -- ivy: strands of uneven width and length, bunched in a few places (some hold a leaf ball, some two, some none)
+ -- ivy: strands of uneven width and length, bunched in a few places
  local n=R.i(3,6);local zi=za+R.r(8,16)
  for _=1,n do
   zi=zi+R.r(8,46)
   if zi>zb-4 then break end
   local len,w=R.r(7,26),R.r(.8,1.7)
   face('Ivy',s,zi-w/2,zi+w/2,50.4-len,50.4,3.4,tint(R,{62,128,58},8),'LeafyGrass',BAY)
-  local f=R.f()
-  if f<.6 then local d=R.r(2.2,4.2);ball('Ivy leaves',d,s*(IN-(R.r(3.4,4.3)-d/2)),50.4-len+R.r(0,1.5),zi+R.r(-.6,.6),tint(R,{78,150,66},8),'LeafyGrass',BAY)
-  elseif f<.8 then
-   local d1,d2=R.r(1.8,2.8),R.r(1.6,2.6)
-   ball('Ivy leaves',d1,s*(IN-(R.r(3.4,4.3)-d1/2)),50.4-len,zi+R.r(-.6,.6),tint(R,{78,150,66},8),'LeafyGrass',BAY)
-   ball('Ivy leaves',d2,s*(IN-(R.r(3.4,4.3)-d2/2)),50.4-len*R.r(.4,.7),zi+R.r(-.8,.8),tint(R,{70,140,60},8),'LeafyGrass',BAY)
-  end
+  local f=R.f() -- (the leaf balls on the ivy are gone)
+  if f<.6 then spend(R,7)elseif f<.8 then spend(R,13)end
   if R.chance(.3)then zi=zi+R.r(1.5,3)end -- a second strand close by
  end
 end
 
--- JUNGLE: temple ruins. The long bands are runs in close stone shades; crenels differ (stepped, plain, broken, missing); pillars are unevenly spaced, some broken, some crowned
--- with leaves; carved faces are whole, weathered or blank; vines and moss are strewn about.
+-- JUNGLE: temple ruins. The long bands are runs in close stone shades; crenels differ (stepped, plain, worn down, missing); pillars are unevenly spaced, some broken; carved faces are
+-- whole, weathered or blank; vines hang here and there.
 function W.jungle(s,z0,z1,R)
- local stone,dark,moss={112,128,100},{78,96,72},{70,124,62}
+ local stone,dark={112,128,100},{78,96,72}
  runs(R,z0,z1,70,150,0,0,function(a,b)face('Stone foot',s,a,b,5.5,11,1.0,tint(R,dark,9),'Cobblestone')end)
  runs(R,z0,z1,70,150,0,0,function(a,b)face('Glyph band',s,a,b,27,31.5,.7,tint(R,{126,134,104},9),'Slate')end)
  runs(R,z0,z1,70,150,0,0,function(a,b)face('Top step',s,a,b,46.6,49,1.5,tint(R,{100,116,90},8),'Slate')end)
@@ -278,7 +268,7 @@ function W.jungle(s,z0,z1,R)
   local roll=R.f()
   if roll<.12 then -- a missing crenel
   elseif roll<.42 then box('Temple step',s*(IN-.6),s*(IN+3.6),52.6,52.6+R.r(1.6,3.4),z-hw,z+hw,tint(R,stone,10),'Cobblestone')
-  elseif roll<.52 then egg('Rubble',{R.r(3.6,6.5),R.r(1.6,2.8),R.r(4,8)},s*(IN+1.2),53.2,z,tint(R,{98,112,88},8),'Cobblestone')
+  elseif roll<.52 then spend(R,6) -- (a rubble blob stood here: gone, the crenel is missing)
   else
    local h1=R.r(2.2,3.6);local c=tint(R,stone,10)
    box('Temple step',s*(IN-.6),s*(IN+3.6),52.6,52.6+h1,z-hw,z+hw,c,'Cobblestone')
@@ -292,8 +282,7 @@ function W.jungle(s,z0,z1,R)
   local broken=R.chance(.2)
   local top=broken and R.r(36,47)or 50.4
   face('Temple pillar',s,z-hw,z+hw,5.3,top,R.r(2.2,2.7),tint(R,{96,116,88},8),'Slate')
-  if broken then lowEgg(R,'Rubble',s,z+R.r(-1,1),R.r(4,6.5),R.r(2,3.4),R.r(5,8),R.r(2.6,3.1),tint(R,{98,112,88},8),'Cobblestone')
-  elseif R.chance(.55)then ball('Leaf crown',R.r(4.6,7.8),s*(IN-R.r(.4,1.4)),R.r(54.8,57.2),z+R.r(-1.5,1.5),tint(R,{58,124,58},8),'LeafyGrass')end
+  if broken then spend(R,9)elseif R.chance(.55)then spend(R,7)end -- (the rubble at a broken pillar's foot and the leaf crowns are gone)
  end
  -- carved faces: a few, each different (whole, weathered, or only the slab); glyph tiles in some places
  local _,fbays=spread(R,z0+BORDER,z1-BORDER,85,.3)
@@ -319,21 +308,14 @@ function W.jungle(s,z0,z1,R)
    face('Glyph tile',s,z-hw,z+hw,y0,y0+R.r(2.4,3.0),.95,tint(R,{70,90,64},8),'Slate',BAY)
   end
  end
- -- vines and moss strewn about
+ -- vines hanging here and there
  local zv=z0+BORDER+R.r(2,10)
  for _=1,R.i(6,10)do
   zv=zv+R.r(14,60)
   if not inside(zv,z0,z1,2)then break end
   local a,w=R.r(8,26),R.r(.6,1.4)
   face('Vine',s,zv-w/2,zv+w/2,46.6-a,46.6,1.65,tint(R,{43,108,56},8),'LeafyGrass',BAY)
-  if R.chance(.65)then ball('Vine leaves',R.r(2.2,3.8),s*(IN-1.4),46.6-a,zv,tint(R,{61,129,62},8),'LeafyGrass',BAY)end
- end
- local zm=z0+BORDER+R.r(2,8)
- for _=1,R.i(5,10)do
-  zm=zm+R.r(14,70)
-  if not inside(zm,z0,z1,4)then break end
-  local k=R.r(.7,1.4)
-  egg('Overgrowth',{5*k,4.2*k,10*k},s*(IN+1.4),53.4,zm,tint(R,moss,9),'LeafyGrass',BAY)
+  if R.chance(.65)then spend(R,4)end -- (the leaf balls on the vines are gone)
  end
 end
 
@@ -386,23 +368,22 @@ function W.desert(s,z0,z1,R)
  end
 end
 
--- SNOW: ice bricks. Snow drifts and pillows of every size, ice pillars (some broken), icicles in bunches of two to five of different lengths.
+-- SNOW: ice bricks. Snow drifts of every size at the foot, a snow cap, ice pillars (some broken), icicles in bunches of one to three of different lengths.
 function W.snow(s,z0,z1,R)
  runs(R,z0,z1,140,260,0,0,function(a,b)local y=27+R.r(-.4,.4);face('Ice band',s,a,b,y,y+R.r(1.1,1.6),.4,tint(R,{140,188,214},6),'Ice')end)
  runs(R,z0,z1,34,90,0,8,function(a,b)face('Snow drift',s,a,b,5.5,5.5+R.r(2.2,3.6),R.r(1.2,1.9),tint(R,{236,242,248},4),'Snow')end)
  wrap('Snow cap',s,z0,z1,50.2,52.6,1.5,.6,{240,246,250},'Snow')
- -- soft lumps along the cap: uneven spacing, size and fatness
+ -- (the snow pillows that lay along the cap are gone)
  local z=z0+BORDER+R.r(2,12)
  while z<z1-BORDER-8 do
-  local k=R.r(.75,1.1);local sx=R.r(6,8.6)*k
-  egg('Snow pillow',{sx,R.r(3.4,6.6)*k,R.r(12,28)*k},s*(OUT+1-sx/2-R.r(0,.8)),52.6,z,tint(R,{246,250,252},3),'Snow')
+  spend(R,8)
   z=z+R.r(15,50)
  end
  local piers=spread(R,z0+BORDER,z1-BORDER,50,.3)
  for _,z in ipairs(piers)do
   local hw=R.r(2.0,3.2);local broken=R.chance(.18)
   face('Ice pillar',s,z-hw,z+hw,5.3,broken and R.r(38,47)or 50.2,1.2,tint(R,{150,196,222},6),'Ice')
-  if R.chance(.75)then local k=R.r(.7,1.15);egg('Snow mound',{5*k,6*k,16*k},s*(IN-.2),5.35+3*k,z+R.r(-1.5,1.5),{246,250,252},'Snow')end
+  if R.chance(.75)then spend(R,2)end -- (the snow mounds at the foot are gone)
  end
  -- icicles: bunches of 0 - 5 hanging from the cap, each a different length and lean, bunched unevenly
  local zi=z0+BORDER+R.r(2,12)
@@ -413,7 +394,8 @@ function W.snow(s,z0,z1,R)
    local t=R.r(.7,1.1) -- (an icicle hangs wholly in front of an ice pillar's face, 1.2 proud: its planes never share the pillar's)
    local w,dir=R.r(.9,2),R.sign()
    local a=math.max(zi,edge+.3+(dir<0 and w or 0)) -- (icicles never overlap: their tops share the cap's underside)
-   tooth('Icicle',{s*(IN-(1.2+t/2+R.r(.1,.6))),50.2,a},{0,-1,0},{0,0,1},len,w,t,dir,tint(R,{204,232,246},5),'Ice',BAY)
+   -- (its wall side stands 1.3 - 1.45 proud, under the cap's inner face at 1.5 proud, so its top touches the cap's underside)
+   tooth('Icicle',{s*(IN-(1.2+t/2+R.r(.1,.25))),50.2,a},{0,-1,0},{0,0,1},len,w,t,dir,tint(R,{204,232,246},5),'Ice',BAY)
    edge=dir>0 and a+w or a
    zi=edge+R.r(.3,3.5)
   end
@@ -421,7 +403,7 @@ function W.snow(s,z0,z1,R)
  end
 end
 
--- LAVA: volcano rock. Teeth of every height and width leaning both ways, columns (some broken), glowing seams in pieces, cracks of different length and bend, a few drips.
+-- LAVA: volcano rock. Teeth of every height and width leaning both ways, columns (some broken), glowing seams in pieces, cracks of different length and bend. (Owner: the Neon "Lava drip" pieces under the wall top are gone, for good.)
 function W.lava(s,z0,z1,R)
  runs(R,z0,z1,100,220,0,0,function(a,b)face('Basalt foot',s,a,b,5.5,9.2,1.0,tint(R,{40,34,36},4),'Basalt')end)
  runs(R,z0,z1,60,160,8,40,function(a,b)face('Ember seam',s,a,b,9.2,9.2+R.r(.3,.7),.7,{255,106,36},'Neon')end)
@@ -444,12 +426,6 @@ function W.lava(s,z0,z1,R)
   local n,len=R.i(1,3),R.r(6,12)
   zigzag('Glowing crack',s,zc,R.r(n*len+13,47),n,len,R.r(.4,.9),.12,R.r(.25,.6),{255,R.i(110,134),40},'Neon',BAY) -- (never lower than Y 12: the keys)
   zc=zc+R.r(36,125)
- end
- local zd=z0+BORDER+R.r(4,30)
- while zd<z1-BORDER-4 do
-  local w=R.r(.5,1)
-  face('Lava drip',s,zd,zd+w,R.r(34,46),49.7,.46,{255,110,36},'Neon',BAY)
-  zd=zd+R.r(60,200)
  end
 end
 
@@ -494,7 +470,7 @@ function W.crystal(s,z0,z1,R)
  end
 end
 
--- STORM PEAKS: dark slate fort. Buttresses of different height, only some with a lightning rod (each its own length and lean, some tipped with a glow ball), a few with a stone cap,
+-- STORM PEAKS: dark slate fort. Buttresses of different height, only some with a lightning rod (each its own length and lean), a few with a stone cap,
 -- broken battlement teeth of every height, bolts of two to four segments in some bays.
 function W.storm(s,z0,z1,R)
  runs(R,z0,z1,120,260,0,0,function(a,b)face('Slate foot',s,a,b,5.5,10,1.0,tint(R,{52,60,76},4),'Slate')end)
@@ -506,12 +482,12 @@ function W.storm(s,z0,z1,R)
   face('Buttress',s,z-hw,z+hw,5.3,top,1.8,tint(R,{60,70,88},5),'Slate')
   if R.chance(.8)then local sw=R.r(.3,.55);face('Copper strap',s,z-sw,z+sw,R.r(8,12),top+.3,1.95,tint(R,{190,112,66},6),'Metal')end
   local roll=R.f()
-  if roll<.55 then -- a rod, its own length and lean, a glow ball on most
+  if roll<.55 then -- a rod, its own length and lean
    local len=R.r(5,13);local lx,lz=R.r(-.1,.1),R.r(-.1,.1)
    local M=mul(Rz(lx*-s),Rx(lz));local up=col(M,2)
    local base={s*(IN-.6),top,z}
    cyl('Lightning rod',len,.6,cf(base[1]+up[1]*len/2,base[2]+up[2]*len/2,base[3]+up[3]*len/2,mul(M,UPRIGHT)),tint(R,{196,120,70},6),'Metal')
-   if R.chance(.7)then local d=R.r(1.3,2.2);ball('Charged tip',d,base[1]+up[1]*(len+d*.35),base[2]+up[2]*(len+d*.35),base[3]+up[3]*(len+d*.35),{176,220,255},'Neon')end
+   if R.chance(.7)then spend(R,1)end -- (the glow balls on the rods' tips are gone)
   elseif roll<.8 then box('Buttress cap',s*(IN-2.1),s*(IN+.8),top,top+R.r(1,2.2),z-hw-.3,z+hw+.3,tint(R,{74,84,104},5),'Slate')
   end
  end
@@ -541,7 +517,7 @@ local function endWall(R)
   box('Buttress',x-hw,x+hw,5.3,top,z-1.8,z+SINK,{60,70,88},'Slate')
   box('Copper strap',x-.4,x+.4,10,top+.3,z-1.95,z+SINK,{190,112,66},'Metal')
   local len=R.r(7,12);vcyl('Lightning rod',x,z-.6,top,top+len,.6,{196,120,70},'Metal')
-  ball('Charged tip',R.r(1.5,2.1),x,top+len+.6,z-.6,{176,220,255},'Neon')
+  spend(R,1)
  end
  local tx=-66
  for _=1,4 do

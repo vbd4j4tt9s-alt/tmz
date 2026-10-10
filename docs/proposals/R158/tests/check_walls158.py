@@ -11,7 +11,10 @@ Usage: python3 check_walls158.py <specs.txt> [<specs_again.txt>]      exits 1 wh
  4. variety     - NOT REPEATED: no run of 5 posts / pillars / teeth in a row with the same size (the same Name along one wall), per Name the heights / sizes vary, neighbouring parts of one name
                   are not evenly spaced (spacing spread > 30 %); the base caps use at least 3 close shades.
  5. determinism - the second dump equals the first (a fixed seed per wall, no run-time randomness).
-Prints the high-part list (above Y 55 inside the refresh cover's footprint) and the shadow-caster numbers for design.md."""
+ 6. floating    - every Snow icicle touches the cap it hangs from.
+ 7. no drips    - no Lava wall part is named like a drip (owner: gone), the rest of the Lava wall design is there.
+ 8. no round    - no wall part is a Ball, carries a sphere mesh or is named like a ball / blob / leaf crown / drip (owner: "remove those leaf balls, don't have plain balls").
+Prints the high-part list (over the refresh cover's roof or past its sides, inside |x| 95) and the shadow-caster numbers for design.md."""
 import collections, json, math, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +23,7 @@ import make158 as M  # noqa: E402  (corners / load_specs: the design's own helpe
 
 DESIGN = {'Forest': 306, 'Jungle': 250, 'Desert': 197, 'Snow': 236, 'Lava': 228, 'Crystal': 238, 'Storm Peaks': 256, 'Borders': 36, 'Walls': 1747, 'Lite': 1206, 'Ground': 15, 'BaseA': 261}
 # The numbers this data builds (fixed seeds): lock them so a change of the generator is a visible, deliberate edit.
-EXPECT = {'Forest': 250, 'Jungle': 202, 'Desert': 140, 'Snow': 223, 'Lava': 210, 'Crystal': 180, 'Storm Peaks': 240, 'Borders': 36, 'Walls': 1481, 'Lite': 1138}
+EXPECT = {'Forest': 238, 'Jungle': 159, 'Desert': 140, 'Snow': 142, 'Lava': 190, 'Crystal': 180, 'Storm Peaks': 225, 'Borders': 36, 'Walls': 1310, 'Lite': 1020}
 IN, OUT = 89.0, 94.0
 
 
@@ -89,8 +92,8 @@ def check_placement(S, bad):
             bad.append('%s is over the pyramid\'s footprint' % tag)
         if end and (max(abs(p[0]) for p in P) > IN or min(p[2] for p in P) < 5975.5 - 2):
             bad.append('%s (end wall) is out of its wall' % tag)
-        # inside the refresh cover's footprint and above its roof (Y 55)
-        if max(ys) > 55 and max(xs) <= 95 and min(zs) > -100:
+        # inside the refresh cover's footprint, over its roof (Y 55) or past its sides (|x| 94)
+        if (max(ys) > 55 or max(xs) > 94 + 1e-6) and max(xs) <= 95 and min(zs) > -100:
             high.append(s)
         n += 1
     for s in S['specs']['backdrops']:
@@ -117,6 +120,54 @@ def check_placement(S, bad):
         n += 1
     print('placement rules: %d parts checked' % n)
     return high
+
+
+def check_floating(S, bad):
+    """Nothing floats (code review of the walls build): every Snow icicle hangs from the cap (its top at the cap's underside, Y 50.2) with its wall side under the cap's inner face
+    (1.5 studs proud: |x| 87.5), so the two touch."""
+    ic = 0
+    for s in S['specs']['walls']:
+        if s['Name'] == 'Icicle':
+            ic += 1
+            P = M.corners(s)
+            if abs(max(p[1] for p in P) - 50.2) > 1e-3 or max(abs(p[0]) for p in P) <= IN - 1.5 + 0.02:
+                bad.append('Snow icicle at z %.1f hangs free of the cap: top Y %.2f, wall side at |x| %.2f (the cap\'s inner face is |x| %.1f)' % (s['CF'][2], max(p[1] for p in P), max(abs(p[0]) for p in P), IN - 1.5))
+    if not ic:
+        bad.append('no icicles in the data')
+    print('floating: %d icicles touch the snow cap' % ic)
+
+
+def check_no_round(S, bad):
+    """Owner: "remove those leaf balls, don't have plain balls or anything that might reduce the look of the walls": no part of any wall (track walls, lite set, base caps, ground) is a Ball,
+    carries a sphere mesh (an egg / blob) or is named like a ball / blob / leaf / crown / tuft / overgrowth / rubble / pillow / mound / drip / egg / sphere."""
+    import re
+    word = re.compile(r'ball|blob|leaf|leaves|crown|tuft|overgrowth|rubble|pillow|mound|drip|egg|sphere', re.I)
+    n = 0
+    for name, lst in S['specs'].items():
+        for s in lst:
+            n += 1
+            if s['Shape'] == 'Ball':
+                bad.append('%s: %s/%s is a Ball' % (name, s['Group'], s['Name']))
+            if s.get('Mesh') == 'Sphere':
+                bad.append('%s: %s/%s carries a sphere mesh' % (name, s['Group'], s['Name']))
+            if word.search(s['Name']):
+                bad.append('%s: %s/%s is named like a ball / blob / leaf / drip' % (name, s['Group'], s['Name']))
+    print('round pieces: none in %d parts (no Ball, no sphere mesh, no ball / blob / leaf / drip name)' % n)
+
+
+def check_no_drips(S, bad):
+    """Owner: the Lava walls' Neon "Lava drip" pieces under the wall top are gone for good: no Lava wall part (full or lite set) is named like a drip, and the rest of the Lava design is still there."""
+    names = collections.Counter()
+    for lst in (S['specs']['walls'], S['specs']['walls_lite']):
+        for s in lst:
+            if s['Group'] == 'TrackWalls158/Lava':
+                names[s['Name']] += 1
+                if 'drip' in s['Name'].lower():
+                    bad.append('Lava wall part %s at z %.1f is a drip (the owner removed them)' % (s['Name'], s['CF'][2]))
+    for need in ('Basalt foot', 'Ember seam', 'Under glow', 'Basalt top', 'Rock tooth', 'Basalt column', 'Glowing crack'):
+        if not names[need]:
+            bad.append('the Lava wall lost its %s' % need)
+    print('lava wall: no drips; parts by name: %s' % ', '.join('%s %d' % kv for kv in sorted(names.items())))
 
 
 def faces(s):
@@ -287,8 +338,11 @@ def main():
     high = check_placement(S, bad)
     check_shadows(S, bad)
     check_planes(S, bad)
+    check_floating(S, bad)
+    check_no_drips(S, bad)
+    check_no_round(S, bad)
     check_variety(S, bad)
-    print('parts reaching over the refresh cover (above Y 55, inside |x| 95): %d of %d' % (len(high), len(S['specs']['walls'])))
+    print('parts reaching over the refresh cover (above Y 55 or past |x| 94, inside |x| 95): %d of %d' % (len(high), len(S['specs']['walls'])))
     if len(sys.argv) > 2:
         if open(sys.argv[1], 'rb').read() != open(sys.argv[2], 'rb').read():
             bad.append('the second dump differs from the first (the data must be fixed-seed)')

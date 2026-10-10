@@ -60,6 +60,11 @@ function S.Footprint(part)
  if sx<=0 and sy<=0 and sz<=0 then return nil end
  local ey=math.abs(r10)*sx+math.abs(r11)*sy+math.abs(r12)*sz
  local fp={Y0=cy-ey,Y1=cy+ey}
+ -- R158: a part (a mesh: its box is a square round a round thing) can say what it covers: KeyboardDisc = the radius of its round footprint, centred on the part
+ local disc=part:GetAttribute('KeyboardDisc')
+ if type(disc)=='number'and disc>0 then
+  fp.Kind='disc';fp.X,fp.Z,fp.R=cx,cz,disc;fp.X0,fp.X1,fp.Z0,fp.Z1=cx-disc,cx+disc,cz-disc,cz+disc;return fp
+ end
  local okS,shape=pcall(function()return part.Shape.Name end) -- (a MeshPart has no Shape)
  shape=okS and tostring(shape)or''
  if shape:find('Ball',1,true)then

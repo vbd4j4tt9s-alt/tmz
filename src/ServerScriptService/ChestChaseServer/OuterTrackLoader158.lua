@@ -4,7 +4,8 @@
 --   1. hand    ServerStorage.OuterTrackAssets158: a model (or MeshPart / Part / Folder) named by the key (Key2, Key3 ... for more looks of the same thing)
 --   2. owner   built in from the owner's files: DesertPyramid and StormDarkMount (part data, OuterTrackModels158), LavaVolcano and SnowMountains (his meshes, loaded by id with
 --              AssetService:CreateMeshPartAsync, each in a pcall, given up after OuterTrackAssets158.LoadSeconds)
---   3. game    a model the map already has (its oaks, jungle trees, ice trees, crystal clusters: OuterTrackAssets158.Game), copied
+--   3. game    a model the game already has (the map's oak, jungle trees, ice trees, crystal clusters, copied from the map; and the hub's own trees, built with HubLifeArt151's
+--              builders: OuterTrackAssets158.Game); a key with several models (the Forest's and the Jungle's trees) gives each spot one of them (the spot's Look)
 --   4. id      OuterTrackAssets158.Ids[key] (0 = not set): AssetService:LoadAssetAsync, then InsertService:LoadAsset (as HubTreeLoader151 does for the hub's trees); Roblox only lets a
 --              game load models its owner owns, a model by someone else fails with "not authorized" and that is ONE plain note, never a warning
 -- A key with no model is skipped (one plain print, nothing part-built in its place).
@@ -49,29 +50,75 @@ function L.HandPlaced(key)
  return list
 end
 local function countParts(m)local n=m:IsA('BasePart')and 1 or 0;for _,d in ipairs(m:GetDescendants())do if d:IsA('BasePart')then n+=1 end end;return n end
--- Models the map already has (OuterTrackAssets158.Game).
+-- Models the map already has (OuterTrackAssets158.Game): the Models of the entry (and of each of its Also entries) whose Name (and, when given, whose parent's name) matches the
+-- pattern, under the Obby.Biomes folders whose name starts with Biome; at most Max of them, in name order (the fewest parts first with Smallest). Returns {{Model=, Label=}}.
+local function gather(biomes,prefix,entry)
+ local keyed={}
+ for _,b in ipairs(biomes:GetChildren())do
+  if b.Name:sub(1,#prefix)==prefix then
+   for _,d in ipairs(b:GetDescendants())do
+    if d:IsA('Model')and d.Name:match(entry.Name)and(not entry.Parent or(d.Parent~=nil and d.Parent.Name:match(entry.Parent)))then
+     keyed[#keyed+1]={Model=d,Name=d:GetFullName(),Parts=countParts(d)}
+    end
+   end
+  end
+ end
+ table.sort(keyed,function(a,b)if entry.Smallest and a.Parts~=b.Parts then return a.Parts<b.Parts end;return a.Name<b.Name end)
+ local out={}
+ for i=1,math.min(entry.Max or 1,#keyed)do out[i]={Model=keyed[i].Model,Label=keyed[i].Model.Name}end
+ return out
+end
 function L.GameModels(map,key)
  local g=Assets.Game[key];if not g then return{}end
  local obby=map:FindFirstChild('Obby');local biomes=obby and obby:FindFirstChild('Biomes')
- local found={}
- if biomes then for _,b in ipairs(biomes:GetChildren())do
-  if b.Name:sub(1,#g.Biome)==g.Biome then
-   for _,d in ipairs(b:GetDescendants())do if d:IsA('Model')and d.Name:match(g.Name)then found[#found+1]=d end end
-  end
- end end
- local keyed={}
- for _,m in ipairs(found)do keyed[#keyed+1]={Model=m,Name=m:GetFullName(),Parts=countParts(m)}end
- table.sort(keyed,function(a,b)if g.Smallest and a.Parts~=b.Parts then return a.Parts<b.Parts end;return a.Name<b.Name end)
  local out={}
- for i=1,math.min(g.Max or 1,#keyed)do out[i]=keyed[i].Model end
+ if biomes then
+  local entries={g}
+  for _,e in ipairs(g.Also or{})do entries[#entries+1]=e end
+  for _,e in ipairs(entries)do for _,m in ipairs(gather(biomes,g.Biome,e))do out[#out+1]=m end end
+ end
  return out
 end
--- A private, safe, locked copy of a source model as {Model, Size} (nil, why when it cannot be used).
+-- The hub's own trees (ReplicatedStorage.HubLifeArt151: the builders the hub's square draws its trees with) built into private Models of their own, with a tiny context that keeps the
+-- core and detail parts (no 'fine' extras). Each recipe in Game[key].Hub is {Kind = 'Oak' | 'Leafy' | 'Poplar' | 'Palm', Arg = the size / tone the builder takes, X, Z = the builder's
+-- seed}: the same recipe always gives the same tree, a different seed a different crown. Returns {{Model=, Label=}} (nothing, and why, when the builders are not there).
+local HUB_FN={Oak='Oak',Leafy='LeafyTree',Poplar='Poplar',Palm='Palm'}
+function L.HubModels(key)
+ local g=Assets.Game[key];local recipes=g and g.Hub
+ if not recipes or #recipes==0 then return{}end
+ local ok,Art,K=pcall(function()return require(RS:WaitForChild('HubLifeArt151',5)),require(RS:WaitForChild('HubDecorKit151',5))end)
+ if not ok or type(Art)~='table'or type(K)~='table'then return{},'the hub tree builders are not there'end
+ local out={}
+ for _,r in ipairs(recipes)do
+  local fn=Art[HUB_FN[r.Kind]or'']
+  if type(fn)=='function'then
+   local built,m=pcall(function()
+    local model=Instance.new('Model');model.Name='Hub '..r.Kind
+    local ctx={Emitters={}}
+    function ctx.Part(level,_,_,name,size,cf,color,mat,o)if level=='fine'then return nil end;return K.Part(model,name,size,cf,color,mat,o)end
+    fn(ctx,r.X,r.Z,r.Arg)
+    return model
+   end)
+   if built and m and #m:GetChildren()>0 then out[#out+1]={Model=m,Label='hub '..r.Kind:lower()..(r.Arg and(' '..tostring(r.Arg))or'')..' ('..tostring(r.X)..','..tostring(r.Z)..')'}end
+  end
+ end
+ return out
+end
+-- A copy of the game's own model keeps no CollectionService tag and no attribute: Clone copies both, and the map's passes have marked their parts (HideBushes124 tags every big Bush
+-- 'HideBush' with a HideBushId: a giant copy with them would turn its bushes see-through for the player hiding in a real bush and add parts to the hiding scan).
+local function strip(o)
+ local CS=game:GetService('CollectionService')
+ for _,tag in ipairs(CS:GetTags(o))do CS:RemoveTag(o,tag)end
+ for k in pairs(o:GetAttributes())do o:SetAttribute(k,nil)end
+end
+-- A private, safe, locked copy of a source model as {Model, Size} (nil, why when it cannot be used). Only a Model can be scaled and moved as one, so a part, a Folder or anything
+-- else that is not a Model goes into a Model of its own.
 local function prepare(src)
  if T.IsCode(src)then return nil,'it is a script'end
  local ok,res=pcall(function()
   local m=src:Clone()
-  if m:IsA('BasePart')then local w=Instance.new('Model');w.Name=src.Name;m.Parent=w;m=w end
+  if not m:IsA('Model')then local w=Instance.new('Model');w.Name=src.Name;m.Parent=w;m=w end
+  strip(m);for _,d in ipairs(m:GetDescendants())do strip(d)end
   local scripts,other=T.Sanitize(m)
   T.Lock(m)
   local centre,size=T.Box(m)
@@ -96,7 +143,22 @@ function L.LoadId(id)
  end
  return nil,table.concat(errs,'; ')
 end
--- One of the owner's meshes as a MeshPart (an instance of its own, unparented): CreateMeshPartAsync, each form in a pcall.
+-- One of the owner's meshes as a MeshPart (an instance of its own, unparented): CreateMeshPartAsync, each form in a pcall. The mesh is asked for with the cheap fidelities (a box for
+-- collision: nothing collides with it anyway; automatic rendering); an engine that does not know the options is asked again without them.
+local function meshOptions()
+ local ok,opts=pcall(function()return{CollisionFidelity=Enum.CollisionFidelity.Box,RenderFidelity=Enum.RenderFidelity.Automatic}end)
+ return ok and opts or nil
+end
+local function askMesh(svc,arg)
+ local opts=meshOptions()
+ if opts then
+  local ok,res=pcall(function()return svc:CreateMeshPartAsync(arg,opts)end)
+  if ok then return res end
+  local why=tostring(res):lower()
+  if not(why:find('argument',1,true)or why:find('option',1,true)or why:find('expected',1,true)or why:find('cast',1,true))then error(res,0)end -- (a real failure is not asked twice)
+ end
+ return svc:CreateMeshPartAsync(arg)
+end
 function L.CreateMesh(meshId)
  local errs={}
  local tries={}
@@ -107,7 +169,7 @@ function L.CreateMesh(meshId)
   local ok,res=timed(function()
    local svc=game:GetService(t[1])
    if svc.CreateMeshPartAsync==nil then error(t[1]..'.CreateMeshPartAsync does not exist')end
-   return svc:CreateMeshPartAsync(t[2])
+   return askMesh(svc,t[2])
   end)
   if ok and typeof(res)=='Instance'then return res end
   errs[#errs+1]=t[1]..': '..short(ok and'nothing returned'or res)
@@ -129,9 +191,7 @@ local function volcanoTemplate()
  return prepare(mp)
 end
 -- The key's template: {Kind='instance'|'specs'|'hills', Source=text, Protos=, Model=}, or nil and why. Cached per key (a rebuild reuses what was loaded).
-function L.Template(map,key)
- local c=L.Cache[key]
- if c~=nil then if c==false then return nil,L.Cache[key..'/why']end;return c end
+local function build(map,key)
  local result,why
  local errs={}
  -- 1. hand-placed
@@ -157,12 +217,18 @@ function L.Template(map,key)
    if ok then result={Kind='hills',Source='the owner\'s Low Poly Island Hills (4 meshes loaded by id)',Meshes=meshes}end
   end
  end
- -- 3. the game's own models
+ -- 3. the game's own models (its map's trees / crystals, and the hub's own trees)
  if not result then
-  local game_=L.GameModels(map,key)
-  local protos={}
-  for _,src in ipairs(game_)do local p,e=prepare(src);if p then protos[#protos+1]=p else errs[#errs+1]=src:GetFullName()..': '..tostring(e)end end
-  if #protos>0 then result={Kind='instance',Source='the game\'s own model'..(#protos>1 and's'or'')..' ('..game_[1].Name..')',Protos=protos}end
+  local sources=L.GameModels(map,key)
+  local hub,hubWhy=L.HubModels(key)
+  for _,e in ipairs(hub)do sources[#sources+1]=e end
+  if hubWhy then errs[#errs+1]=hubWhy end
+  local protos,labels={},{}
+  for _,e in ipairs(sources)do
+   local p,err=prepare(e.Model)
+   if p then p.Label=e.Label;protos[#protos+1]=p;labels[#labels+1]=e.Label else errs[#errs+1]=e.Label..': '..tostring(err)end
+  end
+  if #protos>0 then result={Kind='instance',Source='the game\'s own model'..(#protos>1 and's'or'')..' ('..table.concat(labels,', ')..')',Protos=protos}end
  end
  -- 4. an asset id
  if not result then
@@ -180,6 +246,26 @@ function L.Template(map,key)
  why=#errs>0 and table.concat(errs,'; ')or'no model yet'
  L.Cache[key]=false;L.Cache[key..'/why']=why
  return nil,why
+end
+-- One request at a time per key: while another thread is already loading this key (the volcano's swap in LavaVolcano158 and the background loader both want the owner's volcano), a
+-- second caller waits for that answer (at most 5 x OuterTrackAssets158.LoadSeconds) instead of asking Roblox for the same mesh again.
+L.Pending={}
+function L.Template(map,key)
+ local c=L.Cache[key]
+ if c~=nil then if c==false then return nil,L.Cache[key..'/why']end;return c end
+ if L.Pending[key]then
+  local waited=0
+  while L.Pending[key]and waited<Assets.LoadSeconds*5 do waited+=task.wait(.1)end
+  c=L.Cache[key]
+  if c==nil then return nil,'still loading'end
+  if c==false then return nil,L.Cache[key..'/why']end
+  return c
+ end
+ L.Pending[key]=true
+ local ok,res,why=pcall(build,map,key)
+ L.Pending[key]=nil
+ if not ok then error(res,0)end
+ return res,why
 end
 function L.Reset()L.Cache={}end
 
@@ -199,6 +285,11 @@ function L.Finish(m,slot)
   d.CastShadow=Assets.Shadows==true and math.max(d.Size.X,d.Size.Y,d.Size.Z)>=20
   if tint then local c=d.Color;d.Color=Color3.new(math.min(1,c.R*tint[1]/255),math.min(1,c.G*tint[2]/255),math.min(1,c.B*tint[3]/255))end
  end end
+end
+-- Which of a key's models a spot gets: its Look (1, 2, 3 ... wrapping round the models there are), else the spot's number in its key (the models take turns).
+function L.ProtoFor(tpl,slot,index)
+ local n=#tpl.Protos
+ return tpl.Protos[1+(((slot.Look or index)-1)%n)]
 end
 -- A clone of a prepared template, scaled to the spot's box, stood on the ground, turned and leaned (L.Finish then locks / tints it). Returns the Model (unparented).
 function L.PlaceModel(proto,slot,name)
@@ -341,11 +432,14 @@ function L.Run(map,generation)
       if tpl.Kind=='specs'then m=L.PlaceSpecs(tpl.Model,slot,name,'TrackBackdrops158/'..def.Biome)
       elseif tpl.Kind=='hills'then m=L.PlaceHills(tpl,slot,name,gameTrees,i)
       else
-       m=L.PlaceModel(tpl.Protos[1+((i-1)%#tpl.Protos)],slot,name)
+       local proto=L.ProtoFor(tpl,slot,i) -- (the spot's Look picks one of the key's models, else they take turns)
+       m=L.PlaceModel(proto,slot,name)
+       if proto.Label then m:SetAttribute('Model',proto.Label)end
        if slot.Glow then addGlow(m,slot)end
       end
       L.Finish(m,slot)
       m:SetAttribute('Key',key);m:SetAttribute('Spot',i)
+      m.ModelStreamingMode=Enum.ModelStreamingMode.Atomic -- (a tree, a mountain streams in whole: it never pops in half-built at the streaming edge)
       m.Parent=folder
       st.Placed+=1;st.Parts+=countParts(m)
      end)

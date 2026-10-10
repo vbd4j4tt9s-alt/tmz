@@ -7,7 +7,8 @@
 --   1. hand       a model the owner dragged into ServerStorage.OuterTrackAssets158, named by the key (or Key2, Key3 ... for more looks of the same thing)
 --   2. owner      the owner's own file, built into the game (DesertPyramid: the 82-part file as data; StormDarkMount: his 1,532-part mountain cut down to 280 parts; LavaVolcano and
 --                 SnowMountains: his meshes, loaded by id with AssetService:CreateMeshPartAsync when the server starts)
---   3. game       a model the game already builds (its oaks, jungle trees, ice trees, crystal clusters), copied from the map and scaled up (A.Game)
+--   3. game       a model the game already has (the map's oak, jungle trees, ice trees, crystal clusters, copied from the map; and the hub's own trees, which HubLifeArt151 builds),
+--                 scaled up (A.Game)
 --   4. id         A.Ids[key] (a Creator Store / inventory model id; 0 = not set), loaded with AssetService:LoadAssetAsync / InsertService:LoadAsset. Roblox only lets a game load models
 --                 its owner owns: a model by someone else fails with "not authorized", which is why the dragged-in model (1) comes first.
 --   A key with none of these is skipped with one plain note in the Output.
@@ -20,7 +21,7 @@ A.LoadSeconds=8                -- the longest the server waits for one model to 
 
 -- Asset ids (0 = not set). 9981304 = the owner's pyramid, 5138892863 = his volcano: both are built into the game, the ids are kept for reference / as the last resort.
 A.Ids={
- ForestOak=0,JungleTree=0,JungleTemple=0,JungleCliff=0,
+ ForestTree=0,JungleTree=0,
  DesertDune=0,DesertObelisk=0,DesertPyramid=9981304,
  SnowTree=0,SnowMountains=0,
  LavaVolcano=5138892863,
@@ -31,21 +32,29 @@ A.Ids={
 A.Mesh={
  LavaVolcano={MeshId='rbxassetid://5138886694',TextureId='rbxassetid://5138888007',Size={69.97479248046875,52.653690338134766,59.81602096557617},Color={163,162,165}},
 }
--- Models the game already has (found in the map by name under the biome's folder): Biome = the Obby.Biomes child's name starts with it, Name = a Lua pattern for the model's name,
--- Max = how many different ones are used (picked in name order, spread over the spots), Smallest = the ones with the fewest parts first.
+-- Models the game already has. Found in the map by name under the biome's folder: Biome = the Obby.Biomes child's name starts with it, Name = a Lua pattern for the model's name (Parent =
+-- one for its parent's name, when given), Max = how many different ones are used (picked in name order), Smallest = the ones with the fewest parts first, Also = more entries of the same
+-- shape. Hub = the hub's own trees (ReplicatedStorage.HubLifeArt151 builds them): {Kind = 'Oak' | 'Leafy' | 'Poplar' | 'Palm', Arg = its size S / M / L or its tone, X, Z = the builder's
+-- seed (a different seed, a different crown)}. The models of a key, in this order: the map's, then the hub's. A spot's Look picks one of them (1, 2, 3 ...; no Look: they take turns).
+-- The map has ONE oak design (the Forest's three Oaks and the Jungle's two are the same tree in different sizes and greens): the rest of the variety is the hub's trees.
 A.Game={
- ForestOak={Biome='Biome_1_',Name='^Oak$',Max=3},
- JungleTree={Biome='Biome_6_',Name='^Tall jungle tree$',Max=2},
+ ForestTree={Biome='Biome_1_',Name='^Oak$',Max=1,Hub={
+  {Kind='Oak',Arg='L',X=780,Z=10},{Kind='Oak',Arg='M',X=480,Z=20},{Kind='Oak',Arg='L',X=1020,Z=50},
+  {Kind='Oak',Arg='M',X=420,Z=10},{Kind='Oak',Arg='S',X=240,Z=40},
+  {Kind='Poplar',X=2580,Z=10},{Kind='Poplar',X=2880,Z=60},
+ }},
+ JungleTree={Biome='Biome_6_',Name='^Tall jungle tree$',Max=1,Also={{Name='^Oak$',Parent='^Jungle corner$',Max=1}},Hub={
+  {Kind='Palm',X=2940,Z=10},{Kind='Palm',X=3060,Z=30},{Kind='Palm',X=3240,Z=60},
+  {Kind='Oak',Arg='M',X=540,Z=30},{Kind='Poplar',X=2700,Z=30},{Kind='Oak',Arg='M',X=420,Z=10},
+ }},
  SnowTree={Biome='Biome_3_',Name='^IceTree_%d+$',Max=4},
  CrystalSpire={Biome='Biome_5_',Name='^Crystal$',Max=1,Smallest=true},
 }
 -- The keys, in the order they are looked at: biome (the folder under TrackBackdrops158), who gives the model, what it is. Source: 'owner' (built in from his file / meshes), 'game' (the
 -- game's own model), 'waiting' (nothing yet: send an id or drag a model into the folder).
 A.Keys={
- {Key='ForestOak',Biome='Forest',Source='game',What='a tall round oak (the game\'s own Oak)'},
- {Key='JungleTree',Biome='Jungle',Source='game',What='a giant flat-top jungle tree (the game\'s own Tall jungle tree)'},
- {Key='JungleTemple',Biome='Jungle',Source='waiting',What='a stepped stone temple, about 140 studs wide and 140 tall (one, far left; its front faces the track)'},
- {Key='JungleCliff',Biome='Jungle',Source='waiting',What='a mossy cliff with a waterfall and a pool at its foot, about 100 wide and 156 tall (one, far right; its front faces the track)'},
+ {Key='ForestTree',Biome='Forest',Source='game',What='large trees (the game\'s own Forest oak and the hub\'s oaks and poplars), 95 - 170 studs tall: a loose forest on both sides in three bands, denser at the back'},
+ {Key='JungleTree',Biome='Jungle',Source='game',What='large trees (the game\'s own Tall jungle tree and Jungle oak, and the hub\'s palms, oaks and poplar), 95 - 165 studs tall: a loose jungle on both sides in three bands, denser at the back'},
  {Key='DesertDune',Biome='Desert',Source='waiting',What='a big sand dune, about 340 wide and 85 tall (five)'},
  {Key='DesertObelisk',Biome='Desert',Source='waiting',What='a tall sandstone obelisk with a gold tip, about 9 wide and 110 tall (two)'},
  {Key='DesertPyramid',Biome='Desert',Source='owner',What='the great pyramid, the owner\'s asset 9981304 (82 parts, built in as data; one, far right)'},
@@ -61,31 +70,58 @@ A.Keys={
 }
 -- The spots. X / Z = where the model's base centre stands (Y = its base, default the ground), Yaw = degrees about the up axis (the model's front, -Z, turns toward -X for +90, as Roblox's CFrame.Angles does),
 -- W / H / D = the box it must fit (see above), Scale = for the owner's own models: the size relative to his file, Mirror = left and right swapped (parts only),
--- Tilt = degrees of lean (the volcano), Tint = colour multiplier {r,g,b} / 255, Glow = a small glowing mouth on top (the volcano; no lava streams).
+-- Tilt = degrees of lean (the volcano), Tint = colour multiplier {r,g,b} / 255, Glow = a small glowing mouth on top (the volcano; no lava streams), Look = which of the key's models
+-- the spot gets (1, 2, 3 ... in the order of A.Game; the Forest and Jungle trees). The Forest and Jungle spots (between TREES158 BEGIN / END) are laid out by
+-- docs/proposals/R158/design/make_trees158.py from a fixed seed; edit them by hand or run it again with --write.
 -- Every box obeys the rules (checked by docs/proposals/R158/tests/run_walls158.sh): all of it at |x| >= 100 (or behind the end wall, z > 5990) and off the hub (z >= -99).
 A.Slots={
- -- Forest: tall oaks behind both walls (the game's own Oak model, scaled to the spot's height)
- {Key='ForestOak',X=-122,Z=-56,Yaw=0,W=30,H=80.4,D=30,Tint={255,244,250}},
- {Key='ForestOak',X=-136,Z=8,Yaw=53,W=34,H=86.4,D=34,Tint={248,251,251}},
- {Key='ForestOak',X=-122,Z=56,Yaw=106,W=28,H=76.4,D=28,Tint={241,228,252}},
- {Key='ForestOak',X=-168,Z=-24,Yaw=159,W=40,H=92.4,D=40,Tint={234,235,253}},
- {Key='ForestOak',X=-164,Z=44,Yaw=212,W=36,H=88.4,D=36,Tint={227,242,254}},
- {Key='ForestOak',X=-216,Z=10,Yaw=265,W=44,H=100.4,D=44,Tint={250,249,255}},
- {Key='ForestOak',X=127,Z=-44,Yaw=318,W=32,H=82.4,D=32,Tint={243,226,226}},
- {Key='ForestOak',X=132,Z=16,Yaw=11,W=28,H=78.4,D=28,Tint={236,233,227}},
- {Key='ForestOak',X=126,Z=64,Yaw=64,W=32,H=86.4,D=32,Tint={229,240,228}},
- {Key='ForestOak',X=170,Z=-12,Yaw=117,W=40,H=94.4,D=40,Tint={252,247,229}},
- {Key='ForestOak',X=166,Z=50,Yaw=170,W=38,H=96.4,D=38,Tint={245,254,230}},
- {Key='ForestOak',X=220,Z=24,Yaw=223,W=44,H=102.4,D=44,Tint={238,231,231}},
- -- Jungle: giant jungle trees (the game's own Tall jungle tree), a stepped temple, a waterfall cliff
- {Key='JungleTree',X=-130,Z=140,Yaw=0,W=52,H=103.9,D=52,Tint={234,235,253}},
- {Key='JungleTree',X=-140,Z=300,Yaw=71,W=52,H=93.9,D=52,Tint={227,242,254}},
- {Key='JungleTree',X=-141,Z=460,Yaw=142,W=52,H=98.9,D=52,Tint={250,249,255}},
- {Key='JungleTree',X=140,Z=190,Yaw=213,W=52,H=98.9,D=52,Tint={243,226,226}},
- {Key='JungleTree',X=142,Z=360,Yaw=284,W=52,H=93.9,D=52,Tint={236,233,227}},
- {Key='JungleTree',X=133,Z=500,Yaw=355,W=52,H=103.9,D=52,Tint={229,240,228}},
- {Key='JungleTemple',X=-320,Z=320,Yaw=-90,W=140,H=141,D=140},
- {Key='JungleCliff',X=318,Z=250,Yaw=90,W=104,H=156,D=108},
+ -- TREES158 BEGIN
+ -- Forest: large trees on both sides in three bands (front, middle, back: taller and denser the further out); Look = the key's model (A.Game order)
+ {Key='ForestTree',X=-152,Z=-50,Yaw=5,W=86.0,H=95.0,D=86.2,Tint={220,226,221},Look=3},
+ {Key='ForestTree',X=-161,Z=33,Yaw=355,W=87.7,H=107.6,D=75.7,Tint={254,244,243},Look=1},
+ {Key='ForestTree',X=-247,Z=-28,Yaw=226,W=93.9,H=115.2,D=81.1,Tint={246,244,236},Look=1},
+ {Key='ForestTree',X=-211,Z=30,Yaw=61,W=48.7,H=134.9,D=48.5,Tint={234,241,232},Look=8},
+ {Key='ForestTree',X=-263,Z=-67,Yaw=186,W=48.1,H=133.3,D=47.9,Tint={237,246,235},Look=8},
+ {Key='ForestTree',X=-315,Z=-18,Yaw=290,W=107.2,H=131.5,D=92.6,Tint={247,240,245},Look=1},
+ {Key='ForestTree',X=-295,Z=44,Yaw=16,W=56.7,H=145.2,D=56.7,Tint={237,246,239},Look=7},
+ {Key='ForestTree',X=152,Z=-49,Yaw=178,W=88.0,H=105.5,D=89.6,Tint={206,220,210},Look=6},
+ {Key='ForestTree',X=170,Z=29,Yaw=16,W=89.8,H=110.2,D=77.6,Tint={255,245,238},Look=1},
+ {Key='ForestTree',X=202,Z=-58,Yaw=329,W=53.4,H=147.9,D=53.1,Tint={236,245,243},Look=8},
+ {Key='ForestTree',X=213,Z=11,Yaw=251,W=94.1,H=123.1,D=82.1,Tint={220,223,216},Look=5},
+ {Key='ForestTree',X=303,Z=-60,Yaw=267,W=58.0,H=160.7,D=57.7,Tint={230,248,235},Look=8},
+ {Key='ForestTree',X=278,Z=-27,Yaw=193,W=66.2,H=169.4,D=66.2,Tint={235,246,235},Look=7},
+ {Key='ForestTree',X=316,Z=17,Yaw=180,W=99.4,H=129.9,D=99.3,Tint={216,227,217},Look=4},
+ -- Jungle: large trees on both sides in three bands (front, middle, back: taller and denser the further out); Look = the key's model (A.Game order)
+ {Key='JungleTree',X=-178,Z=156,Yaw=45,W=98.8,H=106.2,D=97.8,Tint={169,201,171},Look=3},
+ {Key='JungleTree',X=-161,Z=274,Yaw=45,W=79.3,H=100.6,D=69.3,Tint={254,244,249},Look=1},
+ {Key='JungleTree',X=-167,Z=360,Yaw=18,W=92.9,H=95.1,D=94.8,Tint={162,191,166},Look=4},
+ {Key='JungleTree',X=-168,Z=446,Yaw=190,W=89.6,H=99.1,D=81.1,Tint={149,187,152},Look=6},
+ {Key='JungleTree',X=-222,Z=132,Yaw=175,W=96.1,H=96.6,D=90.3,Tint={165,200,175},Look=5},
+ {Key='JungleTree',X=-252,Z=211,Yaw=317,W=101.0,H=128.1,D=88.2,Tint={252,243,242},Look=1},
+ {Key='JungleTree',X=-212,Z=305,Yaw=79,W=101.8,H=112.6,D=92.2,Tint={145,185,152},Look=6},
+ {Key='JungleTree',X=-216,Z=444,Yaw=18,W=61.4,H=157.4,D=61.4,Tint={155,196,175},Look=7},
+ {Key='JungleTree',X=-322,Z=146,Yaw=340,W=97.2,H=104.5,D=96.2,Tint={165,198,174},Look=3},
+ {Key='JungleTree',X=-331,Z=223,Yaw=28,W=108.9,H=142.5,D=95.0,Tint={152,188,164},Look=8},
+ {Key='JungleTree',X=-344,Z=308,Yaw=250,W=108.2,H=116.3,D=107.1,Tint={166,202,172},Look=3},
+ {Key='JungleTree',X=-292,Z=372,Yaw=152,W=60.8,H=155.7,D=60.8,Tint={158,190,173},Look=7},
+ {Key='JungleTree',X=-305,Z=425,Yaw=194,W=107.9,H=141.1,D=94.0,Tint={151,190,160},Look=8},
+ {Key='JungleTree',X=-275,Z=478,Yaw=0,W=97.5,H=117.8,D=85.2,Tint={242,251,248},Look=2},
+ {Key='JungleTree',X=172,Z=144,Yaw=155,W=98.3,H=108.7,D=89.0,Tint={146,189,153},Look=6},
+ {Key='JungleTree',X=155,Z=227,Yaw=272,W=90.9,H=109.8,D=79.5,Tint={245,247,243},Look=2},
+ {Key='JungleTree',X=162,Z=295,Yaw=20,W=90.1,H=114.2,D=78.7,Tint={250,249,238},Look=1},
+ {Key='JungleTree',X=216,Z=152,Yaw=145,W=99.9,H=130.6,D=87.0,Tint={151,195,162},Look=8},
+ {Key='JungleTree',X=243,Z=246,Yaw=326,W=101.0,H=122.0,D=88.3,Tint={252,242,247},Look=2},
+ {Key='JungleTree',X=211,Z=326,Yaw=5,W=102.0,H=102.6,D=95.9,Tint={166,199,171},Look=5},
+ {Key='JungleTree',X=206,Z=389,Yaw=36,W=54.6,H=139.9,D=54.6,Tint={157,191,171},Look=7},
+ {Key='JungleTree',X=234,Z=461,Yaw=189,W=102.5,H=123.9,D=89.7,Tint={243,242,243},Look=2},
+ {Key='JungleTree',X=288,Z=125,Yaw=319,W=54.1,H=138.5,D=54.1,Tint={152,198,173},Look=7},
+ {Key='JungleTree',X=348,Z=181,Yaw=53,W=103.5,H=125.1,D=90.5,Tint={247,244,242},Look=2},
+ {Key='JungleTree',X=303,Z=252,Yaw=357,W=109.0,H=120.6,D=98.7,Tint={146,184,155},Look=6},
+ {Key='JungleTree',X=291,Z=313,Yaw=143,W=60.3,H=154.4,D=60.3,Tint={160,198,176},Look=7},
+ {Key='JungleTree',X=309,Z=365,Yaw=287,W=103.8,H=135.7,D=90.4,Tint={149,191,161},Look=8},
+ {Key='JungleTree',X=311,Z=414,Yaw=30,W=63.8,H=163.5,D=63.8,Tint={158,199,172},Look=7},
+ {Key='JungleTree',X=287,Z=456,Yaw=41,W=53.4,H=136.7,D=53.4,Tint={159,191,170},Look=7},
+ -- TREES158 END
  -- Desert: big dunes, two obelisks, the great pyramid (the owner's asset 9981304, placed from data)
  {Key='DesertDune',X=-300,Z=640,Yaw=0,W=340,H=85,D=400},
  {Key='DesertDune',X=-290,Z=1090,Yaw=0,W=320,H=75,D=360},

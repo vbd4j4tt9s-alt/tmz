@@ -1,24 +1,24 @@
 == hub
-12926 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+12832 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == forest
-13113 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+13019 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == jungle
-13985 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+13891 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == desert
-15479 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+15385 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == snow
-15565 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+15471 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == lava
-15590 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+15496 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == crystal
-15597 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+15503 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS
 == storm
-15370 parts in the scene, 4041 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 287
+15276 parts in the scene, 3947 of them new (walls, backdrops, base caps, the new volcano): counted 0, look-alike (no visible flicker) 286
 R158 z-fighting (camera anywhere): PASS

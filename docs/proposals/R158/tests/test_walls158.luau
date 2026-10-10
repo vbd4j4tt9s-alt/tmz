@@ -146,9 +146,18 @@ for _,root in ipairs({wallsRoot,backRoot,baseRoot})do for _,d in ipairs(root:Get
  if not(d:IsA('BasePart')or c=='Folder'or c=='Model'or c=='SpecialMesh'or c=='Decal'or c=='Texture')then nonGeom=nonGeom or(d:GetFullName()..' is a '..c)end
 end end
 check('built: nothing under them but parts, folders, models, meshes and decals (no script, no sound, no light, no joint)',nonGeom==nil,nonGeom)
-local persistent
-for _,root in ipairs({wallsRoot,backRoot,baseRoot})do for _,d in ipairs(root:GetDescendants())do if d._class=='Model'and(d._props.ModelStreamingMode==R.Enum.ModelStreamingMode.Persistent or d._props.ModelStreamingMode==R.Enum.ModelStreamingMode.Atomic)then persistent=d.Name end end end
-check('built: no Persistent / Atomic model (nothing on a client waits for these parts; they stream in and out)',persistent==nil,persistent)
+local persistent,notAtomic,nBackdrops
+nBackdrops=0
+for _,root in ipairs({wallsRoot,backRoot,baseRoot})do for _,d in ipairs(root:GetDescendants())do
+ if d._class=='Model'then
+  local mode=d._props.ModelStreamingMode
+  local backdrop=d._parent~=nil and d._parent.Name=='Models'
+  if mode==R.Enum.ModelStreamingMode.Persistent or(mode==R.Enum.ModelStreamingMode.Atomic and not backdrop)then persistent=d.Name end
+  if backdrop then nBackdrops+=1;if mode~=R.Enum.ModelStreamingMode.Atomic then notAtomic=notAtomic or d.Name end end
+ end
+end end
+check('built: no Persistent model and no Atomic wall / ground / cap part (nothing on a client waits for them: they stream in and out one by one)',persistent==nil,persistent)
+check('built: every placed backdrop Model is Atomic (a tree or a mountain streams in whole, never half-built at the streaming edge; '..nBackdrops..' models)',nBackdrops>20 and notAtomic==nil,notAtomic or nBackdrops)
 check('built: the folders carry their version and part counts',wallsRoot:GetAttribute('Version')==158 and wallsRoot:GetAttribute('Parts')==#walls and baseRoot:GetAttribute('Parts')==#base and backRoot:GetAttribute('Version')==158)
 -- the keep-clear rules on what was BUILT (the data checks do the same on the data)
 local keysBad,gateBad,walkBad,pyrBad,reachBad
@@ -195,6 +204,23 @@ check('lava: no stream, pool, river, channel or molten crater is left anywhere o
 local magmaParts=0
 for _,p in ipairs(partsOf(map))do if p.Name=='MagmaSurface'or p.Name=='MovingMoltenCurrent'or p.Name=='ContinuousBasaltBank'or p.Name=='BasaltChannelBank'then magmaParts+=1 end end
 check('lava: no magma surface, current or channel bank part is left ('..magmaParts..')',magmaParts==0)
+do -- owner: the Lava track walls' Neon "Lava drip" pieces are gone for good (the rest of the Lava wall is built)
+ local lavaWall=wallsRoot:FindFirstChild('Lava')
+ local drips,nBuilt,foot=0,0,0
+ if lavaWall then for _,p in ipairs(partsOf(lavaWall))do nBuilt+=1;if p.Name:lower():find('drip',1,true)then drips+=1 end;if p.Name=='Basalt foot'then foot+=1 end end end
+ check('lava wall: no part of the Lava track walls is a drip (built: '..nBuilt..' parts, 0 drips), the foot, the glow seams and the crest are there',lavaWall~=nil and drips==0 and nBuilt==gotBy.Lava and foot>0,drips..' drips of '..nBuilt)
+end
+do -- owner: "remove those leaf balls, don't have plain balls or anything that might reduce the look of the walls": nothing round on any wall
+ local round,nChecked={},0
+ local function words(n)n=n:lower();for _,w in ipairs({'ball','blob','leaf','leaves','crown','tuft','overgrowth','rubble','pillow','mound','drip','egg','sphere'})do if n:find(w,1,true)then return true end end;return false end
+ for _,root in ipairs({wallsRoot,baseRoot})do for _,d in ipairs(root:GetDescendants())do
+  nChecked+=1
+  local isBall=d:IsA('BasePart')and d._props.Shape~=nil and enumName(d._props.Shape)=='Ball'
+  if isBall or d._class=='SpecialMesh'or words(d.Name)then round[#round+1]=d:GetFullName()end
+ end end
+ for _,g in ipairs(groundParts)do if enumName(g._props.Shape)=='Ball'or words(g.Name)then round[#round+1]=g:GetFullName()end end
+ check('walls: no Ball, no sphere mesh and nothing named like a ball / blob / leaf / crown / drip on any track wall, base wall or the ground ('..nChecked..' instances looked at)',#round==0 and nChecked>1000,round[1])
+end
 local landmark=map.MythicLandmarks:FindFirstChild('Biome4_Landmark')
 check('lava: with no volcano model to load the old cone stays (its slopes and crater lip), without its channels and crater',landmark~=nil and landmark:GetAttribute('Volcano158')==nil and landmark:FindFirstChild('BasaltSlope')~=nil and landmark:FindFirstChild('MoltenCrater')==nil)
 local sawNote
@@ -205,12 +231,13 @@ info(sawNote or'(no volcano note)')
 -- 4. the outer track with nothing to load -------------------------------------------------------------------------------------------------------------
 local status=Loader.Status
 local function placed(key)return status[key]and status[key].Placed or 0 end
-check('outer: the keys with a model got their spots: ForestOak 12, JungleTree 6, DesertPyramid 1, SnowTree 8, CrystalSpire 6, StormDarkMount 4',placed('ForestOak')==12 and placed('JungleTree')==6 and placed('DesertPyramid')==1 and placed('SnowTree')==8 and placed('CrystalSpire')==6 and placed('StormDarkMount')==4,
- 'oak '..placed('ForestOak')..' jungle '..placed('JungleTree')..' pyramid '..placed('DesertPyramid')..' snow '..placed('SnowTree')..' crystal '..placed('CrystalSpire')..' storm '..placed('StormDarkMount'))
-local waiting={'JungleTemple','JungleCliff','DesertDune','DesertObelisk','CrystalMountain','StormTower','StormLightning','StormEndPeak'}
+local nForest,nJungle=#Assets.SlotsOf('ForestTree'),#Assets.SlotsOf('JungleTree')
+check('outer: the keys with a model got their spots: ForestTree '..nForest..', JungleTree '..nJungle..', DesertPyramid 1, SnowTree 8, CrystalSpire 6, StormDarkMount 4',placed('ForestTree')==nForest and placed('JungleTree')==nJungle and placed('DesertPyramid')==1 and placed('SnowTree')==8 and placed('CrystalSpire')==6 and placed('StormDarkMount')==4,
+ 'forest '..placed('ForestTree')..' jungle '..placed('JungleTree')..' pyramid '..placed('DesertPyramid')..' snow '..placed('SnowTree')..' crystal '..placed('CrystalSpire')..' storm '..placed('StormDarkMount'))
+local waiting={'DesertDune','DesertObelisk','CrystalMountain','StormTower','StormLightning','StormEndPeak'}
 local okWait=true
 for _,k in ipairs(waiting)do if placed(k)~=0 then okWait=false end end
-check('outer: the keys with no model (JungleTemple, JungleCliff, DesertDune, DesertObelisk, CrystalMountain, StormTower, StormLightning, StormEndPeak) place nothing',okWait)
+check('outer: the keys with no model (DesertDune, DesertObelisk, CrystalMountain, StormTower, StormLightning, StormEndPeak) place nothing',okWait)
 check('outer: the owner\'s two mesh models (SnowMountains, LavaVolcano) place nothing when no mesh can be loaded',placed('SnowMountains')==0 and placed('LavaVolcano')==0)
 local counts={}
 for _,l in ipairs(startup)do
@@ -242,6 +269,44 @@ check('outer: every model part is anchored, no collision / touch / query, no sha
 local scripts=0
 for _,root in ipairs({wallsRoot,backRoot,baseRoot})do scripts+=countClass(root,'Script')+countClass(root,'LocalScript')+countClass(root,'ModuleScript')+countClass(root,'Sound')+countClass(root,'PointLight')+countClass(root,'Weld')end
 check('outer: no script, sound, light or joint under any new folder',scripts==0,scripts)
+-- 4b. the Forest and Jungle trees as built (owner: "forest and jungle can just have large trees on the outside with our current game assets")
+do
+ local function modelsIn(biome)local f=backRoot:FindFirstChild(biome);local m=f and f:FindFirstChild('Models');return m and m:GetChildren()or{}end
+ local function bbox(m)local lo,hi;for _,p in ipairs(partsOf(m))do local a,b=aabb(p);if not lo then lo,hi={a[1],a[2],a[3]},{b[1],b[2],b[3]}else for i=1,3 do lo[i]=math.min(lo[i],a[i]);hi[i]=math.max(hi[i],b[i])end end end;return lo,hi end
+ local totalTreeParts=0
+ for _,def in ipairs({{'ForestTree','Forest'},{'JungleTree','Jungle'}})do
+  local key,biome=def[1],def[2]
+  local tpl=Loader.Template(map,key)
+  local protos=tpl and tpl.Protos or{}
+  for i,p in ipairs(protos)do info(string.format('tree look %s %d: %-18s %2d parts, size %.2f x %.2f x %.2f',key,i,tostring(p.Label),p.Parts,p.Size.X,p.Size.Y,p.Size.Z))end
+  local slots=Assets.SlotsOf(key)
+  local list={};for _,m in ipairs(modelsIn(biome))do if m:GetAttribute('Key')==key then list[#list+1]=m end end
+  local parts,labels,nLabels,bad=0,{},0,nil
+  for _,m in ipairs(list)do
+   local slot=slots[m:GetAttribute('Spot')]
+   parts+=#partsOf(m)
+   local lo,hi=bbox(m);local label=m:GetAttribute('Model')
+   if not labels[label or'?']then labels[label or'?']=true;nLabels+=1 end
+   local want=protos[1+(((slot.Look or 1)-1)%#protos)]
+   local sink=Assets.Ground-lo[2]
+   if not(want and want.Label==label)then bad=bad or(m.Name..': is '..tostring(label)..', the spot\'s Look '..tostring(slot.Look)..' wants '..tostring(want and want.Label))end
+   if not(near(hi[2]-lo[2],slot.H,slot.H*.012))then bad=bad or(m.Name..': '..string.format('%.1f',hi[2]-lo[2])..' tall, the spot says '..slot.H)end
+   if not(sink>=.2 and sink<=.5)then bad=bad or(m.Name..': stands '..string.format('%.2f',sink)..' under the ground (floating or sunk)')end
+   local box=Assets.Box(slot)
+   if lo[1]<box[1]-.6 or hi[1]>box[2]+.6 or lo[3]<box[5]-.6 or hi[3]>box[6]+.6 then bad=bad or(m.Name..': outside its spot\'s box')end
+   -- (the model is stood on its spot by the centre of its box before the turn; a leaning crown moves the box's centre a little when it turns)
+   if not(math.abs((lo[1]+hi[1])/2-slot.X)<=.25*math.max(slot.W,slot.D)and math.abs((lo[3]+hi[3])/2-slot.Z)<=.25*math.max(slot.W,slot.D))then bad=bad or(m.Name..': not on its spot')end
+  end
+  check('trees: '..biome..': all '..#slots..' spots are placed ('..#list..'), each the model its Look says, as tall as the spot says (within 1.2 %), standing on the ground (not floating, not sunk), inside its box and centred',#list==#slots and bad==nil,bad)
+  check('trees: '..biome..': '..nLabels..' different tree models in the built forest (at least 6)',nLabels>=6)
+  totalTreeParts+=parts
+  local tagged=0
+  for _,m in ipairs(list)do for _,d in ipairs(m:GetDescendants())do if d._tags and next(d._tags)~=nil or next(d._attrs or{})~=nil then tagged+=1 end end end
+  check('trees: '..biome..': no tag and no attribute on any part of any tree (nothing the map\'s passes marked came along)',tagged==0,tagged)
+ end
+ info('Forest + Jungle tree parts: '..totalTreeParts..' (the owner\'s limit: under about 900; R158 first build: 204 + 198 = 402)')
+ check('trees: Forest + Jungle models together are '..totalTreeParts..' parts (under 900)',totalTreeParts>0 and totalTreeParts<900)
+end
 info('outer track parts: '..modelParts..' in models + '..#groundParts..' ground slabs; walls '..#wallList..', base caps '..#baseList)
 info('start-up built in '..string.format('%.2f',os.clock()-t0)..' s on this machine (mock)')
 
@@ -256,6 +321,23 @@ map:SetAttribute('BiomesRefreshing',true)
 check('refresh: when the track closes for its refresh exactly those parts turn invisible (no more, no fewer)',hidden()==high,hidden())
 map:SetAttribute('BiomesRefreshing',false)
 check('refresh: and they are back when it opens again',hidden()==0)
+-- independent of Specs.OverCover: every wall piece over the cover's roof (Y 55) or past its sides (|x| 94, the cover's width), inside |x| 95 and off the hub, is on the hidden list
+do
+ local inHigh={};for _,h in ipairs(TW.High)do inHigh[h.Part]=true end
+ local missing,bySide,expectN=nil,0,0
+ for _,p in ipairs(wallList)do
+  local lo,hi=aabb(p);local reach=math.max(math.abs(lo[1]),math.abs(hi[1]))
+  if(hi[2]>55 or reach>94.0001)and reach<=95.0001 and hi[3]>-99 then
+   expectN+=1
+   if not inHigh[p]then missing=missing or(p:GetFullName()..' sticks out of the refresh cover and is not hidden while the track refreshes')end
+   if hi[2]<=55 then bySide+=1 end
+  end
+ end
+ map:SetAttribute('BiomesRefreshing',true)
+ local hiddenNow=hidden()
+ map:SetAttribute('BiomesRefreshing',false)
+ check('refresh: every wall piece over the cover\'s roof (Y 55) or past its sides (|x| 94) is hidden while the track refreshes ('..expectN..' pieces, '..bySide..' of them at or under Y 55, sticking out of its sides)',missing==nil and hiddenNow==expectN and bySide>=10,missing or(hiddenNow..' hidden, '..expectN..' expected, '..bySide..' by the sides'))
+end
 
 -- 6. idempotent --------------------------------------------------------------------------------------------------------------------------------------
 local fpW,fpC,fpG=fingerprint(wallsRoot),fingerprint(baseRoot),fingerprint(backRoot,true)
@@ -350,8 +432,8 @@ AS.LoadAssetAsync=function(self,id)
  if id==444 then coroutine.yield();return nil end -- never answers
  error('unknown asset '..tostring(id))
 end
-local savedIds={StormTower=Assets.Ids.StormTower,StormLightning=Assets.Ids.StormLightning,StormEndPeak=Assets.Ids.StormEndPeak,JungleTemple=Assets.Ids.JungleTemple,JungleCliff=Assets.Ids.JungleCliff}
-Assets.Ids.StormTower=111;Assets.Ids.JungleTemple=222;Assets.Ids.StormEndPeak=333;Assets.Ids.JungleCliff=444
+local savedIds={StormTower=Assets.Ids.StormTower,StormLightning=Assets.Ids.StormLightning,StormEndPeak=Assets.Ids.StormEndPeak,DesertObelisk=Assets.Ids.DesertObelisk}
+Assets.Ids.StormTower=111;Assets.Ids.StormLightning=222;Assets.Ids.StormEndPeak=333;Assets.Ids.DesertObelisk=444
 printed={};Loader.Reset()
 local t1=R.clock
 Loader.Run(map)
@@ -361,8 +443,8 @@ local tw=(function()for _,m in ipairs(modelsOf('Storm Peaks'))do if m.Name=='Sto
 check('id: the loaded model is made safe like a hand-placed one',tw and countClass(tw,'Script')==0 and flagsOf(partsOf(tw),true,true)==nil)
 local authNote,hangNote,nilNote
 for _,l in ipairs(printed)do
- if l:find('JungleTemple',1,true)and l:find('not your asset',1,true)then authNote=l end
- if l:find('JungleCliff',1,true)and l:find('timed out',1,true)then hangNote=l end
+ if l:find('StormLightning',1,true)and l:find('not your asset',1,true)then authNote=l end
+ if l:find('DesertObelisk',1,true)and l:find('timed out',1,true)then hangNote=l end
  if l:find('StormEndPeak',1,true)and l:find('asset 333',1,true)then nilNote=l end
 end
 check('id: "not authorized" is ONE plain note that says the asset is not yours, the key is skipped',authNote~=nil,authNote)
@@ -372,10 +454,10 @@ local anyWarn
 for _,w in ipairs(warned)do if w:find('R158',1,true)then anyWarn=w end end
 check('id: none of these failures was a warning',anyWarn==nil,anyWarn)
 local stormEnd=0;for _,m in ipairs(modelsOf('Storm Peaks'))do if m.Name:find('^StormEndPeak')then stormEnd+=1 end end
-check('id: nothing is placed for the keys whose asset failed',stormEnd==0 and #(function()local t={};for _,m in ipairs(modelsOf('Jungle'))do if m.Name:find('^JungleTemple')or m.Name:find('^JungleCliff')then t[#t+1]=m end end;return t end)()==0)
+check('id: nothing is placed for the keys whose asset failed',stormEnd==0 and #(function()local t={};for _,m in ipairs(modelsOf('Storm Peaks'))do if m.Name:find('^StormLightning')then t[#t+1]=m end end;for _,m in ipairs(modelsOf('Desert'))do if m.Name:find('^DesertObelisk')then t[#t+1]=m end end;return t end)()==0)
 for k,v in pairs(savedIds)do Assets.Ids[k]=v end
 -- the box guard
-local rogue={Key='JungleTemple',X=-60,Z=300,Yaw=0,W=50,H=50,D=50}
+local rogue={Key='ForestTree',X=-60,Z=300,Yaw=0,W=50,H=50,D=50}
 check('guard: a spot whose box would reach inside |x| 100 is refused',select(1,Loader.Allowed(rogue))==false)
 check('guard: a spot over the hub (z < -99) is refused, a spot behind the end wall may cross x = 0',select(1,Loader.Allowed({X=200,Z=-150,Yaw=0,W=20,H=20,D=20}))==false and select(1,Loader.Allowed({X=0,Z=6500,Yaw=0,W=800,H=300,D=800}))==true)
 local rulesBad
@@ -453,6 +535,14 @@ local oldFoot={}
 do local x0,x1,z0,z1;for _,d in ipairs(oldLandmark:GetChildren())do if d:IsA('BasePart')and(d.Name=='BasaltSlope'or d.Name=='CraterLip')then local lo,hi=aabb(d);x0=x0 and math.min(x0,lo[1])or lo[1];x1=x1 and math.max(x1,hi[1])or hi[1];z0=z0 and math.min(z0,lo[3])or lo[3];z1=z1 and math.max(z1,hi[3])or hi[3]end end;oldFoot={x0,x1,z0,z1} end
 local oldVent=oldLandmark:FindFirstChild('CraterVent')
 check('track volcano: the old cone is measured (footprint '..string.format('%.0f x %.0f',oldFoot[2]-oldFoot[1],oldFoot[4]-oldFoot[3])..') and has its vent',oldFoot[1]~=nil and oldVent~=nil)
+-- the keyboard's skip scan (KeyboardSkip152) as it sees the map with the OLD cone, to compare with what it sees with the owner's mesh volcano (one MeshPart: its box is a square)
+local Skip=W.require(RS.KeyboardSkip152);local KT=W.require(RS.KeyboardTrack)
+local function skipCells()
+ local attrs=map:GetAttributes();attrs.KeyboardSkip=nil
+ local geo=KT.Geometry(attrs,mapService.BaseBoundaryLine.Position.X)
+ return Skip.Scan(map,geo).Cells
+end
+local cellsOld=skipCells()
 Loader.Reset();printed={}
 local res=LV.Apply(map)
 local newLandmark=map.MythicLandmarks:FindFirstChild('Biome4_Landmark')
@@ -472,6 +562,16 @@ local vent=newLandmark:FindFirstChild('CraterVent')
 check('track volcano: the old embers, smoke and light (CraterVent) moved up to the new mouth',vent~=nil and vent._props.CFrame.Position.Y>=hi[2]-1.5 and near(vent._props.CFrame.Position.X,(lo[1]+hi[1])/2,.5))
 check('track volcano: no lava stream, channel or pool in it, none on the map',#findStreams(map)==0)
 check('track volcano: its root part is the PrimaryPart (the model can be moved as one)',newLandmark.PrimaryPart~=nil and newLandmark.PrimaryPart.Name=='VolcanoRoot')
+-- the keyboard: the mesh volcano's box is a square round a round thing; keys under its square corners must not be left out (bare floor patches the old cone never had)
+do
+ local cellsNew=skipCells()
+ local nOld,nNew,extra,asBox=0,0,0,0
+ for k in pairs(cellsOld)do nOld+=1 end
+ for k in pairs(cellsNew)do nNew+=1;if not cellsOld[k]then extra+=1 end end
+ info('keyboard skip: '..nOld..' cells with the old cone, '..nNew..' with the owner\'s volcano ('..extra..' extra)')
+ local disc=0;for _,p in ipairs(meshes)do if type(p:GetAttribute('KeyboardDisc'))=='number'and p:GetAttribute('KeyboardDisc')>0 then disc+=1 end end
+ check('track volcano: the keyboard leaves out no key it did not leave out for the old cone (the mesh says KeyboardDisc: a round footprint, not its square box); '..nNew..' cells now, '..nOld..' before',extra==0 and nNew>0 and disc==#meshes,extra..' extra, '..disc..' discs')
+end
 local res2=LV.Apply(map)
 check('track volcano: Apply again changes nothing (already the owner\'s volcano)',res2.Already==true and select(2,child(map.MythicLandmarks,'Biome4_Landmark'))==1)
 check('track volcano: the V129 undo still finds its replacement (VolcanoVersion 129 on Biome4_Landmark)',newLandmark:GetAttribute('VolcanoVersion')==129)
@@ -499,6 +599,59 @@ do
  local t=Loader.Template(map,'LavaVolcano')
  check('track volcano: a model dragged into ServerStorage.OuterTrackAssets158.LavaVolcano is used before any mesh is loaded',t~=nil and t.Kind=='instance'and t.Source:find('ServerStorage',1,true)~=nil)
  hand:Destroy()
+end
+
+-- 8. the code review's fixes ------------------------------------------------------------------------------------------------------------------------------
+-- (a) a copy of the game's own model keeps no tag and no attribute; (b) a source that is not a Model (a Folder from a loaded asset) is wrapped in one; (c) the mesh is asked for with
+-- the cheap fidelities, and asked again without them only when the engine does not know them.
+do
+ local CS=W.service('CollectionService')
+ -- the mock's Clone leaves tags and attributes behind; Roblox's Clone copies both (that is the bug): make the mock do the same
+ local rawClone=R.Inst.Clone
+ R.Inst.Clone=function(self)
+  local c=rawClone(self)
+  for k,v in pairs(self._attrs)do c._attrs[k]=v end
+  if self._tags then local own={};for t in pairs(self._tags)do own[t]=true end;c._tags=own end -- (its own table: the mock keeps _tags among the properties Clone copies by reference)
+  return c
+ end
+ local src=R.new('Model');src.Name='Tall jungle tree'
+ block(src,'Trunk',V3(5,26,5),V3(0,13,0))
+ local bush=block(src,'Bush',V3(9,7,9),V3(14,4,0))
+ bush:SetAttribute('HideBushId',7);CS:AddTag(bush,'HideBush')
+ src:SetAttribute('Looked',true);CS:AddTag(src,'Scenery')
+ local copy=src:Clone()
+ check('prepare: (the mock now copies tags and attributes on Clone, as Roblox does: the copy of the bush carries HideBush / HideBushId)',CS:HasTag(copy:FindFirstChild('Bush'),'HideBush')and copy:FindFirstChild('Bush'):GetAttribute('HideBushId')==7 and copy:GetAttribute('Looked')==true)
+ local p=Loader.Prepare(src)
+ local dirty=0
+ for _,d in ipairs(p.Model:GetDescendants())do if(d._tags and next(d._tags)~=nil)or next(d._attrs)~=nil then dirty+=1 end end
+ if(p.Model._tags and next(p.Model._tags)~=nil)or next(p.Model._attrs)~=nil then dirty+=1 end
+ check('prepare: a prepared copy of a game model keeps no CollectionService tag and no attribute (HideBush / HideBushId would turn the giant bushes see-through for a player hiding in a real bush)',dirty==0 and #partsOf(p.Model)==2,dirty)
+ check('prepare: ... and the original in the map keeps its own tag and attribute',CS:HasTag(bush,'HideBush')and bush:GetAttribute('HideBushId')==7 and CS:HasTag(src,'Scenery'),
+  tostring(CS:HasTag(bush,'HideBush'))..' '..tostring(bush:GetAttribute('HideBushId'))..' '..tostring(CS:HasTag(src,'Scenery')))
+ -- (b) a Folder source
+ local folderSrc=R.new('Folder');folderSrc.Name='LoadedTree'
+ block(folderSrc,'Trunk',V3(4,20,4),V3(0,10,0));block(folderSrc,'Crown',V3(14,8,14),V3(0,24,0))
+ local pf=Loader.Prepare(folderSrc)
+ local okPlace,placedF=pcall(function()return Loader.PlaceModel(pf,{X=200,Z=100,Yaw=0,W=60,H=80,D=60},'t')end)
+ check('prepare: a Folder source (a loaded asset may be one) is wrapped in a Model of its own, so it scales and moves as one',pf~=nil and pf.Model._class=='Model'and pf.Model.Name=='LoadedTree'and okPlace and #partsOf(placedF)==2,tostring(placedF))
+ local partSrc=R.new('Part');partSrc.Name='LoneRock';partSrc.Size=V3(10,10,10)
+ local pp=Loader.Prepare(partSrc)
+ check('prepare: a lone Part is wrapped in a Model too',pp~=nil and pp.Model._class=='Model')
+ R.Inst.Clone=rawClone
+ -- (c) the mesh request's options
+ local seen={}
+ local askedFor
+ AS.CreateMeshPartAsync=function(self,content,options)seen[#seen+1]=options;return fakeMesh('rbxassetid://5138886694',V3(70,52.6,59.8))end
+ local mp=Loader.CreateMesh('rbxassetid://5138886694')
+ check('mesh: CreateMeshPartAsync is asked with CollisionFidelity Box and RenderFidelity Automatic',mp~=nil and #seen==1 and seen[1]~=nil and seen[1].CollisionFidelity==R.Enum.CollisionFidelity.Box and seen[1].RenderFidelity==R.Enum.RenderFidelity.Automatic)
+ seen={}
+ AS.CreateMeshPartAsync=function(self,content,options)seen[#seen+1]=options or'none';if options then error('invalid argument #3 to \'CreateMeshPartAsync\' (expected nil)')end;return fakeMesh('rbxassetid://5138886694',V3(70,52.6,59.8))end
+ local mp2=Loader.CreateMesh('rbxassetid://5138886694')
+ check('mesh: an engine that does not know the options is asked again without them',mp2~=nil and #seen==2 and seen[1]~='none'and seen[2]=='none',#seen)
+ seen={}
+ AS.CreateMeshPartAsync=function(self,content,options)seen[#seen+1]=options or'none';error('HTTP 403 (Forbidden)')end
+ local mp3,why3=Loader.CreateMesh('rbxassetid://5138886694')
+ check('mesh: a real failure (HTTP 403) is asked once, not twice, and says why',mp3==nil and #seen==1 and tostring(why3):find('403',1,true)~=nil,#seen)
 end
 print('R158 walls (mock): '..passed..' checks passed, '..failed..' failed')
 if failed>0 then error('R158 walls: '..failed..' checks failed')end

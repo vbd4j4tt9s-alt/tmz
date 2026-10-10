@@ -15,7 +15,8 @@ import make158 as M  # noqa: E402  (the design's scene helpers: SPOTS, overlaps,
 ROOT = M.ROOT
 
 
-OUTER_BIOMES = ['forest', 'desert', 'crystal', 'storm']  # the backdrops that exist without the owner's meshes (the mock cannot load meshes)
+OUTER_BIOMES = ['forest', 'jungle', 'desert', 'crystal', 'storm']  # the backdrops that exist without the owner's meshes (the mock cannot load meshes)
+TREE_BIOMES = ('forest', 'jungle')  # Forest and Jungle: large trees only; three views each (over the left wall, over the right wall, from the runner's camera on the track)
 
 
 def views():
@@ -25,9 +26,14 @@ def views():
         V.append({'name': 'wall_' + bid, 'pos': [16, 21, z - 40], 'look': [-89, 32, z + 34], 'fov': 62, 'shadowAt': [-60, 20, z + 30], 'shadowExtent': 140, 'fogNear': 700, 'fogFar': 2600})
         V.append({'name': 'along_' + bid, 'pos': [55, 26, z - 150], 'look': [-89, 34, z + 70], 'fov': 66, 'shadowAt': [-60, 20, z - 20], 'shadowExtent': 200, 'fogNear': 900, 'fogFar': 3000})
     for bid in OUTER_BIOMES:
-        (cx, cy, cz), (lx, ly, lz) = {'storm': ((0, 170, -520), (0, 70, 260)), 'forest': ((30, 75, -70), (-160, 55, 60)), 'crystal': ((30, 90, -330), (0, 70, 200))}.get(bid, M.OUTER[bid])  # (a camera held up over the walls so the backdrop shows)
+        (cx, cy, cz), (lx, ly, lz) = {'storm': ((0, 170, -520), (0, 70, 260)), 'forest': ((30, 75, -70), (-160, 55, 60)), 'jungle': ((30, 75, -110), (-165, 55, 70)), 'crystal': ((30, 90, -330), (0, 70, 200))}.get(bid, M.OUTER[bid])  # (a camera held up over the walls so the backdrop shows)
         z = M.SPOTS[bid]['z']
         V.append({'name': 'out_' + bid, 'pos': [cx, cy, z + cz], 'look': [lx, ly, z + lz], 'fov': 64, 'shadowAt': [0, 20, z], 'shadowExtent': 260, 'fogNear': 1200, 'fogFar': 4200})
+        if bid in TREE_BIOMES:
+            # the other side, over the right wall, further along the track
+            V.append({'name': 'outr_' + bid, 'pos': [-cx, cy, z + cz + 150], 'look': [-lx, ly, z + lz + 150], 'fov': 64, 'shadowAt': [0, 20, z], 'shadowExtent': 260, 'fogNear': 1200, 'fogFar': 4200})
+            # the runner's camera on the track (a little behind and above the runner, looking along the track): what the player sees of the trees over the walls
+            V.append({'name': 'run_' + bid, 'pos': [0, 20, z + cz - 20 + (30 if bid == 'forest' else 60)], 'look': [-20, 58, z + cz + 150 + (60 if bid == 'forest' else 100)], 'fov': 70, 'shadowAt': [0, 20, z], 'shadowExtent': 260, 'fogNear': 1200, 'fogFar': 4200})
     V.append({'name': 'hub_gate', 'pos': [-26, 40, -158], 'look': [-6, 63, -100], 'fov': 46, 'shadowAt': [0, 30, -110], 'shadowExtent': 130, 'fogNear': 900, 'fogFar': 2600})
     V.append({'name': 'hub_top', 'pos': [-168, 40, -146], 'look': [-236, 54, -104], 'fov': 44, 'shadowAt': [-220, 40, -110], 'shadowExtent': 90, 'fogNear': 900, 'fogFar': 2600})
     V.append({'name': 'hub_corner', 'pos': [-262, 34, -178], 'look': [-334, 53, -106], 'fov': 50, 'shadowAt': [-300, 40, -130], 'shadowExtent': 110, 'fogNear': 900, 'fogFar': 2600})
@@ -50,7 +56,7 @@ def cmd_scenes(plain, built, out):
         if bid in OUTER_BIOMES:
             far = [p for p in b['parts'] if M.overlaps(p, -2000, 2000, z - 700, z + 2400)]
             M.write(os.path.join(out, 'far_%s.json' % bid), far, [])
-            jobs.append('far_%s=%s@out_%s' % (bid, os.path.join(out, 'far_%s.json' % bid), bid))
+            jobs.append('far_%s=%s@out_%s%s' % (bid, os.path.join(out, 'far_%s.json' % bid), bid, (',outr_%s,run_%s' % (bid, bid)) if bid in TREE_BIOMES else ''))
     for tag, world in (('cur', plain), ('new', built)):
         d = json.load(open(os.path.join(world, 'hub.json')))
         hub = [p for p in d['parts'] if M.overlaps(p, -700, 700, -700, 400) and '/TrackBackdrops158/' not in p['path'] and '/TrackWalls158/' not in p['path']]
@@ -147,19 +153,26 @@ def cmd_sheet(rendered, specs_path, design):
             sheet.paste(im, (gap + k * (w4 + gap), y + 70))
     sheet.save(os.path.join(design, 'base_walls.png'), optimize=True)
     # outer_track_built.png: what stands outside the walls now (the game's own models + the owner's pyramid and dark mountain; the volcano and the snow hills load by mesh id in Studio)
-    cells = [('far_%s_out_%s' % (b, b), t, sub) for b, t, sub in (
-        ('forest', 'Forest', 'the game\'s own oaks, scaled up (12 spots)'), ('desert', 'Desert', 'the owner\'s great pyramid (asset 9981304, 82 blocks as data) far right; dunes wait for models'),
-        ('crystal', 'Crystal', 'the game\'s own crystal clusters as giant spires (6 spots)'), ('storm', 'Storm Peaks', 'the owner\'s dark mountain, cut to 280 blocks a copy: two copies each side'))]
-    w2, h2 = 700, 394
-    sheet = Image.new('RGB', (2 * w2 + 3 * gap, 100 + 2 * (h2 + 60 + gap)), BG)
+    # three columns: Forest (3 views), Jungle (3 views), then Desert / Crystal / Storm Peaks
+    cells = [('far_forest_out_forest', 'Forest: from over the left wall', 'the Forest\'s oak, the hub\'s oaks and poplars: 14 trees, 131 parts'),
+             ('far_forest_outr_forest', 'Forest: from over the right wall', 'three bands a side, denser and taller at the back'),
+             ('far_forest_run_forest', 'Forest: from the track', 'what the runner sees: the tops of the trees over the log fort'),
+             ('far_jungle_out_jungle', 'Jungle: from over the left wall', 'jungle trees, the hub\'s palms, oaks, poplar: 29 trees, 348 parts'),
+             ('far_jungle_outr_jungle', 'Jungle: from over the right wall', 'a loose jungle on both sides, a denser and taller back row'),
+             ('far_jungle_run_jungle', 'Jungle: from the track', 'what the runner sees over the temple wall'),
+             ('far_desert_out_desert', 'Desert', 'the owner\'s great pyramid (82 blocks) far right; dunes wait'),
+             ('far_crystal_out_crystal', 'Crystal', 'the game\'s own crystal clusters as giant spires (6 spots)'),
+             ('far_storm_out_storm', 'Storm Peaks', 'the owner\'s dark mountain, 280 blocks a copy, two each side')]
+    w2, h2 = 560, 315
+    sheet = Image.new('RGB', (3 * w2 + 4 * gap, 100 + 3 * (h2 + 60 + gap)), BG)
     d = ImageDraw.Draw(sheet)
     d.text((gap, 14), 'Outside the walls, as built now (approximate picture)', font=font(28, True), fill=GOLD)
-    d.text((gap, 54), 'No part-built objects: the ground and the owner\'s / the game\'s own models. The owner\'s volcano and snow hills are meshes: they appear in Studio, not in this offline picture.', font=font(15), fill=SUB)
+    d.text((gap, 54), 'No part-built objects: the ground and the owner\'s / the game\'s own models. Forest and Jungle: only large trees (479 parts together). The owner\'s volcano and snow hills are meshes: they appear in Studio, not here.', font=font(15), fill=SUB)
     for i, (name, title, sub) in enumerate(cells):
-        x = gap + (i % 2) * (w2 + gap)
-        y = 90 + (i // 2) * (h2 + 60 + gap)
+        x = gap + (i % 3) * (w2 + gap)
+        y = 90 + (i // 3) * (h2 + 60 + gap)
         d.text((x, y), title, font=font(21, True), fill=INK)
-        d.text((x, y + 28), sub, font=font(15), fill=SUB)
+        d.text((x, y + 28), (sub if d.textlength(sub, font=font(15)) <= w2 else sub[:int(len(sub) * w2 / d.textlength(sub, font=font(15))) - 3] + '...'), font=font(15), fill=SUB)
         p = os.path.join(rendered, name + '.png')
         im = Image.open(p).convert('RGB').resize((w2, h2), Image.LANCZOS) if os.path.exists(p) else Image.new('RGB', (w2, h2), (60, 30, 30))
         sheet.paste(im, (x, y + 56))

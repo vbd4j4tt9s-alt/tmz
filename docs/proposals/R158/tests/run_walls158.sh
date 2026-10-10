@@ -18,9 +18,13 @@
 #                sweep, run_zfight_sweep.sh, runs as its own suite.)
 #  5b. R154 hub z-fighting (run_hub_zfight154.sh, strict hub mode) on the built code: 0 visible pairs (the base walls stand in the hub).
 #  6. test_walls158.luau (the real start-up in the mock): the folders, every part against its spec, the flags, the saved walls, the lava, the outer track, the refresh hide, idempotence,
-#                the loader on fake models (hand-placed / id / not authorized / never answers / missing), the snow hills, the volcano on the track and outside.
+#                the loader on fake models (hand-placed / id / not authorized / never answers / missing), the snow hills, the volcano on the track and outside; the Forest and Jungle trees as
+#                built (every spot, each its Look's model, as tall as its spot says, on the ground, in its box, Forest + Jungle under 900 parts); the code review's fixes (a copy of a game model
+#                keeps no tag or attribute, a Folder source is wrapped in a Model, the mesh is asked with the cheap fidelities, the refresh hides what sticks out of the cover's sides, the
+#                mesh volcano adds no key to the keyboard's skip, every backdrop Model is Atomic).
+#  6b. test_boot158.luau: MapService.new never waits for an asset request (every request hangs / the volcano's mesh arrives late), one shared request, the old cone stays until it arrives.
 #  7. LavaFlow - test_lavaflow158.luau: no per-frame step with no routes or pools; wakes and sleeps; fails on the old script (the teeth).
-#  8. mutations- each of 12 breaks of the code must make a step above fail.   "nomutate" as the 3rd argument skips this step.
+#  8. mutations- each of 27 breaks of the code must make a step above fail.   "nomutate" as the 3rd argument skips this step.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};PLACE=${2:-/root/.cl""aude/uploads/6cdd31e0-8cb6-5e3e-be99-4466c272405d/b4f113d1-sapkeyver.rbxl};MODE=$3
@@ -96,6 +100,13 @@ W=$OUT/built
 cp "$HERE/test_walls158.luau" "$W/"
 if (cd "$W" && timeout 900 /opt/luau/luau test_walls158.luau > out158.txt 2> err158.txt);then grep -E '^(FAIL)' "$W/out158.txt" || true;grep -E '^INFO (track wall parts|outer track parts|start-up)' "$W/out158.txt";grep -E 'R158 walls \(mock\):' "$W/out158.txt"
 else grep -E '^FAIL' "$W/out158.txt" | head -20;tail -5 "$W/err158.txt";RC=1;fi
+echo "== 6b. test_boot158 (MapService.new never waits for an asset request: every request hangs / the volcano's mesh arrives late; one shared request)"
+cp "$HERE/test_boot158.luau" "$W/"
+for m in hang arrive;do
+ (printf "MODE='%s'\n" "$m";cat "$HERE/test_boot158.luau") > "$W/run_boot_$m.luau"
+ if (cd "$W" && timeout 900 /opt/luau/luau run_boot_$m.luau > boot_$m.txt 2> boot_$m.err);then grep -E '^FAIL' "$W/boot_$m.txt" || true;grep -E 'R158 boot \(' "$W/boot_$m.txt"
+ else grep -E '^FAIL' "$W/boot_$m.txt" | head -20;tail -5 "$W/boot_$m.err";RC=1;fi
+done
 echo "== 7. LavaFlow (no per-frame step with no streams; the old script must fail)"
 L=$OUT/lf;mkdir -p "$L"
 cp "$T/roblox.luau" "$P/inventory_R113/tests/world.luau" "$P/R149/tests/zfight_world.luau" "$HERE/test_lavaflow158.luau" "$L/"
@@ -123,6 +134,14 @@ PY
   cp "$HERE/test_walls158.luau" "$d/w/"
   killed=
   if ! (cd "$d/w" && timeout 900 /opt/luau/luau test_walls158.luau > o.txt 2> e.txt);then killed="the mock test ($(grep -c '^FAIL' "$d/w/o.txt") failing checks, e.g. $(grep -m1 '^FAIL' "$d/w/o.txt" | cut -c1-80))";fi
+  if [ -z "$killed" ];then # the boot test: every asset request hangs / the volcano's mesh arrives late
+   for bm in hang arrive;do
+    if [ -z "$killed" ];then
+     (printf "MODE='%s'\n" "$bm";cat "$HERE/test_boot158.luau") > "$d/w/run_boot_$bm.luau"
+     (cd "$d/w" && timeout 900 /opt/luau/luau run_boot_$bm.luau > b.txt 2> be.txt) || killed="the boot test, $bm ($(grep -c '^FAIL' "$d/w/b.txt") failing checks, e.g. $(grep -m1 '^FAIL' "$d/w/b.txt" | cut -c1-80))"
+    fi
+   done
+  fi
   if [ -z "$killed" ];then
    mkdir -p "$d/data";cp "$d/src/ServerScriptService/ChestChaseServer/TrackWallSpecs158.lua" "$d/src/ServerScriptService/ChestChaseServer/OuterTrackAssets158.lua" "$d/src/ServerScriptService/ChestChaseServer/OuterTrackModels158.lua" "$HERE/dump_specs158.luau" "$HERE/test_outer158.luau" "$d/data/"
    (cd "$d/data" && /opt/luau/luau dump_specs158.luau > s1.txt 2>/dev/null && /opt/luau/luau dump_specs158.luau > s2.txt 2>/dev/null) || true
@@ -148,6 +167,29 @@ PY
  mutant bandsOverlap "$C/TrackWallSpecs158.lua" "s0,s1=depth,sec.len-depth end" "s0,s1=depth-SINK,sec.len-(depth-SINK) end"
  mutant towerCapsOnePlane "$C/TrackWallSpecs158.lua" "-(i%2)*.04," "-(i%2)*0,"
  mutant slotInside "$C/OuterTrackAssets158.lua" "{Key='DesertPyramid',X=470," "{Key='DesertPyramid',X=170,"
+ # the Forest and Jungle trees
+ mutant treeInside "$C/OuterTrackAssets158.lua" "{Key='ForestTree',X=" "{Key='ForestTree',X=-60+0*"
+ mutant treeStamp "$C/OuterTrackLoader158.lua" "return tpl.Protos[1+(((slot.Look or index)-1)%n)]" "return tpl.Protos[1]"
+ # the code review's fixes
+ mutant swapOnBoot "$C/LavaVolcano158.lua" " task.spawn(function()
+  local ok,err=pcall(M.Swap,map,old,res,removedText)" " pcall(function()
+  local ok,err=pcall(M.Swap,map,old,res,removedText)"
+ mutant noSharedRequest "$C/OuterTrackLoader158.lua" " if L.Pending[key]then" " if false then"
+ mutant tagsStay "$C/OuterTrackLoader158.lua" "  strip(m);for _,d in ipairs(m:GetDescendants())do strip(d)end
+" ""
+ mutant folderBare "$C/OuterTrackLoader158.lua" "if not m:IsA('Model')then local w=Instance.new('Model')" "if m:IsA('BasePart')then local w=Instance.new('Model')"
+ mutant meshBox "$C/OuterTrackLoader158.lua" "CollisionFidelity=Enum.CollisionFidelity.Box" "CollisionFidelity=Enum.CollisionFidelity.Default"
+ mutant notAtomic "$C/OuterTrackLoader158.lua" " m.ModelStreamingMode=Enum.ModelStreamingMode.Atomic" " local _noAtomic=true"
+ mutant meshSquare "$C/LavaVolcano158.lua" "   if d:IsA('MeshPart')then d:SetAttribute('KeyboardDisc',math.max(.5,disc))end" "   local _noDisc=true"
+ mutant coverSides "$C/TrackWallSpecs158.lua" "(hi[2]>D.CoverTop or reach>D.CoverSide+1e-6)" "(hi[2]>D.CoverTop)"
+ mutant icicleFloats "$C/TrackWallSpecs158.lua" "R.r(.1,.25))),50.2,a}" "R.r(.1,.6))),50.2,a}"
+ mutant leafNamed "$C/TrackWallSpecs158.lua" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')" " wrap('Leaf crown',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')"
+ mutant lavaDripsBack "$C/TrackWallSpecs158.lua" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')
+ face('Lava drip',s,z0+10,z0+11,40,49.7,.46,{255,110,36},'Neon',BAY)"
+ mutant ballBack "$C/TrackWallSpecs158.lua" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')
+ part('Rock lump','Ball',{5,5,5},cf(s*88,53,z0+20),{58,124,58},'Basalt')"
+ mutant eggBack "$C/TrackWallSpecs158.lua" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')" " wrap('Basalt top',s,z0,z1,49.9,52.4,1.2,.5,{46,40,42},'Basalt')
+ part('Rock lump','Block',{6,4,12},cf(s*90,53,z0+20),{58,124,58},'Basalt',{mesh='Sphere'})"
 fi
 [ $RC = 0 ] || exit 1
 echo "== 9. R152 load guard (line 1 of every client script)"

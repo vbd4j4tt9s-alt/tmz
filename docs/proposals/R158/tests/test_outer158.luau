@@ -14,7 +14,14 @@ local function near(a,b,e)return math.abs(a-b)<=(e or 1e-6)end
 -- 1. keys and ids ----------------------------------------------------------------------------------------------------------------------------------
 local keys={};for i,k in ipairs(Assets.Keys)do keys[k.Key]=i end
 local nKeys=#Assets.Keys
-check('keys: '..nKeys..' keys, each once',nKeys==16 and(function()local n=0;for _ in pairs(keys)do n+=1 end;return n==nKeys end)())
+check('keys: '..nKeys..' keys, each once',nKeys==14 and(function()local n=0;for _ in pairs(keys)do n+=1 end;return n==nKeys end)())
+-- (owner: "forest and jungle can just have large trees": the Jungle's temple and cliff are gone, keys, ids, spots and all)
+local goneKeys=true;local goneSlots=true
+for _,old in ipairs({'JungleTemple','JungleCliff','ForestOak'})do
+ if keys[old]or Assets.Ids[old]~=nil or Assets.Game[old]~=nil then goneKeys=false end
+ for _,s in ipairs(Assets.Slots)do if s.Key==old then goneSlots=false end end
+end
+check('keys: JungleTemple and JungleCliff are gone (no key, no id, no spot), and the old ForestOak key is ForestTree now',goneKeys and goneSlots and keys.ForestTree~=nil and keys.JungleTree~=nil)
 local missingId,missingSlot,missingSource
 for _,k in ipairs(Assets.Keys)do
  if type(Assets.Ids[k.Key])~='number'then missingId=k.Key end
@@ -32,7 +39,7 @@ check('keys: the volcano\'s mesh and texture are the file\'s (5138886694 / 51388
 check('keys: the game-model sources name a biome folder and a model name each',(function()for k,g in pairs(Assets.Game)do if not(keys[k]and g.Biome and g.Name)then return false end end;return true end)())
 check('keys: the outer track casts no shadow by default (the design)',Assets.Shadows==false)
 local count={};for _,s in ipairs(Assets.Slots)do count[s.Key]=(count[s.Key]or 0)+1 end
-check('keys: spots per key: ForestOak 12, JungleTree 6, DesertPyramid 1, SnowTree 8, SnowMountains 2, LavaVolcano 4, CrystalSpire 6, StormDarkMount 4',count.ForestOak==12 and count.JungleTree==6 and count.DesertPyramid==1 and count.SnowTree==8 and count.SnowMountains==2 and count.LavaVolcano==4 and count.CrystalSpire==6 and count.StormDarkMount==4)
+check('keys: spots per key: ForestTree 14, JungleTree 29, DesertPyramid 1, SnowTree 8, SnowMountains 2, LavaVolcano 4, CrystalSpire 6, StormDarkMount 4',count.ForestTree==14 and count.JungleTree==29 and count.DesertPyramid==1 and count.SnowTree==8 and count.SnowMountains==2 and count.LavaVolcano==4 and count.CrystalSpire==6 and count.StormDarkMount==4)
 
 -- 2. the rules for every spot ------------------------------------------------------------------------------------------------------------------------
 local bad
@@ -48,7 +55,7 @@ check('spots: every box is at |x| >= 100 (or behind the end wall) and off the hu
 local ge=0;for _,s in ipairs(Assets.Slots)do if s.Key=='DesertPyramid'then ge=Assets.Box(s)[1]end end
 check('spots: the great pyramid stands far right, clear of the R157 pyramid at x -62 (box starts at x '..string.format('%.0f',ge)..')',ge>200)
 local variety=true
-for _,key in ipairs({'ForestOak','JungleTree','SnowTree','CrystalSpire','LavaVolcano','StormDarkMount'})do
+for _,key in ipairs({'ForestTree','JungleTree','SnowTree','CrystalSpire','LavaVolcano','StormDarkMount'})do
  local seen={};local n=0
  for _,s in ipairs(Assets.SlotsOf(key))do local sig=string.format('%.1f|%.1f|%s|%s',s.H,s.Yaw,tostring(s.Tint and s.Tint[1]),tostring(s.Scale));if not seen[sig]then seen[sig]=true;n+=1 end end
  if n<#Assets.SlotsOf(key)then variety=false end
@@ -61,6 +68,95 @@ check('spots: the four outer volcanoes differ in scale ('..string.format('%.0f -
 local fits=true
 for _,s in ipairs(volcanoes)do local v=Assets.Mesh.LavaVolcano.Size;local k=s.H/v[2];if not(near(s.W,v[1]*k,.2)and near(s.D,v[3]*k,.2))then fits=false end end
 check('spots: a volcano spot\'s box keeps the file\'s proportions (70 : 52.65 : 59.8)',fits)
+
+-- 2b. the Forest and Jungle trees (owner: "forest and jungle can just have large trees on the outside with our current game assets") ----------------------------------------------------
+-- Only large trees, several different models per biome (the game's own: the map's oak / jungle tree, the hub's oak / poplar / palm), uneven heights, every turn, close tints, along the
+-- whole length of the biome on both sides, a denser and taller back row, never over the hub, never inside |x| 100, never past the biome's own ends.
+local biomeOf={};for _,b in ipairs(Specs.Biomes)do biomeOf[b.Name]=b end
+local function meanSd(list)
+ local n,sum=#list,0;for _,v in ipairs(list)do sum+=v end
+ local mean=n>0 and sum/n or 0;local sq=0;for _,v in ipairs(list)do sq+=(v-mean)^2 end
+ return mean,math.sqrt(sq/math.max(n,1))
+end
+local HUB_KINDS={Oak=true,Leafy=true,Poplar=true,Palm=true}
+for _,def in ipairs({{Key='ForestTree',Biome='Forest'},{Key='JungleTree',Biome='Jungle'}})do
+ local key,b=def.Key,biomeOf[def.Biome]
+ local spots=Assets.SlotsOf(key);local n=#spots
+ local z0,z1=math.max(b.Z0,-99),b.Z1
+ local label=def.Biome..' trees'
+ -- the models of the key: the map's (Max, plus the Also entries') then the hub's recipes
+ local g=Assets.Game[key];local nModels=g.Max or 1
+ for _,e in ipairs(g.Also or{})do nModels+=e.Max or 1 end
+ local recipes,dupe,badKind={},nil,nil
+ for _,r in ipairs(g.Hub or{})do
+  local sig=table.concat({r.Kind,tostring(r.Arg),tostring(r.X),tostring(r.Z)},'|')
+  if recipes[sig]then dupe=sig end;recipes[sig]=true
+  if not HUB_KINDS[r.Kind]then badKind=r.Kind end
+ end
+ nModels+=#(g.Hub or{})
+ check(label..': the key has '..nModels..' models (the map\'s and the hub\'s: no recipe twice, each a known kind)',nModels>=7 and dupe==nil and badKind==nil,tostring(dupe or badKind))
+ local looks,hs,yaws,tints,tintSet,sides,badLook={},{}, {},{}, {},{[-1]=0,[1]=0},nil
+ local outside,hub,inZ=nil,nil,nil
+ local minEdge={[-1]=math.huge,[1]=math.huge}
+ local zlo,zhi={[-1]=math.huge,[1]=math.huge},{[-1]=-math.huge,[1]=-math.huge}
+ local front,back={},{}
+ for i,s in ipairs(spots)do
+  local box=Assets.Box(s)
+  local side=s.X<0 and-1 or 1
+  sides[side]+=1
+  looks[s.Look or 0]=(looks[s.Look or 0]or 0)+1
+  if type(s.Look)~='number'or s.Look<1 or s.Look>nModels or s.Look~=math.floor(s.Look)then badLook=badLook or i end
+  hs[#hs+1]=s.H;yaws[#yaws+1]=s.Yaw
+  tints[#tints+1]=s.Tint;tintSet[table.concat(s.Tint or{},',')]=true
+  if box[1]<100 and box[2]>-100 then outside=outside or(label..' spot '..i..' reaches inside |x| 100')end
+  if box[5]<-99 then hub=hub or(label..' spot '..i..' is over the hub')end
+  if box[5]<z0-.01 or box[6]>z1+.01 then inZ=inZ or(label..' spot '..i..' (z '..string.format('%.0f',box[5])..' .. '..string.format('%.0f',box[6])..') leaves the biome ('..z0..' .. '..z1..')')end
+  zlo[side]=math.min(zlo[side],box[5]);zhi[side]=math.max(zhi[side],box[6])
+  local inner=side<0 and-box[2]or box[1]
+  if inner<=125 then front[#front+1]=s elseif inner>=210 then back[#back+1]=s end
+ end
+ check(label..': every box is at |x| >= 100 and off the hub (z >= -99)',outside==nil and hub==nil,outside or hub)
+ check(label..': every box stays inside the biome\'s own stretch (z '..z0..' .. '..z1..')',inZ==nil,inZ)
+ check(label..': '..n..' spots, '..sides[-1]..' on the left and '..sides[1]..' on the right (a forest on both sides)',sides[-1]>=6 and sides[1]>=6 and math.abs(sides[-1]-sides[1])<=3 and n>=14)
+ check(label..': along the WHOLE length on both sides (the first box starts within 25 studs of the biome\'s start, the last ends within 25 of its end)',
+  zlo[-1]<=z0+25 and zlo[1]<=z0+25 and zhi[-1]>=z1-25 and zhi[1]>=z1-25,string.format('left %.0f .. %.0f, right %.0f .. %.0f',zlo[-1],zhi[-1],zlo[1],zhi[1]))
+ local minH,maxH=math.huge,0;for _,h in ipairs(hs)do minH=math.min(minH,h);maxH=math.max(maxH,h)end
+ local _,sdH=meanSd(hs)
+ check(label..': only LARGE trees, heights uneven ('..string.format('%.0f - %.0f studs, spread %.0f',minH,maxH,sdH)..'): none under 75, the tallest over 140, a forest-like skyline',minH>=75 and maxH>=140 and maxH/minH>=1.5 and sdH>=15)
+ local hSet,hDupe={},false
+ for _,h in ipairs(hs)do local k=math.floor(h*2+.5);if hSet[k]then hDupe=true end;hSet[k]=true end
+ check(label..': no two trees have the same height (no stamped copies)',not hDupe)
+ local distinct=0;for lk,c in pairs(looks)do distinct+=1 end
+ local maxShare=0;for _,c in pairs(looks)do maxShare=math.max(maxShare,c/n)end
+ check(label..': '..distinct..' different models in use (at least 6), no one of them more than 40 % of the trees ('..string.format('%.0f %%',maxShare*100)..'), every Look is one of the key\'s models',distinct>=6 and maxShare<=.4 and badLook==nil,badLook)
+ local yawSet,ylo,yhi={},math.huge,-math.huge;for _,y in ipairs(yaws)do yawSet[y]=true;ylo=math.min(ylo,y);yhi=math.max(yhi,y)end
+ local ny=0;for _ in pairs(yawSet)do ny+=1 end
+ check(label..': every tree its own turn ('..ny..' different of '..n..', from '..ylo..' to '..yhi..' degrees)',ny>=n-2 and yhi-ylo>=270)
+ local nt=0;for _ in pairs(tintSet)do nt+=1 end
+ local closeTints=true
+ for i=1,n do for j=i+1,n do if spots[i].Look==spots[j].Look then for c=1,3 do if math.abs(spots[i].Tint[c]-spots[j].Tint[c])>14 then closeTints=false end end end end end
+ check(label..': '..nt..' different tints, the trees of one model only a few shades apart (within 14 of 255)',nt>=n-2 and closeTints)
+ local mf,mb=0,0
+ do local a=0;for _,s in ipairs(front)do a+=s.H end;mf=#front>0 and a/#front or 0;a=0;for _,s in ipairs(back)do a+=s.H end;mb=#back>0 and a/#back or 0 end
+ check(label..': a denser, taller back row ('..#back..' trees with their inner edge past x 210, mean height '..string.format('%.0f',mb)..'; the front row (inner edge by x 125): '..#front..' trees, mean '..string.format('%.0f',mf)..')',#back>=#front+1 and #front>=3 and mb>=mf+15)
+ local closest=math.huge
+ for i=1,n do for j=i+1,n do local dx,dz=spots[i].X-spots[j].X,spots[i].Z-spots[j].Z;closest=math.min(closest,math.sqrt(dx*dx+dz*dz))end end
+ check(label..': no two trees stand on one another (the closest trunks are '..string.format('%.0f',closest)..' studs apart)',closest>=20)
+ local rowOf={}
+ -- a grid would repeat: the z gaps between neighbours in each row are not even
+ local lanes={front={},mid={},back={}}
+ for _,s in ipairs(spots)do
+  local box=Assets.Box(s);local side=s.X<0 and-1 or 1;local inner=side<0 and-box[2]or box[1]
+  local lane=inner<=125 and'front'or inner>=210 and'back'or'mid'
+  local l=lanes[lane];l[side]=l[side]or{};table.insert(l[side],s.Z)
+ end
+ local evenLane
+ for name,sidesZ in pairs(lanes)do for side,zs in pairs(sidesZ)do
+  table.sort(zs)
+  if #zs>=4 then local gaps={};for i=2,#zs do gaps[#gaps+1]=zs[i]-zs[i-1]end;local m,sd=meanSd(gaps);if sd/m<.12 then evenLane=evenLane or(name..' row, side '..side)end end
+ end end
+ check(label..': no row is evenly spaced (no grid)',evenLane==nil,evenLane)
+end
 
 -- 3. the owner's models as data ----------------------------------------------------------------------------------------------------------------------
 local P=Models.Pyramid
