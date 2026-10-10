@@ -347,13 +347,44 @@ function A.Bench(ctx,x,z,yaw,kind)
  for _,sx in ipairs({-1,1})do ctx.Part('core',x,z,'Bench leg',V(.5,1.8,1.7),c*CF(sx*2.5,.9,.05),P.Metal,Mat.Metal)end
  if kind=='garden'then for _,sx in ipairs({-1,1})do ctx.Ball('detail',x,z,'Bench knob',.6,(c*CF(sx*3,4.2,1.05)).Position,P.Gold)end end
 end
-function A.Bunting(ctx,a,b,colours,spacing)
- local mid=(a+b)/2
- ctx.Rod('detail',mid.X,mid.Z,'Bunting line',a,b,.15,{250,250,250})
+-- Bunting. R158 (owner: "fix the disconnect flags": the pennants floated beside and under a straight white string): the string hangs in a SAG, the curve
+-- a:Lerp(b,t) - (0, sin(t * pi) * BuntingSag, 0), drawn as n + 1 straight rod pieces (n = one pennant every ~5 studs) whose ends sit ON that curve, so the string
+-- really follows the sag and its pieces meet end to end (each overlaps the next by BuntingOverlap: a bend of a few degrees leaves no sliver on its outside). The
+-- joints are half a spacing off the pennants: pennant k (k = 1 .. n - 1, at t = k / n) hangs from the MIDDLE of the straight piece k + 1, so its top edge lies on the
+-- rod's axis (the 0.12 plate is hidden inside the 0.15 rod there: no gap, no coplanar face) and its two sides never cross a bend. A pennant is a right
+-- isosceles triangle (a WedgePart, .12 thick): the top edge (the hypotenuse, PennantWidth long) lies along the string's direction at that piece, the point hangs
+-- PennantWidth / 2 straight DOWN under the middle of the edge (a right angle: the corner of a right triangle on its hypotenuse's circle), in the vertical plane
+-- of the string, so it faces along the string and reads as a triangle from either side. Parts, per string: n + 1 rod pieces + n - 1 pennants (the same colours).
+A.BuntingSag=2.2;A.BuntingLine=.15;A.BuntingOverlap=.06;A.PennantWidth=2.55;A.PennantThick=.12
+function A.BuntingCurve(a,b,t)return a:Lerp(b,t)-V(0,math.sin(t*math.pi)*A.BuntingSag,0)end
+-- The plan of one string (pure): Points = the rod pieces' ends in order (Points[1] = a, Points[#Points] = b, the rest on the sag curve), Pennants = for each
+-- pennant its Index (the colour slot), Mid (on the string), and the triangle's three corners: Left / Right (the ends of the top edge) and Tip (the point, below Mid).
+function A.BuntingPlan(a,b,spacing)
  local n=math.floor((b-a).Magnitude/(spacing or 5))
- local dir=(b-a).Unit;local side=V(0,1,0):Cross(dir).Unit
- for k=1,n-1 do local t=k/n;local p=a:Lerp(b,t)-V(0,math.sin(t*math.pi)*2.2,0)
-  ctx.Wedge('detail',mid.X,mid.Z,'Pennant',V(.12,1.8,1.8),CFrame.fromMatrix(p,-side,V(0,1,0))*CFrame.Angles(math.rad(45),0,0),colours[(k-1)%#colours+1],Mat.Fabric,{shadow=false})
+ local pts={a}
+ for j=1,n do pts[#pts+1]=A.BuntingCurve(a,b,(j-.5)/n)end
+ pts[#pts+1]=b
+ local pennants,half={},A.PennantWidth/2
+ for k=1,n-1 do
+  local p,q=pts[k+1],pts[k+2] -- the straight piece centred on t = k / n
+  local mid,dir=(p+q)/2,(q-p).Unit
+  pennants[#pennants+1]={Index=k,Mid=mid,Left=mid-dir*half,Right=mid+dir*half,Tip=mid-V(0,half,0)}
+ end
+ return{Points=pts,Pennants=pennants}
+end
+function A.Bunting(ctx,a,b,colours,spacing)
+ local home=(a+b)/2 -- (every piece goes into the cell / level folder of the string's middle, as before)
+ local plan=A.BuntingPlan(a,b,spacing)
+ local pts=plan.Points
+ for s=1,#pts-1 do
+  local dir=(pts[s+1]-pts[s]).Unit
+  ctx.Rod('detail',home.X,home.Z,'Bunting line',pts[s]-dir*A.BuntingOverlap,pts[s+1]+dir*A.BuntingOverlap,A.BuntingLine,{250,250,250})
+ end
+ for _,p in ipairs(plan.Pennants)do
+  -- the wedge's own corners: right angle at its back-bottom edge, tall side +Y, long side along Z (the slope is the hypotenuse): Tip is the right angle
+  local up,along=p.Right-p.Tip,p.Tip-p.Left
+  local y,z=up.Unit,along.Unit
+  ctx.Wedge('detail',home.X,home.Z,'Pennant',V(A.PennantThick,up.Magnitude,along.Magnitude),CFrame.fromMatrix(p.Mid,y:Cross(z),y,z),colours[(p.Index-1)%#colours+1],Mat.Fabric,{shadow=false})
  end
 end
 
@@ -466,8 +497,12 @@ A.Full={ -- (R154: everything the square had; A.Layout, below, is what is built 
  },
  benches={ -- (R152: the four benches round the fountain are gone with it; R153: so are the two pairs at the garden nooks and the stone one at the lane nook, where the trampolines stand)
   {75,-200,math.pi/2,'wood'},{-75,-200,-math.pi/2,'wood'},{44,-275,math.pi/2,'garden'},{-44,-275,-math.pi/2,'garden'}},
+ -- bunting: from, to ({x, y, z}), palette. R158: a string's ends are on something. The post lamps' ends are inside the lantern (y 17.4: the lantern is 16 to 18); the market ends
+ -- are inside the eave's green roof course (the lowest course reaches z -290 .. -248.5, so z -250 and -287 are on it). The four market-corner DOUBLE lamps' ends were
+ -- (+-55, 17.4): 1 stud over the arm's top, in the air (R151 hung them from a single post's height); they are now at the middle of the cap on the lamp's market-side head
+ -- (x +-52.5, y 16.25 = FLOOR + 12.25), so the string leaves that head's cap and the lamp holds it.
  bunting={{{-15.4,17.4,-200},{15.4,17.4,-228},'rainbow'},{{15.4,17.4,-200},{-15.4,17.4,-228},'rainbow'},
-  {{55,17.4,-236},{22,23,-250},'candy'},{{-55,17.4,-236},{-22,23,-250},'candy'},{{55,17.4,-308},{22,23,-287},'candy'},{{-55,17.4,-308},{-22,23,-287},'candy'}},
+  {{52.5,16.25,-236},{22,23,-250},'candy'},{{-52.5,16.25,-236},{-22,23,-250},'candy'},{{52.5,16.25,-308},{22,23,-287},'candy'},{{-52.5,16.25,-308},{-22,23,-287},'candy'}},
  patches={ -- x, z, r, shade (1 light, 2 deep, 3 sand, 4 ash), height layer (1 = 4.07, 2 = 4.12)
   {62,-205,16,1,1},{-62,-205,16,2,1},{78,-215,9,2,2},{-78,-195,9,1,2},{88,-282,13,1,1},{-88,-282,13,2,1},{82,-368,15,2,1},{-82,-368,15,1,1},
   {124,-134,9,1,1},{-124,-134,9,2,1},{232,-286,8,3,1},{276,-252,7,3,2},{-232,-286,8,4,1},{-276,-252,7,4,2},
@@ -520,7 +555,8 @@ function A.Filter(full,tidy)
  if tidy.Lamps~=true and tidy.Lamps~=nil then
   out.lamps={};for _,l in ipairs(full.lamps)do if keptLamp(l[1],l[2])then out.lamps[#out.lamps+1]=l end end
   -- a string of bunting hangs between two lamps: one whose end stood on a lamp that went is dropped
-  local function hungFrom(e)for _,l in ipairs(full.lamps)do if lampAt(l,e[1],e[3])then return l end end;return nil end
+  -- (R158: a double lamp's string is tied to one of its two heads, 2.5 studs off the post: the lamp an end hangs from is the one within 3 studs)
+  local function hungFrom(e)for _,l in ipairs(full.lamps)do if (l[1]-e[1])^2+(l[2]-e[3])^2<=3^2 then return l end end;return nil end
   out.bunting={}
   for _,b in ipairs(full.bunting)do
    local ok=true

@@ -7,6 +7,7 @@
 -- the track gate as two rook towers): section 16 checks every removal and the battlement and the rook gate.
 -- R153 (owner: "remove the ground design for the side gardens"): section 17 checks that the garden spurs are plain cobblestone: no welcome mats,
 -- no base-coloured curbs or strips on the ground, and the cream street curbs run flush to each spur with no gap.
+-- R158 (owner: "fix the disconnect flags"): section 19 checks the bunting: the string follows its sag in continuous pieces, every pennant hangs from it, both ends of every string are on a part.
 local Z=require('./zfight_world');local W=Z.W;local R=Z.R;local V3,CF=R.Vector3.new,R.CFrame.new
 local RS=W.RS
 local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end;Run.IsStudio=function()return false end
@@ -656,10 +657,13 @@ do
  check('tidy: the lighting script still finds its lamps: 8 real lights, each on a lamp head at a kept lit lamp, 16 heads in ctx.Heads (all neon), in mirror pairs',badLight==0 and #ctx4.Lights==8 and #ctx4.Heads==16,badLight)
  local lines,pennants=by['Bunting line']or 0,by['Pennant']or 0
  local hungOk=true
+ -- (R158: a double lamp's string is tied to one of its two heads, 2.5 studs off the post: an end hangs from a lamp within 3 studs)
  for _,b in ipairs(Art.Layout.bunting)do for _,e in ipairs({b[1],b[2]})do
-  for _,l in ipairs(Art.Full.lamps)do if math.abs(l[1]-e[1])<.01 and math.abs(l[2]-e[3])<.01 and not want[string.format('%.1f,%.1f',l[1],l[2])]then hungOk=false end end
+  for _,l in ipairs(Art.Full.lamps)do if (l[1]-e[1])^2+(l[2]-e[3])^2<=3.1^2 and not want[string.format('%.1f,%.1f',l[1],l[2])]then hungOk=false end end
  end end
- check('tidy: the flags stay and hang from lamps that stay: 5 strings of bunting built ('..lines..' lines, '..pennants..' pennants), none from a lamp that went',lines==5 and pennants>20 and hungOk,lines..' / '..pennants)
+ local wantLines,wantPennants=0,0 -- (R158: each string is n + 1 straight rod pieces along its sag, with n - 1 pennants: HubLifeArt151.BuntingPlan)
+ for _,b in ipairs(Art.Layout.bunting)do local plan=Art.BuntingPlan(V3(b[1][1],b[1][2],b[1][3]),V3(b[2][1],b[2][2],b[2][3]));wantLines+=#plan.Points-1;wantPennants+=#plan.Pennants end
+ check('tidy: the flags stay and hang from lamps that stay: 5 strings of bunting built ('..lines..' rod pieces, '..pennants..' pennants), none from a lamp that went',#Art.Layout.bunting==5 and lines==wantLines and pennants==wantPennants and pennants>20 and hungOk,lines..' / '..pennants)
  check('tidy: nothing else changed on the square: 24 trees, the bushes, topiary pots and grass patches are all built',(by['Grass patch']or 0)>=14 and (by['Topiary pot']or 0)>=8 and (by['Bush']or 0)>=16)
  sc4:Destroy()
  -- the table is the knob: every kind comes back by flipping its value (the full layout), then the tidy is put back
@@ -683,6 +687,134 @@ do
  check('tidy: the part counts fall on every tier (the numbers above): tier 1 '..total[1].Before..' -> '..total[1].After..', tier 2 '..total[2].Before..' -> '..total[2].After..', tier 3 '..total[3].Before..' -> '..total[3].After,
   total[1].After<total[1].Before and total[2].After<total[2].Before and total[3].After<total[3].Before and #Art.Layout.lamps==12 and #Art.Layout.beds==0)
  root:Destroy()
+end
+
+-- 19. R158 bunting (owner: "fix the disconnect flags": the white string was ONE straight rod while the pennants hung on a sagging curve up to 2.2 studs lower, centred on their
+-- points, so they floated beside / under it; and the four market-corner double lamps' ends were 1 stud over the lamp, in the air). HubLifeArt151.Bunting now draws the string as
+-- straight rod pieces ALONG the sag, each pennant hangs from the middle of a piece, and every end is on a part. Everything is read from the PARTS the real client built on the
+-- owner's place (every detail level shown), not from the layout: the string's pieces, the pennants' corners and the parts (lamps, the market's roof) the ends touch. ----------------
+do
+ local Art=W.module('HubLifeArt151')
+ budget.Tier=3;local api5,sc5=load();tick(1);local life5=W.workspace:FindFirstChild('HubLife151')
+ api5.Near.detail=1e6;api5.Near.fine=1e6;api5.ApplyLod()
+ local rods,pens,real={},{},{}
+ for _,p in ipairs(partsUnder(W.workspace))do
+  local mine=life5~=nil and p:IsDescendantOf(life5)
+  if mine and p.Name=='Bunting line'then rods[#rods+1]=p
+  elseif mine and p.Name=='Pennant'then pens[#pens+1]=p
+  elseif (p._props.Transparency or 0)<1 then real[#real+1]=p end -- (a real, visible part: the lamps, the market, the walls ... but no other bunting piece)
+ end
+ local function ends(p)local c=p._props.CFrame;local r=c.R;local h=V3(r[1][1],r[2][1],r[3][1])*(p._props.Size.X/2);return c.Position-h,c.Position+h end -- (a cylinder's axis is its local X)
+ local function segDist(pt,a,b)local d=b-a;local t=math.clamp((pt-a):Dot(d)/d:Dot(d),0,1);return(pt-(a+d*t)).Magnitude end
+ local function toLocal(p,pt)local c=p._props.CFrame;local r=c.R;local v=pt-c.Position;return{r[1][1]*v.X+r[2][1]*v.Y+r[3][1]*v.Z,r[1][2]*v.X+r[2][2]*v.Y+r[3][2]*v.Z,r[1][3]*v.X+r[2][3]*v.Y+r[3][3]*v.Z}end
+ -- the distance from a point to a part (0 inside it): exact for boxes, balls and cylinders; a wedge counts as its box (never nearer than it is)
+ local function partDist(p,pt)
+  local l=toLocal(p,pt);local s=p._props.Size;local sh=p._props.Shape;sh=sh and(sh.Name or tostring(sh))or'Block'
+  if sh=='Ball'then return math.max(0,math.sqrt(l[1]^2+l[2]^2+l[3]^2)-s.X/2)end
+  if sh=='Cylinder'then return math.sqrt(math.max(0,math.sqrt(l[2]^2+l[3]^2)-s.Y/2)^2+math.max(0,math.abs(l[1])-s.X/2)^2)end
+  return math.sqrt(math.max(0,math.abs(l[1])-s.X/2)^2+math.max(0,math.abs(l[2])-s.Y/2)^2+math.max(0,math.abs(l[3])-s.Z/2)^2)
+ end
+ local function nearestReal(pt)local best,bp=1e9,nil;for _,p in ipairs(real)do local d=partDist(p,pt);if d<best then best,bp=d,p end end;return best,bp end
+ local function onString(group,pt)local best,bp=1e9,nil;for _,r in ipairs(group)do local a,b=ends(r);local d=segDist(pt,a,b);if d<best then best,bp=d,r end end;return best,bp end
+ -- the strings: rods whose axes touch (within .1) form one chain, walked from one free end
+ local n=#rods;local nb={};for i=1,n do nb[i]={}end
+ for i=1,n do local a0,a1=ends(rods[i]);for j=i+1,n do local b0,b1=ends(rods[j])
+  if math.min(segDist(a0,b0,b1),segDist(a1,b0,b1),segDist(b0,a0,a1),segDist(b1,a0,a1))<=.1 then nb[i][#nb[i]+1]=j;nb[j][#nb[j]+1]=i end
+ end end
+ local seen,chains,bad={},{},{}
+ for i=1,n do if not seen[i]then
+  local comp,stack={},{i};seen[i]=true
+  while #stack>0 do local k=table.remove(stack);comp[#comp+1]=k;for _,j in ipairs(nb[k])do if not seen[j]then seen[j]=true;stack[#stack+1]=j end end end
+  local free={};for _,k in ipairs(comp)do if #nb[k]==1 then free[#free+1]=k elseif #nb[k]~=2 then bad[#bad+1]='a rod piece with '..#nb[k]..' neighbours at '..tostring(rods[k]._props.CFrame.Position)end end
+  if #free~=2 then bad[#bad+1]='a string with '..#free..' free ends near '..tostring(rods[comp[1]]._props.CFrame.Position)
+  else
+   local order,prev,cur={},nil,free[1]
+   while cur do order[#order+1]=cur;local nxt=nil;for _,j in ipairs(nb[cur])do if j~=prev then nxt=j end end;prev,cur=cur,nxt end
+   chains[#chains+1]=order
+  end
+ end end
+ -- the layout's strings, each matched to the chain whose two free ends are at its own a and b; its pieces ordered from a to b as {start, end, part}
+ local strings={}
+ for _,b in ipairs(Art.Layout.bunting)do
+  local a,c=V3(b[1][1],b[1][2],b[1][3]),V3(b[2][1],b[2][2],b[2][3]);local s={A=a,B=c,Palette=b[3],Rods={},Pieces={}}
+  local dirAB=(c-a).Unit
+  for _,ch in ipairs(chains)do
+   local pcs={}
+   for _,idx in ipairs(ch)do local x,y=ends(rods[idx]);if(y-x):Dot(dirAB)<0 then x,y=y,x end;pcs[#pcs+1]={x,y,rods[idx]}end
+   table.sort(pcs,function(u,v)return(u[1]-a):Dot(dirAB)<(v[1]-a):Dot(dirAB)end)
+   if(pcs[1][1]-a).Magnitude<.15 and(pcs[#pcs][2]-c).Magnitude<.15 then s.Pieces=pcs;for _,pc in ipairs(pcs)do s.Rods[#s.Rods+1]=pc[3]end;break end
+  end
+  strings[#strings+1]=s
+ end
+ local matched=true;for _,s in ipairs(strings)do if #s.Pieces==0 then matched=false end end
+ check('bunting: the '..#rods..' rod pieces make '..#chains..' strings, one per layout string ('..#strings..'), each a plain chain with two free ends that sit on the layout\'s two end points',
+  #bad==0 and #chains==#strings and #strings==5 and matched,first(bad)or(#chains..'/'..#strings))
+ -- the pieces: as many as the plan says, continuous (each meets the next within .1 at both ends: no gap), smooth (a bend under 10 degrees), along the sag curve, .15 thick, white
+ local gaps,kinks,off,thick,plain={},{},{},{},{}
+ for si,s in ipairs(strings)do
+  local plan=Art.BuntingPlan(s.A,s.B)
+  if #s.Pieces~=#plan.Points-1 then gaps[#gaps+1]='string '..si..': '..#s.Pieces..' pieces, the plan has '..(#plan.Points-1)end
+  for k=1,#s.Pieces-1 do
+   local u,v=s.Pieces[k],s.Pieces[k+1]
+   if segDist(u[2],v[1],v[2])>.1 or segDist(v[1],u[1],u[2])>.1 then gaps[#gaps+1]='string '..si..' between pieces '..k..' and '..(k+1)end
+   local ang=math.deg(math.acos(math.clamp((u[2]-u[1]).Unit:Dot((v[2]-v[1]).Unit),-1,1)))
+   if ang>10 then kinks[#kinks+1]=string.format('string %d at piece %d: %.1f degrees',si,k,ang)end
+  end
+  -- the string follows the sag curve: every point of the curve is within .1 of a piece, and every piece's middle is within .1 of the curve
+  local samples={};for i=0,200 do samples[i]=Art.BuntingCurve(s.A,s.B,i/200)end
+  for i=0,200 do local d=onString(s.Rods,samples[i]);if d>.1 then off[#off+1]=string.format('string %d: the sag curve at t=%.2f is %.2f from the string',si,i/200,d);break end end
+  for _,pc in ipairs(s.Pieces)do local mid=(pc[1]+pc[2])/2;local best=1e9;for i=0,200 do best=math.min(best,(samples[i]-mid).Magnitude)end;if best>.1 then off[#off+1]=string.format('string %d: a piece\'s middle is %.2f off the sag curve',si,best)end end
+  for _,pc in ipairs(s.Pieces)do local p=pc[3]
+   if math.abs(p._props.Size.Y-.15)>1e-6 or math.abs(p._props.Size.Z-.15)>1e-6 then thick[#thick+1]=path(p)end
+   local c=p._props.Color;if not(math.abs(c.R*255-250)<.01 and math.abs(c.G*255-250)<.01 and math.abs(c.B*255-250)<.01)or p._props.Material.Name~='SmoothPlastic'then plain[#plain+1]=path(p)end
+  end
+ end
+ check('bunting: the pieces of every string meet end to end (no gap: each end of a piece lies on the next piece) and number as the plan says (n + 1 for n pennant spacings)',#gaps==0,first(gaps))
+ check('bunting: the string is smooth: no bend between two pieces over 10 degrees (a sag, not a zigzag)',#kinks==0,first(kinks))
+ check('bunting: the string follows the sag curve (a:Lerp(b,t) - (0, sin(t pi) 2.2, 0)): the whole curve lies within 0.1 stud of the pieces and every piece\'s middle within 0.1 of the curve',#off==0 and Art.BuntingSag==2.2,first(off))
+ check('bunting: every piece is 0.15 thick and the same white (250, 250, 250) SmoothPlastic as before',#thick==0 and #plain==0,first(thick)or first(plain))
+ -- the pennants: each hangs from its string
+ local palettes={rainbow={{255,96,96},{255,206,72},{96,200,120},{90,170,255},{190,120,255}},candy={{236,104,92},{252,244,226},{52,168,160},{244,196,86}}}
+ local topBad,downBad,faceBad,spill,colBad,perString={},{},{},{},{},{}
+ for _,p in ipairs(pens)do
+  local c=p._props.CFrame;local s=p._props.Size;local r=c.R
+  local A_,C_,B_=c*V3(0,-s.Y/2,-s.Z/2),c*V3(0,s.Y/2,s.Z/2),c*V3(0,-s.Y/2,s.Z/2) -- the wedge's slope runs A -> C (its top edge here); B, the right angle, is its point
+  local mid=(A_+C_)/2
+  local best,bs,bp=1e9,nil,nil -- the string it hangs from: the nearest of all
+  for _,st in ipairs(strings)do local d,rod=onString(st.Rods,mid);if d<best then best,bs,bp=d,st,rod end end
+  perString[bs]=(perString[bs]or 0)+1
+  local worst=math.max(best,(onString(bs.Rods,A_)),(onString(bs.Rods,C_)))
+  if worst>.1 then topBad[#topBad+1]=string.format('a pennant at %s: its top edge is %.2f from the string',tostring(mid),worst)end
+  local tip=B_-mid
+  if not(tip.Y<=-1 and math.abs(tip.X)<.1 and math.abs(tip.Z)<.1)then downBad[#downBad+1]=string.format('a pennant at %s: its point is (%.2f, %.2f, %.2f) from its top edge\'s middle',tostring(mid),tip.X,tip.Y,tip.Z)end
+  -- it faces along the string: a .12 plate whose flat sides are vertical and run along the string (its thin axis is level and square to the string's direction there), top edge parallel to the string
+  local r0,r1=ends(bp);local dir=(r1-r0).Unit;local thin=V3(r[1][1],r[2][1],r[3][1]);local edge=(C_-A_).Unit
+  if not(math.abs(thin.Y)<.01 and math.abs(thin:Dot(dir))<.01 and edge:Cross(dir).Magnitude<.01 and math.abs(s.X-.12)<1e-6)then
+   faceBad[#faceBad+1]=string.format('a pennant at %s: thin axis (%.2f, %.2f, %.2f), edge x string %.3f',tostring(mid),thin.X,thin.Y,thin.Z,edge:Cross(dir).Magnitude)end
+  local col=p._props.Color;local ok=false
+  for _,pc in ipairs(palettes[bs.Palette])do if math.abs(col.R*255-pc[1])<.01 and math.abs(col.G*255-pc[2])<.01 and math.abs(col.B*255-pc[3])<.01 then ok=true end end
+  if not ok or p._props.Material.Name~='Fabric'or p._class~='WedgePart'then colBad[#colBad+1]=path(p)end
+  for _,q in ipairs(pens)do if q~=p and(q._props.CFrame.Position-c.Position).Magnitude<2.6 then spill[#spill+1]='two pennants '..string.format('%.2f',(q._props.CFrame.Position-c.Position).Magnitude)..' apart at '..tostring(mid)end end
+ end
+ local wrong,expect=0,0
+ for _,st in ipairs(strings)do local plan=Art.BuntingPlan(st.A,st.B);expect+=#plan.Pennants;if(perString[st]or 0)~=#plan.Pennants then wrong+=1 end end
+ check('bunting: every pennant\'s top edge lies on its string (its two ends and its middle within 0.1 stud of a rod piece: no gap, none floating beside or under it), the plan\'s count on each string ('..#pens..')',
+  #topBad==0 and #pens==expect and wrong==0,first(topBad)or(#pens..'/'..expect..' pennants, '..wrong..' strings with a wrong number'))
+ check('bunting: every pennant hangs DOWN from the string: its point 1+ stud under the middle of its top edge, straight below it',#downBad==0,first(downBad))
+ check('bunting: every pennant faces along the string: a .12 plate whose flat sides are vertical and square to the string, its top edge parallel to the rod piece it hangs from',#faceBad==0,first(faceBad))
+ check('bunting: the same colours and fabric: every pennant a Fabric WedgePart in its string\'s palette (rainbow across the avenue, candy to the market); none within 2.6 studs of another',#colBad==0 and #spill==0,first(colBad)or first(spill))
+ -- both ends of every string are on a real part (within .5 stud): the lamp's head, cap or arm, or the market's roof; none in the air
+ local airy,touch={},{}
+ for si,s in ipairs(strings)do for _,e in ipairs({s.A,s.B})do
+  local d,part=nearestReal(e)
+  touch[#touch+1]=string.format('(%.1f, %.1f, %.1f) -> %s %.2f',e.X,e.Y,e.Z,part and part.Name or'nothing',d)
+  if d>.5 then airy[#airy+1]=string.format('string %d: the end at (%.1f, %.1f, %.1f) is %.2f from the nearest part (%s)',si,e.X,e.Y,e.Z,d,part and part.Name or'none')end
+ end end
+ print('BUNTING ENDS: '..table.concat(touch,'; '))
+ check('bunting: both ends of every string are within 0.5 stud of a real part (10 ends: a lamp head / cap / arm, or the market\'s roof): none hangs in the air',#airy==0 and #touch==10,first(airy)or #touch)
+ print(string.format('BUDGET bunting: %d rod pieces + %d pennants = %d parts (R154: 5 rods + 29 pennants = 34)',#rods,#pens,#rods+#pens))
+ check('bunting: a modest part count: under 80 parts for the five strings (the detail level: none are built at tier 1)',#rods+#pens<80,#rods+#pens)
+ sc5:Destroy()
 end
 
 print(string.format('R151 base area: %d passed, %d failed',passed,failed))
