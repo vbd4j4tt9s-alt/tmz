@@ -1,0 +1,11 @@
+forest      1954 new parts with  4571 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+jungle      1954 new parts with  5443 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+desert      1954 new parts with  6937 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+snow        1954 new parts with  7023 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+lava        1954 new parts with  7017 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+crystal     1954 new parts with  7051 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+storm       1954 new parts with  6828 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 0
+hub A        261 new parts with  5829 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 44
+hub B        702 new parts with  5611 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 48
+hub C        530 new parts with  5829 map parts: counted 0, tight (< 0.1) 0, look-alike (no visible flicker) 36
+R158 design z-fighting (R149 detector, R152 rules): PASS
