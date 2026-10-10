@@ -34,7 +34,9 @@ if git -C "$REPO" cat-file -e "$BASE:src/StarterPlayer/StarterPlayerScripts/Hotb
   [ "$(head -1 "$REPO/$f")" = "$(git -C "$REPO" show "$BASE:$f" | head -1)" ] || fail "$f: line 1 (the load guard) changed"
  done
  echo "ok: line 1 of the $n changed client scripts is unchanged (the load guard)"
- git -C "$REPO" diff --quiet "$BASE" -- src/ServerScriptService/ChestChaseServer/Config.lua && echo "ok: Config.lua is untouched" || fail "Config.lua changed since $BASE"
+ cfgnorm(){ sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/"; } # (every release bumps the Version line; nothing else in Config may change)
+ git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | cfgnorm > "$OUT/cfg_base.txt"
+ cfgnorm < "$REPO/src/ServerScriptService/ChestChaseServer/Config.lua" | cmp -s - "$OUT/cfg_base.txt" && echo "ok: Config.lua is untouched (apart from the release's Version line)" || fail "Config.lua changed since $BASE (beyond the Version line)"
  git -C "$REPO" diff --quiet "$BASE" -- src/ReplicatedStorage/TreadmillBonusRules.lua && echo "ok: TreadmillBonusRules (frozen by R150) is untouched" || fail "TreadmillBonusRules changed since $BASE"
 else echo "skipped: commit $BASE is not in this clone (the load guard / Config checks)";fi
 (cd "$REPO" && grep -v '^#' "$P/R151/tests/frozen.sha256" | sha256sum -c --quiet -) && echo "ok: the frozen files (R151 frozen.sha256) match" || fail "a frozen file changed"
