@@ -491,11 +491,11 @@ function PlayerDataService:OpenSeedPack(player, inventoryId, unitRoll)
         self:QueueGardenSave(player)
         self:TutorialEvent(player,'Seed')
         self:QuestEvent(player,'Open',1) -- R140 daily quest
-        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil or luckTest)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is)
+        pcall(function()require(script.Parent.PullAnnouncer).OnOpened(player,pack,reward,testSeed~=nil or luckTest or pack.Floor~=nil)end) -- R151: a real open of a Legendary+ seed is announced (a TEST pack never is; R158d: nor the new-player gift pack)
         -- R151: the hub's BEST PULL board (this server's own, R153; HubDisplayService.NotePull; set by the main script). It never yields or throws here; a TEST pack (/test rarepacks, or any pack an owner command made:
         -- TestGrant) is flagged so it is not counted and never announced as a record.
         local hook=self.OnPackOpened
-        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=luck,PassLuck=passLuck,Lucky=pity~=nil and pity.Lucky or nil,Test=testSeed~=nil or pack.TestGrant==true or luckTest}) end -- (R155: the luck the roll took; Lucky = the pity's lucky pack)
+        if hook then pcall(hook,player,reward,{Stage=pack.Stage,Variant=pack.BagVariant,Version=pack.OddsVersion,Boost=pack.RateBoost,Luck=luck,PassLuck=passLuck,Lucky=pity~=nil and pity.Lucky or nil,Test=testSeed~=nil or pack.TestGrant==true or luckTest or pack.Floor~=nil}) end -- (R158d: the new-player gift pack is silent: no BEST PULL) -- (R155: the luck the roll took; Lucky = the pity's lucky pack)
         return reward,nil,pity -- (R155: this open's pack pity {Group, Lucky, Count}; nil for a TEST open)
     end
     return nil, "THAT PACK IS GONE FROM YOUR BAG!"

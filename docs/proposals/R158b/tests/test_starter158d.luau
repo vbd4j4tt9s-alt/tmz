@@ -254,7 +254,7 @@ do
  end
  sv.D.OnPackOpened=nil
  check(below==0,'F: 2,000 real opens of the floored pack: NONE below Mythic (below: '..below..')')
- check(hookTest==0,'F: a floored open is a REAL open (the announcer / hub hook sees Test = false)')
+ check(hookTest==2000,'F: a floored open is SILENT (owner: no chat announcement, no BEST PULL): the hub hook sees Test = true every time ('..hookTest..')')
  local line={};for _,r in ipairs(order)do line[#line+1]=r..' '..(counts[r]or 0)end
  print('INFO 2,000 real opens: '..table.concat(line,', '))
  for _,r in ipairs(order)do
