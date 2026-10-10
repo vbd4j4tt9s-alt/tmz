@@ -1,6 +1,6 @@
 --!nocheck
 -- R149 baked fruit meshes: what happens when a bake fails. Each scenario is its own world (FruitMeshes149 remembers a seed's final state):
---   luau test_fruit_mesh_fallback.luau -a neutral   the 4th EditableMesh (the Snow Melon's neutral twin) gets no memory: the Snow Melon goes back
+--   luau test_fruit_mesh_fallback.luau -a neutral   the 8th EditableMesh (the Snow Melon's neutral twin; R158d: after the two hologram keys, 4 before) gets no memory: the Snow Melon goes back
 --                                                   to its part-built fruit (both its templates dropped), the Watermelon and Ember Pumpkin keep
 --                                                   their meshes; logged once; Prepare again changes nothing;
 --   luau test_fruit_mesh_fallback.luau -a every     EditableMesh is not available at all: all three keep the R149 part-built fruit, one log line;
@@ -46,11 +46,11 @@ end
 local function failures(f)local t={};local list=f:FindFirstChild('Failures');for _,v in ipairs(list and list:GetChildren()or{})do t[v.Name]=v.Value end;return t end
 
 if SCENARIO=='neutral'or SCENARIO=='every'or SCENARIO=='content'then
- local opts=({neutral={FailAt=4},every={Missing=true},content={ContentFail=1}})[SCENARIO]
+ local opts=({neutral={FailAt=8},every={Missing=true},content={ContentFail=1}})[SCENARIO]
  local log=Mock.install(W,opts);load()
  local ready,errors=Mock.prepare(W)
  local f=W.RS:FindFirstChild(FM.Folder);local fl=failures(f)
- local failed=({neutral={SnowMelon149=true},every={Watermelon149=true,SnowMelon149=true,EmberPumpkin149=true},content={EmberPumpkin149=true}})[SCENARIO]
+ local failed=({neutral={SnowMelon149=true},every={Watermelon149=true,SnowMelon149=true,EmberPumpkin149=true,HoloMelon158=true,HoloPumpkin158=true},content={EmberPumpkin149=true}})[SCENARIO]
  local nFailed=0;for _ in pairs(failed)do nFailed+=1 end
  check(ready==false and #errors==nFailed,SCENARIO..': Prepare reports '..nFailed..' failure(s): '..tostring(errors and errors[1]))
  check((W.warns or 0)==1,SCENARIO..': logged exactly once ('..tostring(W.warns)..' warning(s))')
@@ -133,8 +133,8 @@ else
  local log=Mock.install(W)
  W.Run.IsServer=function()return true end;load()
  local n,mesh=visible(hotbar('EmberBloomSeed'))
- check(n==4 and mesh==1 and #log.Contents==6 and(W.warns or 0)==0,'server ok: the first build (e.g. the market at server start) bakes every key on demand and gets its mesh ('..#log.Contents..' bakes)')
- check(FM.Prepare()==true and #log.Contents==6,'server ok: the bootstrap\'s Prepare afterwards bakes nothing more')
+ check(n==4 and mesh==1 and #log.Contents==10 and(W.warns or 0)==0,'server ok: the first build (e.g. the market at server start) bakes every key on demand and gets its mesh ('..#log.Contents..' bakes)')
+ check(FM.Prepare()==true and #log.Contents==10,'server ok: the bootstrap\'s Prepare afterwards bakes nothing more')
  for _,id in ipairs(ORDER)do meshBuilt(id,'server ok')end
  W.Run.IsServer=function()return false end
  local ok,why=pcall(FM.Prepare);check(not ok and tostring(why):find('server-only',1,true)~=nil,'a client cannot bake')

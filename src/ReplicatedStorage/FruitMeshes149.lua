@@ -6,6 +6,10 @@
 -- PlantVisuals asks Art / Suffix which build a seed uses and routes these keys' Get / Status here (DetailReady keeps the server
 -- silhouette while a template is still loading). If a bake fails, or the server never started baking (no folder), the seed keeps
 -- its R149 part-built fruit; a failure is logged once.
+-- R158d (owner: the Holo Melon uses the updated melon and pumpkin meshes): two more keys, HoloMelon158 and HoloPumpkin158, are the Watermelon's and the Ember Pumpkin's
+-- mesh again (the same vertices, normals and triangles: a test pins it) with their vertex colours turned into brightness for the Mech hologram (HologramForms tints the part
+-- cyan / violet and draws it in Neon, so the stripes and the pumpkin's grooves show as brighter and dimmer bands). They are baked, kept and failed exactly like the other keys
+-- (a `_Neutral` twin for the Gold / Diamond coats). UsesMesh / Suffix also answer for the Holo Melon seed (both keys must be Ready; if one fails it keeps its wire form).
 local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local M={Folder='FruitMeshTemplates149'}
 -- seed -> its mesh key, the fruit specs the mesh replaces, the spec whose frame (and, unless Fit='all', size) it takes, the body's name,
@@ -19,7 +23,9 @@ M.Seeds={
  SnowdropSeed={Key='SnowMelon149',Name='Snow melon body',Body='Snow melon rind',Replace={'Snow melon rind','Snow melon stripe band','Snow cap'},Tone={190,232,234}},
  EmberBloomSeed={Key='EmberPumpkin149',Name='Pumpkin body',Body='Pumpkin heart',Replace={'Pumpkin heart','Pumpkin rib','Ember groove'},Fit='all',Tone={232,108,28},UnripeNeutral=true},
 }
-M.Keys={'EmberPumpkin149','SnowMelon149','Watermelon149'}
+M.Keys={'EmberPumpkin149','HoloMelon158','HoloPumpkin158','SnowMelon149','Watermelon149'}
+-- seed -> its hologram keys (not a plant that draws its own fruit body from them: HologramForms builds the Mech fruit)
+M.Holo={HoloMelonSeed={'HoloMelon158','HoloPumpkin158'}}
 local owned={};for _,k in ipairs(M.Keys)do owned[k]=true end
 function M.Owns(key)return owned[key]==true end
 local byKey={};for _,cfg in pairs(M.Seeds)do byKey[cfg.Key]=cfg end
@@ -105,6 +111,16 @@ local BUILD={
  SnowMelon149=function()return lathe(9,32,'X',melonShape,melonColour('SnowMelon149'))end,
  EmberPumpkin149=function()return lathe(7,40,'Y',pumpkinShape,pumpkinColour)end,
 }
+-- R158d: the Mech hologram's copy of a real fruit mesh: the same geometry, each vertex colour replaced by its brightness (0.3 .. 1, grey), so the part colour
+-- (HologramForms: cyan / violet) is what shows and the real stripes / grooves / ground spot are its bright and dim bands.
+local HOLO={HoloMelon158='Watermelon149',HoloPumpkin158='EmberPumpkin149'}
+local function hologram(key)
+ local d=BUILD[HOLO[key]]();local lo,hi,lum=math.huge,-math.huge,{}
+ for i,c in ipairs(d.Colors)do local l=.2126*c[1]+.7152*c[2]+.0722*c[3];lum[i]=l;lo=math.min(lo,l);hi=math.max(hi,l)end
+ for i in ipairs(d.Colors)do local g=.3+.7*((lum[i]-lo)/(hi-lo))^1.5;d.Colors[i]={g,g,g}end
+ return d
+end
+for key in pairs(HOLO)do BUILD[key]=function()return hologram(key)end end
 -- {Vertices, Normals, Colors (0..1), Faces (1-based)}: the ApprovedPlantMeshData format. Pure and deterministic.
 function M.Generate(key)return assert(BUILD[key],'Unknown fruit mesh: '..tostring(key))()end
 
@@ -196,17 +212,22 @@ end
 local final={}
 -- true: the baked mesh body (Ready, or Loading: PlantVisuals.DetailReady keeps the silhouette meanwhile); false: the part-built fruit
 -- (the bake failed, or this server never made the folder).
+local function keysOf(id)local cfg=M.Seeds[id];if cfg then return {cfg.Key}end;return M.Holo[id]end
 function M.UsesMesh(id)
- local cfg=M.Seeds[id];if not cfg then return false end
+ local keys=keysOf(id);if not keys then return false end
  local known=final[id];if known~=nil then return known end
  if not RS:FindFirstChild(M.Folder)then return false end
- local a,b=M.Status(cfg.Key),M.Status(cfg.Key,true)
- if a=='Failed'or b=='Failed'then final[id]=false;return false end
- if a=='Ready'and b=='Ready'then final[id]=true end
+ local ready=true
+ for _,key in ipairs(keys)do
+  local a,b=M.Status(key),M.Status(key,true)
+  if a=='Failed'or b=='Failed'then final[id]=false;return false end
+  if not(a=='Ready'and b=='Ready')then ready=false end
+ end
+ if ready then final[id]=true end
  return true
 end
 -- Part of PlantVisuals' spec cache key, so a seed that falls back never reuses mesh-build specs (and the other way round).
-function M.Suffix(id)if M.Seeds[id]==nil or M.UsesMesh(id)then return ''end;return '|parts'end
+function M.Suffix(id)if keysOf(id)==nil or M.UsesMesh(id)then return ''end;return '|parts' end
 local derived=setmetatable({},{__mode='k'})
 local function body(cfg,source,g,replace)
  local b;for _,s in ipairs(source)do if s.g==g and s.f==cfg.Body then b=s;break end end

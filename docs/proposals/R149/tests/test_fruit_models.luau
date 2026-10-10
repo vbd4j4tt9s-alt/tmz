@@ -155,7 +155,7 @@ do
   check(Visuals.DetailReady(id,crop(id,'pre'))==true,id..': DetailReady (nothing to wait for)')
  end
  check(FM.Suffix('AppleSeed')==''and FM.Suffix('CocoaSeed')==''and FM.UsesMesh('CocoaSeed')==false and FM.Art('CocoaSeed',partSpecs.SunflowerSeed)==partSpecs.SunflowerSeed,'every other seed: no key suffix, no fruit mesh, its art list untouched')
- check(FM.Owns('Watermelon149')and FM.Owns('SnowMelon149')and FM.Owns('EmberPumpkin149')and not FM.Owns('FlutedCocoa')and not FM.Owns('Watermelon149_Neutral'),'FruitMeshes149 owns exactly its three keys')
+ check(FM.Owns('Watermelon149')and FM.Owns('SnowMelon149')and FM.Owns('EmberPumpkin149')and FM.Owns('HoloMelon158')and FM.Owns('HoloPumpkin158')and not FM.Owns('FlutedCocoa')and not FM.Owns('Watermelon149_Neutral'),'FruitMeshes149 owns exactly its three fruit keys and (R158d) the Holo Melon\'s two hologram keys')
  -- the server makes the folder when FruitMeshes149 loads there; nothing is baked yet: Loading
  local f=R.new('Folder');f.Name=FM.Folder;f.Parent=W.RS
  for _,id in ipairs(MESHIDS)do
@@ -662,7 +662,10 @@ do
  local generated={}
  -- 8a. the generator
  for _,key in ipairs(FM.Keys)do
-  local m=byKey[key];local t0=os.clock();local d=FM.Generate(key);local took=os.clock()-t0;generated[key]=d
+  local m=byKey[key]
+  -- R158d: the two hologram keys (the Holo Melon) are the Watermelon's / Ember Pumpkin's mesh with grey colours; docs/proposals/R158b/tests/test_holo158d.luau pins them
+  if not m then generated[key]=FM.Generate(key);continue end
+  local t0=os.clock();local d=FM.Generate(key);local took=os.clock()-t0;generated[key]=d
   check(deepEqual(d,FM.Generate(key)),key..': the generator is deterministic')
   local V,N,C,Fc=d.Vertices,d.Normals,d.Colors,d.Faces
   check(#V==m.Verts and #N==#V and #C==#V and #Fc==m.Tris and #Fc<=512,('%s: %d vertices, %d triangles (<= 512, for phones), a normal and a colour per vertex'):format(key,#V,#Fc))
@@ -730,7 +733,7 @@ do
  end
  -- 8b. the bake: exactly the generated data, the white "_Neutral" twin, editables destroyed, yields, MeshPart settings
  local folder=W.RS:FindFirstChild(FM.Folder)
- check(#bakeLog.Contents==6 and bakeLog.Editables==6 and bakeLog.Destroyed==6,'6 bakes (3 keys x normal / neutral), every EditableMesh destroyed after its bake ('..bakeLog.Destroyed..')')
+ check(#bakeLog.Contents==10 and bakeLog.Editables==10 and bakeLog.Destroyed==10,'10 bakes (5 keys x normal / neutral; R158d: + the two hologram keys), every EditableMesh destroyed after its bake ('..bakeLog.Destroyed..')')
  local k=0
  for _,key in ipairs(FM.Keys)do for _,neutral in ipairs({false,true})do
   k+=1;local rec=bakeLog.Contents[k];local d=generated[key];local name=neutral and key..'_Neutral'or key
@@ -751,8 +754,8 @@ do
    check(o~=nil and o.CollisionFidelity==R.Enum.CollisionFidelity.Hull and o.RenderFidelity==R.Enum.RenderFidelity.Precise,name..': CreateMeshPartAsync with Hull collision and Precise render fidelity')
   end
  end end
- check(folder:GetAttribute('Ready')==true and folder:GetAttribute('FailureCount')==0 and folder:GetAttribute('PreparationFinished')==true and folder:FindFirstChild('Failures')==nil and #folder:GetChildren()==6,
-  'the folder: 6 templates, Ready, 0 failures, finished')
+ check(folder:GetAttribute('Ready')==true and folder:GetAttribute('FailureCount')==0 and folder:GetAttribute('PreparationFinished')==true and folder:FindFirstChild('Failures')==nil and #folder:GetChildren()==10,
+  'the folder: 10 templates, Ready, 0 failures, finished')
  local before=#bakeLog.Contents;check(Mock.prepare(W)==true and#bakeLog.Contents==before,'Prepare again bakes nothing (idempotent)')
  for _,id in ipairs(MESHIDS)do
   local m=MESHFRUIT[id]
@@ -898,7 +901,7 @@ do
   check(noShine,id..' fruit '..i..': no gloss patch on the mesh (R151)')
  end end
  local tris=0;for _,id in ipairs(MESHIDS)do tris=math.max(tris,MESHFRUIT[id].Tris*Catalog[id].FruitCount)end
- print(('INFO phones: at most %d mesh triangles per plant (2 fruit); 6 templates of 242 - 258 vertices in all'):format(tris))
+ print(('INFO phones: at most %d mesh triangles per plant (2 fruit); 10 templates of 242 - 258 vertices in all (R158d: 2 of the 5 keys are the Holo Melon meshes)'):format(tris))
 end
 
 -- 7. Floating parts: the scenes go to check_floating.py (R134) ----------------------------------------------------------------------------------------------

@@ -33,6 +33,7 @@ src/MANIFEST.tsv
 src/ReplicatedStorage/ApprovedPlantArt.lua
 src/ReplicatedStorage/ApprovedPlantArt5.lua
 src/ReplicatedStorage/FruitMeshes149.lua
+src/ReplicatedStorage/HologramForms.lua
 src/ReplicatedStorage/PlantArtCrystal.lua
 src/ReplicatedStorage/PlantArtDesert.lua
 src/ReplicatedStorage/PlantArtForest.lua

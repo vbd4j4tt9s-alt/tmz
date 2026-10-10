@@ -26,10 +26,13 @@ import sys
 
 args = [a for a in sys.argv[1:] if not a.startswith('--')]
 FALLBACK = '--fallback' in sys.argv
+# R158d: the two Mech hologram plants (Holo Melon, Holo Apple Tree) were reworked on purpose (real melon / pumpkin meshes, the real apple): like the redesigned fruit, only their catalog / key /
+# prompt / reach / socket / body-only lines must stay as they were (docs/proposals/R158b/tests/test_holo158d.luau pins the new look).
+HOLO158D = {'HoloMelonSeed', 'HoloAppleTreeSeed'}
 if FALLBACK:
-    REDESIGNED = {'CactusSeed'}
+    REDESIGNED = {'CactusSeed'} | HOLO158D
 else:
-    REDESIGNED = {'SunflowerSeed', 'SnowdropSeed', 'AppleSeed', 'ElderbloomSeed', 'EmberBloomSeed', 'BluebellSeed', 'IceberrySeed'}
+    REDESIGNED = {'SunflowerSeed', 'SnowdropSeed', 'AppleSeed', 'ElderbloomSeed', 'EmberBloomSeed', 'BluebellSeed', 'IceberrySeed'} | HOLO158D
 MUST_MATCH = ('catalog', 'key', 'prompt', 'bodyonly', 'supportsnoidx')
 GLOSS_ALL = {'SunflowerSeed', 'SnowdropSeed', 'EmberBloomSeed', 'AppleSeed', 'ElderbloomSeed', 'BluebellSeed', 'IceberrySeed', 'MoonflowerSeed', 'VeritySeed'}
 GLOSS_RULE = GLOSS_ALL if FALLBACK else {'MoonflowerSeed', 'VeritySeed'}
