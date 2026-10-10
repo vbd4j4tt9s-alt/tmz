@@ -127,6 +127,7 @@ function Service.new(data,chests,passes)
    if offer and Catalog.EventOver()then okay=false;message=Catalog.Event.Refused
    elseif entry and entry.RobuxAvailable and route=='Mech'and routed==count and data:CanReceiveMechPacks(p,count)then
     okay=pcall(Market.PromptProductPurchase,Market,p,id);message=not okay and'Couldn\'t open the purchase. Try again!'or nil -- R148: the opened prompt needs no status line
+   elseif offer and entry and entry.BagFull then okay=false;message=Catalog.BagFull.Notice -- R157: a full Bag is told plainly (no prompt)
    else okay=false;message='CAN\'T BUY THIS RIGHT NOW'end
   else okay=false;message='TRY AGAIN!'end
   -- R148: a gem purchase that went through gets the notice, chime and sparkles; their confirmation line is then redundant
@@ -179,10 +180,14 @@ function Service:State(player)
  for _,offer in ipairs(Catalog.Offers)do
   local count=offer.Count;local info=(self.PackProducts or{})[count]
   local route,key=Routing.Resolve(Catalog.ProductId(count))
-  local allowed=saveReady and Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true and self.Data:CanReceiveMechPacks(player,count)
+  -- R157: BagFull = the ONLY thing in the way is the Bag (200 cap): the sale is on, the data is ready, paid random items are allowed, yet the packs would not fit.
+  -- Nothing may start (GemAvailable / RobuxAvailable stay false); the shop reads "Bag full" instead of "Unavailable". Off sale / event over never set it.
+  local ready=saveReady and Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true
+  local fits,why=false,nil;if ready then fits,why=self.Data:CanReceiveMechPacks(player,count)end
+  local allowed=ready and fits==true
   offers[tostring(count)]={Count=count,GemPrice=offer.GemPrice,GemAvailable=allowed,
    RobuxAvailable=allowed and robuxReady and route=='Mech'and key==count and info~=nil and info.IsForSale~=false,
-   RobuxPrice=info and info.PriceInRobux}
+   RobuxPrice=info and info.PriceInRobux,BagFull=ready and not allowed and why==Catalog.BagFull.Notice or nil}
  end
  for _,row in ipairs(Pricing.Bundles)do
   local info=(self.Products or{})[row.Key];local route,key=Routing.Resolve(Pricing.ProductId(row));local quote=self.Data:BundleQuote(player,row.Key)

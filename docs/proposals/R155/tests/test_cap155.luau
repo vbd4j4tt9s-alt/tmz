@@ -128,7 +128,7 @@ local verity=Data:ConvertVoidPack(A,void.Id);check(verity and verity.BagVariant=
 -- Mech: for Gems (refused, gems kept) and a Robux receipt (never lost)
 A:SetAttribute('PaidRandomAllowed',true);Data:GetPremium(A).Gems=900
 fillTo(A,200);local okM,whyM=Data:BuyMechPack(A,1)
-check(okM==false and whyM=='MAKE ROOM FOR 1 PACKS FIRST!'and Data:GetPremium(A).Gems==900 and held(A)==200,'a Mech pack for Gems at 200: refused, no gems taken ('..tostring(whyM)..')')
+check(okM==false and whyM=='BAG FULL! MAKE ROOM FIRST'and Data:GetPremium(A).Gems==900 and held(A)==200,'a Mech pack for Gems at 200: refused, no gems taken ('..tostring(whyM)..')')
 check(not Data:CanReceiveMechPacks(A,1)and not Data:CanReceiveMechPacks(A,10),'the shop does not offer Mech packs (Gems or Robux) that do not fit')
 fillTo(A,195);check(Data:CanReceiveMechPacks(A,5)and not Data:CanReceiveMechPacks(A,10),'195: a 5-pack fits, a 10-pack does not')
 RS.MechCatalog:SetAttribute('MechPackProductId',777001)

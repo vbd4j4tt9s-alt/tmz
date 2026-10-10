@@ -14,7 +14,7 @@
 #                         R152 (section 16): no fountain / base entrance / mural / banner / signpost / corner tower / hedge / red crest, 24 of 62
 #                         trees, the 18-stud plaza circle at (0, -392) clear, the chess-rook battlement (218 evenly spaced merlons, a corner merlon,
 #                         nothing else over the wall top, none near tower height) and the rook gate (stepped base, tapering shaft, ring, collar,
-#                         flared crown, 8 merlons each; crenellated gatehouse with the sign and the 7 keys).
+#                         flared crown, 8 merlons each; crenellated gatehouse with the 7 keys (R157: the sign is gone)).
 #                         R153 (section 17): the garden spurs are plain street-coloured cobblestone - no welcome mats, no ground part in a base
 #                         colour, every curb neutral cream (bar the 4 garden-walk edgings), nothing laid on or beside a spur, and the street curbs
 #                         meet each spur flush (no bare lawn between a curb end and a spur).

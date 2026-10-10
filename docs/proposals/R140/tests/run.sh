@@ -8,7 +8,7 @@
 #                           speed stays x1, BaseService treadmill gain x1.1 / x1.2 / x1.3, purchases not boosted, MovementGuard); the shared "your plant is ready" queue and the Open Cloud call
 #                           (faked MemoryStore / HttpService); the midnight rollover; the owner's daily command.
 #  test_daily_client.luau - the real TravelButtons + DailyRewardsClient (and ItemPictures): DAILY / INVITE in the top bar row on many
-#                           screens, the window (LOGIN week with mystery silhouettes on white tiles and the Void pack on day 7, QUESTS with "+1 PACK" and the ALL DONE row), claims, badges, auto-open, invite (R149 wording: speed gain), friend chip,
+#                           screens, the window (LOGIN week with mystery silhouettes (R157: no white tile, a light edge; the TODAY tag white with a black outline) and the Void pack on day 7, QUESTS with "+1 PACK" and the ALL DONE row), claims, badges, auto-open, invite (R149 wording: speed gain), friend chip,
 #                           the notification opt-in.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)

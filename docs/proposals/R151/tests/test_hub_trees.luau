@@ -122,6 +122,39 @@ do
  check('load: an asset with no parts is refused (failed), nothing parked',f:GetAttribute('Route16637971059')=='failed'and #f:GetChildren()==0)
 end
 
+-- 1b. R157 (owner: the Output showed "[R151 trees] ...: not loaded (... User is not authorized ...)" as a yellow warning and he called it a bug): the two trees are other people's
+-- assets the game cannot load; the hub uses its part-built trees and that is fine. One plain print per id (never a warn), and "not authorized" is said plainly.
+do
+ local f=folder()
+ local logged,warned={},{}
+ local rawPrint,rawWarn=W.env.print,W.env.warn
+ W.env.print=function(...)local t={};for i=1,select('#',...)do t[#t+1]=tostring((select(i,...)))end;logged[#logged+1]=table.concat(t,' ')end
+ W.env.warn=function(...)local t={};for i=1,select('#',...)do t[#t+1]=tostring((select(i,...)))end;warned[#warned+1]=table.concat(t,' ')end
+ local denied=function()error('Failed to load asset: User is not authorized to access Asset.')end
+ routes(denied,denied)
+ Loader.Run(true)
+ local mine={};for _,l in ipairs(logged)do if l:find('[R151 trees]',1,true)then mine[#mine+1]=l end end
+ check('log: nothing reaches warn() when the two tree models cannot be loaded ('..#warned..' warns)',#warned==0,warned[1])
+ check('log: one print per id, in plain words: "[R151 trees] 16637971059 can\'t be loaded (not your asset); using the built-in trees"',#mine==2 and mine[1]=="[R151 trees] 16637971059 can't be loaded (not your asset); using the built-in trees"
+  and mine[2]=="[R151 trees] 17280628013 can't be loaded (not your asset); using the built-in trees",table.concat(mine,' | '))
+ check('log: the long error text ("AssetService: ... InsertService: ...") is not dumped into that line',not mine[1]:find('AssetService',1,true)and not mine[1]:find('InsertService',1,true))
+ check('log: the hub still keeps its part-built trees (Route<id> = failed, nothing parked, Ready)',f:GetAttribute('Route16637971059')=='failed'and f:GetAttribute('Route17280628013')=='failed'and #f:GetChildren()==0 and f:GetAttribute('Ready')==true)
+ -- another failure (not an authorisation one) keeps its reason, still as one print
+ logged,warned={},{}
+ local f2=folder();routes(nil,function()error('HTTP 500 (Internal Server Error)')end)
+ Loader.Run(true)
+ mine={};for _,l in ipairs(logged)do if l:find('[R151 trees]',1,true)then mine[#mine+1]=l end end
+ check('log: any other failure is one print too, with its reason ("not loaded (...); using the built-in trees")',#warned==0 and #mine==2 and mine[1]:find('16637971059: not loaded (',1,true)~=nil and mine[1]:find('HTTP 500',1,true)~=nil and mine[1]:find('using the built-in trees',1,true)~=nil,mine[1])
+ -- a tree the owner put in by hand is used, and the line says so
+ logged,warned={},{}
+ local f3=folder();routes(denied,denied)
+ local hand=fakeTree('MyStudTree',10);hand.Parent=f3
+ Loader.Run(true)
+ mine={};for _,l in ipairs(logged)do if l:find('[R151 trees]',1,true)then mine[#mine+1]=l end end
+ check('log: with a hand-placed tree the line says it uses that ("... (not your asset); using the trees placed in the folder by hand")',#warned==0 and #mine==2 and mine[1]=="[R151 trees] 16637971059 can't be loaded (not your asset); using the trees placed in the folder by hand",mine[1])
+ W.env.print,W.env.warn=rawPrint,rawWarn
+end
+
 -- 2. templates: sanitize, measure, broken ones -------------------------------------------------------------------------------------------------
 local f=folder()
 local function put(m)m.Parent=f;return m end

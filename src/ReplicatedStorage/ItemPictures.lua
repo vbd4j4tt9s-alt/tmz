@@ -36,7 +36,7 @@ local function noteLoading(key,why)
   if #kinds==0 then return end
   local parts={}
   for _,kind in ipairs(kinds)do parts[#parts+1]=counts[kind]..(counts[kind]==1 and' item picture'or' item pictures')..' waiting for '..kind end
-  warn('[R112] '..table.concat(parts,', '))
+  print('[R112] '..table.concat(parts,', ')) -- R157 (owner: Studio's Output showed it as a warning): pictures waiting for their meshes is a normal loading note, not a problem
  end)
 end
 local function mutationKey(value)return(value=='Gold'or value=='Diamond')and value or'None'end
@@ -142,6 +142,24 @@ end
 local shapeHooked
 -- R153: the black silhouette of a pack (the colour of the mystery pedestal's and the hub displays' silhouettes): every drawn part flat near-black, no textures, decals or effects.
 local SILHOUETTE=RGB(10,9,16)
+-- R157 (owner: "remove the white background" behind the mystery pack in the DAILY window): the near-black silhouette (10,9,16) is only about 1.8 : 1 against the dark navy / purple
+-- cards (48,54,106) / (67,52,110), so without the white tile it is given a thin LIGHT EDGE: a copy of every drawn part, 14% bigger (RIM_GROW), in a pale lilac, pushed straight
+-- back from the camera (the direction this picture is viewed from, views.Pack) by a quarter of the part's depth along that direction - more than the growth needs, so it stays
+-- behind the dark pack and only the rim around the outline shows (the push is tiny next to the camera distance: no visible shrink). The body stays flat near-black (nothing
+-- says which pack it is). The rim parts are named SilhouetteRim; any failure here leaves the plain near-black silhouette.
+local RIM,RIM_GROW,RIM_BACK=RGB(228,222,255),1.14,.25
+local function lightEdge(model)
+ local view=views.Pack.Unit;local body={}
+ for _,d in ipairs(model:GetDescendants())do if d:IsA('BasePart')and d.Transparency<1 then body[#body+1]=d end end
+ for _,d in ipairs(body)do
+  local f=d.CFrame;local size=d.Size
+  local depth=math.abs(f.RightVector:Dot(view))*size.X+math.abs(f.UpVector:Dot(view))*size.Y+math.abs(f.LookVector:Dot(view))*size.Z
+  local rim=d:Clone();rim.Name='SilhouetteRim'
+  rim.Size=size*RIM_GROW;rim.Color=RIM;rim.Material=Enum.Material.SmoothPlastic
+  rim.CFrame=CFrame.new(-view*(depth*RIM_BACK))*f
+  rim.Parent=d.Parent
+ end
+end
 local function silhouette(model)
  for _,d in ipairs(model:GetDescendants())do
   if d:IsA('SurfaceAppearance')or d:IsA('Decal')or d:IsA('Texture')or d:IsA('ParticleEmitter')or d:IsA('Light')then d:Destroy()
@@ -150,6 +168,7 @@ local function silhouette(model)
    if d:IsA('MeshPart')then d.TextureID=''end
   end
  end
+ pcall(lightEdge,model)
 end
 local function build(spec,work)
  if spec.Kind=='Pack'then

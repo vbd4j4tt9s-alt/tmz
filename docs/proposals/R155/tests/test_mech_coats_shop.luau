@@ -28,14 +28,20 @@ for i,offer in ipairs(Mech.Offers)do RS.MechCatalog:SetAttribute(offer.Attribute
 local Market=W.service('MarketplaceService')
 Market.GetProductInfoAsync=function(_,id)return robux[id]and{PriceInRobux=robux[id],IsForSale=true}or nil end
 Market.PromptGamePassPurchase=function()end
+local prompted=0;Market.PromptProductPurchase=function()prompted+=1 end
 -- the server's clock: ENDS - 27d 04h 12m 09s at mock time 0, then one second per second
 local LEFT0=27*86400+4*3600+12*60+9
 local serverClock=function()return ENDS-LEFT0+R.clock end
 W.workspace.GetServerTimeNow=function()return serverClock()end
 local function jumpTo(left)R.clock=LEFT0-left end -- (the mock clock to the moment `left` seconds remain)
 -- scripted server: everything on sale (the CLIENT must turn the buttons off by the clock)
+-- (R157) mode.BagFull: the server says the Bag is full (BagFull = true, both buy flags false); mode.Stale: ... and, wrongly, still says the buy flags are on; mode.Unavailable: off for another reason
+local mode={BagFull=false,Stale=false,Unavailable=false}
 local function serverState()
- local offers={};for _,o in ipairs(Mech.Offers)do offers[tostring(o.Count)]={Count=o.Count,GemPrice=o.GemPrice,GemAvailable=true,RobuxAvailable=true,RobuxPrice=o.TargetRobuxPrice}end
+ local offers={};for _,o in ipairs(Mech.Offers)do
+  local on=not mode.BagFull and not mode.Unavailable or mode.Stale
+  offers[tostring(o.Count)]={Count=o.Count,GemPrice=o.GemPrice,GemAvailable=on,RobuxAvailable=on,RobuxPrice=o.TargetRobuxPrice,BagFull=mode.BagFull and true or nil}
+ end
  local bundles={};for _,row in ipairs(Pricing.Bundles)do bundles[row.Key]={Available=true,Amount=row.Amount,GemPrice=row.GemPrice,RobuxAmount=row.Amount}end
  return {PackOffers=offers,Bundles=bundles,GiftProducts={Growth={Available=true},Speed={Available=true}},GiftCredits={},Gems=5000,OnSale=true,Success=true}
 end
@@ -46,7 +52,11 @@ remote.InvokeServer=function(_,action,value)
  calls[#calls+1]={action,value}
  local s=serverState();s.OnSale=reply.OnSale;if action~='State'then s.Message=reply.Message end;return s
 end
-W.stub('InteractionAudio',{Transaction=function()end,Play=function()end,Preload=function()end})
+local played={};local function plays(name)local n=0;for _,v in ipairs(played)do if v==name then n+=1 end end;return n end
+W.stub('InteractionAudio',{Transaction=function()end,Play=function(name)played[#played+1]=name end,Preload=function()end})
+-- (R157) the game's notice stack: what the shop puts on it
+local notices={}
+W.stub('NoticeFeed83',{Plain=function(text,color,seconds,key,deny)notices[#notices+1]={Text=text,Color=color,Seconds=seconds,Key=key,Deny=deny}end,Preload=function()end})
 W.stub('ShopViewport',{Visible=function()return true end,CachedVisible=function()return true end})
 W.stub('ShopSeedReveal',{Attach=function()return {Refresh=function()end,Destroy=function()end}end})
 W.stub('PackViewport89',{DecorateCard=function()end,Create=function(parent)
@@ -153,5 +163,62 @@ check(live(pack.BuyWithGems)and live(pack.BuyWithRobux)and txt(pack.Contents)=='
 reply.Message="EVENT'S OVER! THANKS FOR PLAYING!"
 act(pack.BuyWithGems)
 check(calls[#calls][1]=='BuyPack'and panel.Status.Visible and(panel.Status.Text:gsub('\n',' '))=="EVENT'S OVER! THANKS FOR PLAYING!",'a purchase the server refuses shows its message: '..tostring(panel.Status.Text))
+
+-- 5. R157 (owner: "if bag is full and player tries to buy a pack or get a pack via the rolls it says bag full"): a full Bag is not "Unavailable" -----------------------------------------
+-- The server flags it (BagFull = true on the offer; both buy flags false). Both buttons read "Bag full" in the dim look of "Unavailable" / "Off sale" but can be pressed: a press shows the game's
+-- red notice "BAG FULL! MAKE ROOM FIRST" with the Denied click, sends nothing, opens no prompt. Event over and Off sale come first. With room the buttons are what they were.
+do
+ local Text=W.module('SimpleGameText')
+ local function reopen()jumpTo(100000);act(panel.Header.Close);act(toggle);R.advance(1);R.advance(1)end
+ local function sends()local n=0;for _,c in ipairs(calls)do if c[1]=='BuyPack'or c[1]=='RobuxPack'then n+=1 end end;return n end
+ reply.Message=nil;reply.OnSale=true
+ -- the "Unavailable" look, for comparison (the server turned the offer off for another reason)
+ mode.Unavailable=true;reopen()
+ check(caption(pack.BuyWithGems)=='Unavailable'and caption(pack.BuyWithRobux)=='Unavailable'and not live(pack.BuyWithGems)and not live(pack.BuyWithRobux),'(control) another reason: both buttons read "Unavailable" and are off')
+ local dimGem,dimRobux=pack.BuyWithGems.BackgroundTransparency,pack.BuyWithRobux.BackgroundTransparency
+ mode.Unavailable=false
+ -- the Bag is full
+ mode.BagFull=true;reopen()
+ check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','a full Bag: both Mech buy buttons read "Bag full" ('..tostring(caption(pack.BuyWithGems))..' / '..tostring(caption(pack.BuyWithRobux))..')')
+ check(caption(pack.BuyWithGems)==Mech.BagFull.Button,'... the words come from MechCatalog.BagFull.Button')
+ check(pack.BuyWithGems.BackgroundTransparency==dimGem and pack.BuyWithRobux.BackgroundTransparency==dimRobux and dimGem>0,'... in the same dim button style as "Unavailable" / "Off sale" ('..tostring(pack.BuyWithGems.BackgroundTransparency)..')')
+ check(live(pack.BuyWithGems)and live(pack.BuyWithRobux),'... and they can be pressed (only to show the message)')
+ local sent0,notes0,deny0,prompts0=sends(),#notices,plays('Denied'),prompted
+ act(pack.BuyWithGems)
+ check(#notices==notes0+1 and notices[#notices].Text=='BAG FULL! MAKE ROOM FIRST','a press on the gem button shows the notice "BAG FULL! MAKE ROOM FIRST" ('..tostring(notices[#notices]and notices[#notices].Text)..')')
+ check(notices[#notices].Color==Text.Red and notices[#notices].Key==nil,'... in the game\'s red, with no key (so the next press shows it again)')
+ check(plays('Denied')==deny0+1,'... and plays the Denied click ('..(plays('Denied')-deny0)..')')
+ check(sends()==sent0 and prompted==prompts0,'... nothing is sent to the server and no purchase prompt opens')
+ check(Text.Format('BAG FULL! MAKE ROOM FIRST')=='BAG FULL! MAKE ROOM FIRST','(SimpleGameText keeps the words as they are)')
+ R.advance(1);notes0,deny0=#notices,plays('Denied')
+ act(pack.BuyWithRobux)
+ check(#notices==notes0+1 and notices[#notices].Text=='BAG FULL! MAKE ROOM FIRST'and plays('Denied')==deny0+1 and sends()==sent0 and prompted==prompts0,'the Robux button does the same: notice, Denied, nothing sent, no prompt')
+ notes0,deny0=#notices,plays('Denied');act(pack.BuyWithRobux);act(pack.BuyWithGems)
+ check(#notices==notes0 and plays('Denied')==deny0+2,'presses in the same instant show the notice once (no pile-up) but every press clicks Denied')
+ for _,count in ipairs({5,10})do act(pack['Quantity'..count])
+  check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','the '..count..'-pack picked: still "Bag full"')
+ end
+ -- a server that wrongly still says the buy flags are on: the client never lets a purchase start
+ mode.Stale=true;reopen()
+ act(pack.Quantity1)
+ check(caption(pack.BuyWithGems)=='Bag full'and caption(pack.BuyWithRobux)=='Bag full','(defensive) BagFull wins over buy flags that are still on: both read "Bag full"')
+ R.advance(1);sent0,prompts0=sends(),prompted;act(pack.BuyWithGems);R.advance(1);act(pack.BuyWithRobux)
+ check(sends()==sent0 and prompted==prompts0,'... and a press sends nothing')
+ mode.Stale=false
+ -- Off sale and Event over come first
+ reply.OnSale=false;reopen()
+ check(caption(pack.BuyWithGems)=='Off sale'and caption(pack.BuyWithRobux)=='Unavailable','Off sale (the flag still set): the gem button says "Off sale", the Robux one "Unavailable" - never "Bag full"')
+ reply.OnSale=true
+ jumpTo(-3);act(panel.Header.Close);act(toggle);R.advance(1);R.advance(1)
+ check(caption(pack.BuyWithGems)=='Event over'and caption(pack.BuyWithRobux)=='Event over'and not live(pack.BuyWithGems)and not live(pack.BuyWithRobux),'Event over (the flag still set): both read "Event over" and are off')
+ notes0=#notices;act(pack.BuyWithGems);act(pack.BuyWithRobux)
+ check(#notices==notes0 and sends()==sent0,'... and a press shows no bag notice and sends nothing')
+ -- room again: back to normal
+ mode.BagFull=false;reopen()
+ check(caption(pack.BuyWithGems)=='80'and caption(pack.BuyWithRobux)=='80 Robux'and live(pack.BuyWithGems)and live(pack.BuyWithRobux)and pack.BuyWithGems.BackgroundTransparency==0,'with room: the buttons are what they were (80 / 80 Robux, on, full colour)')
+ notes0,sent0=#notices,sends();act(pack.BuyWithGems)
+ check(sends()==sent0+1 and calls[#calls][1]=='BuyPack'and #notices==notes0,'... a press buys (BuyPack goes to the server) and shows no bag notice')
+end
+
 print(string.format('%d checks, %d failures',checks,fails))
 if fails>0 then error('test failed')end

@@ -129,28 +129,69 @@ local login=panel.LoginPage;local quests=panel.QuestsPage
 check(login.Visible and not quests.Visible,'the LOGIN tab first (a login reward is waiting)')
 local cards={};for d=1,7 do cards[d]=login:FindFirstChild('Day'..d)end
 check(#cards==7,'seven day cards')
--- R153: a random pack is a mystery: the default-shape pack in near-black on a white tile (the real ItemPictures look); the Void day shows the Void pack's own art; the Gem days a gem
+-- R153: a random pack is a mystery: the default-shape pack in near-black (the real ItemPictures look); the Void day shows the Void pack's own art; the Gem days a gem
+-- R157 (owner: "remove the white background"): NO white tile behind it any more (every holder is see-through); the near-black body (10,9,16 is only ~1.8 : 1 against the dark cards) gets a thin
+-- light edge instead: a pale copy of every body part, bigger and pushed back from the camera (ItemPictures.lightEdge), so only a rim around the outline shows.
 local function dark(holder)
  local v=holder:FindFirstChild('ItemViewport');if not v then return nil end
- local parts,bad=0,0
+ local bodies,rims,bad={},{},0
  for _,d in ipairs(v:GetDescendants())do
-  if d:IsA('BasePart')and d.Transparency<1 then parts+=1;if not(d.Color.R*255<30 and d.Color.G*255<30 and d.Color.B*255<30)or d.Material~=R.Enum.Material.SmoothPlastic then bad+=1 end
+  if d:IsA('BasePart')and d.Transparency<1 then
+   if d.Name=='SilhouetteRim'then
+    rims[#rims+1]=d;if not(d.Color.R*255>200 and d.Color.G*255>200 and d.Color.B*255>200)or d.Material~=R.Enum.Material.SmoothPlastic then bad+=1 end
+   else
+    bodies[#bodies+1]=d;if not(d.Color.R*255<30 and d.Color.G*255<30 and d.Color.B*255<30)or d.Material~=R.Enum.Material.SmoothPlastic then bad+=1 end
+   end
   elseif d:IsA('SurfaceAppearance')or d:IsA('Decal')or d:IsA('Texture')then bad+=1 end
  end
- return parts>0 and bad==0
+ return #bodies>0 and bad==0,bodies,rims
 end
+-- the rim: one per body part (the copy sits in the same parent, in the same order), ~14% bigger, never nearer the camera than its body (the camera sits at +view = (0,.1,-1) from the pack)
+local function rimOK(holder)
+ local ok,bodies,rims=dark(holder);if not ok or #rims~=#bodies then return false,'bodies '..tostring(bodies and #bodies)..' rims '..tostring(rims and #rims)end
+ local view=R.Vector3.new(0,.1,-1).Unit
+ local byParent={};for _,b in ipairs(bodies)do local l=byParent[b.Parent]or{Bodies={},Rims={}};byParent[b.Parent]=l;table.insert(l.Bodies,b)end
+ for _,r in ipairs(rims)do local l=byParent[r.Parent];if not l then return false,'a rim with no body beside it'end;table.insert(l.Rims,r)end
+ for _,l in pairs(byParent)do
+  if #l.Bodies~=#l.Rims then return false,'rims and bodies differ in one parent'end
+  for i,b in ipairs(l.Bodies)do
+   local r=l.Rims[i]
+   if math.abs(r.Size.X/b.Size.X-1.14)>.01 or math.abs(r.Size.Y/b.Size.Y-1.14)>.01 or math.abs(r.Size.Z/b.Size.Z-1.14)>.01 then return false,'size '..b.Name end
+   local behind=(r.CFrame.Position-b.CFrame.Position):Dot(view)
+   if behind>1e-9 then return false,'in front: '..b.Name end
+   if behind>-1e-6 and b.Size.Z>.01 then return false,'not pushed back: '..b.Name end
+  end
+ end
+ return true
+end
+local function noTile(o)return o.BackgroundTransparency==1 end
 local function isGold(c)return math.abs(c.R-255/255)<1e-6 and math.abs(c.G-206/255)<1e-6 and math.abs(c.B-64/255)<1e-6 end
-local function isWhite(o)return o.BackgroundTransparency==0 and o.BackgroundColor3.R==1 and o.BackgroundColor3.G==1 and o.BackgroundColor3.B==1 end
-local mystery=true;for d=1,4 do if not isWhite(cards[d].Art)then mystery=false end end
-check(mystery and cards[7].Art.BackgroundTransparency==1 and cards[5].Art.BackgroundTransparency==1 and cards[6].Art.BackgroundTransparency==1,'R153: the four random-pack days sit on a white tile; the Void day and the Gem days have none')
+local mystery=true;for d=1,7 do if not noTile(cards[d].Art)then mystery=false end end
+check(mystery,'R157: no day card has a white tile behind its picture (the four random-pack days, the Void day and the Gem days are all see-through)')
 frames(8)
 local silOK=true;for d=1,4 do if dark(cards[d].Art)~=true then silOK=false end end
 check(silOK,'R153: those four pictures are the near-black default pack silhouette (no colour, no decal, no texture: nothing says which pack it will be)')
+local rimsOK,rimWhy=true,nil;for d=1,4 do local ok,why=rimOK(cards[d].Art);if not ok then rimsOK=false;rimWhy=why end end
+check(rimsOK,'R157: ... with a thin light edge so it reads on the dark card without the tile: a pale copy of every body part, 14% bigger, pushed back behind it ('..tostring(rimWhy)..')')
+local noRim=true;do local v=cards[7].Art:FindFirstChild('ItemViewport');for _,d in ipairs(v and v:GetDescendants()or{})do if d.Name=='SilhouetteRim'then noRim=false end end end
+check(noRim,'(the Void day\'s real pack has no rim)')
 local sameSil=true;for d=1,4 do local a=asked[cards[d].Art];if not(a and a.Pack and a.Silhouette==true and a.Shape==nil and a.Stage==1 and a.Variant=='Pack01')then sameSil=false end end
 check(sameSil,'R153: the four mystery pictures are all the same proxy: the plain Forest pack, no PackShape (the default shape, like the other reward pictures), Silhouette (nothing about the pack that will be rolled)')
 local v7=asked[cards[7].Art];check(v7 and v7.Pack and v7.Variant=='EclipseReliquary'and v7.Stage==7 and v7.Silhouette==nil,'R153: day 7 asks for the Void pack\'s own art (stage 7 EclipseReliquary), no silhouette')
 check(dark(cards[7].Art)~=true and cards[7].Art:FindFirstChild('ItemViewport')~=nil,'(the Void day shows the real Void pack, not a silhouette)')
 check(cards[1].Today.Visible and not cards[2].Today.Visible,'day 1 is marked TODAY')
+-- R157 (owner: "the TODAY is barely visible, colour the letters white and give it a black outline"): white letters, a solid black UIStroke 2 thick (Contextual: it follows the letters), the same gold tag
+do
+ local t=cards[1].Today;local st=t:FindFirstChildOfClass('UIStroke');local c=t.TextColor3
+ check(c.R==1 and c.G==1 and c.B==1,'R157: the TODAY letters are white (#FFFFFF)')
+ check(st~=nil and st.Color.R==0 and st.Color.G==0 and st.Color.B==0 and st.Thickness==2 and st.Transparency==0 and st.ApplyStrokeMode==R.Enum.ApplyStrokeMode.Contextual,'R157: ... with a black UIStroke, 2 thick, opaque, Contextual (an outline round the letters)')
+ check(t.TextStrokeTransparency==1,'R157: ... and no second, thin text edge on top of it')
+ check(t.Text=='TODAY'and isGold(t.BackgroundColor3)and t.BackgroundTransparency==0,'R157: the tag keeps its yellow (gold) fill and its words')
+ local n=0;for _,d in ipairs(t:GetChildren())do if d:IsA('UIStroke')then n+=1 end end
+ check(n==1,'R157: exactly one outline on the tag')
+ local sizeOK=t.Size.Y.Offset>0 and t.TextSize>=13 and t.TextSize<=14 and t.AnchorPoint.X==.5 and t.AnchorPoint.Y==0 and t.Position.X.Scale==.5 and t.Position.Y.Offset==3
+ check(sizeOK,'R157: the tag keeps its size and its place (top middle of the card): '..tostring(t.Size)..' text '..tostring(t.TextSize))
+end
 check(cards[7].Amount.Text=='VOID PACK'and cards[1].Amount.Text=='RANDOM PACK'and cards[4].Amount.Text=='RANDOM PACK'and cards[5].Amount.Text=='+2'and cards[6].Amount.Text=='+3','rewards: days 1-4 RANDOM PACK, +2, +3 Gems, day 7 VOID PACK')
 check(cards[2].Amount.Text=='RANDOM PACK'and cards[3].Amount.Text=='RANDOM PACK','(days 2 and 3 too)')
 check(login.Note.Text:find('VOID',1,true)and not login.Note.Text:find('MECH',1,true)and login.Note.Text:find('random packs',1,true)and login.Note.Text:find('2 + 3 gems',1,true),'the note: 4 random packs, then 2 + 3 gems, day 7 = VOID: '..login.Note.Text)
@@ -174,7 +215,8 @@ check(rows[1].Task.Text=='Steal 3 packs'and rows[1].IconBack.Icon.Text=='🎒'an
 check(rows[2].Bar.Count.Text=='1 / 3'and math.abs(rows[2].Bar.Fill.Size.X.Scale-1/3)<1e-6,'quest 2 shows 1 / 3 with a third of the bar')
 check(rows[1].Claim.Visible and not rows[2].Claim.Visible and not rows[3].Claim.Visible,'only finished quests have CLAIM')
 check(rows[1].Reward.Amount.Text=='+1 PACK'and rows[2].Reward.Amount.Text=='+1 PACK'and rows[3].Reward.Amount.Text=='+1 PACK','each quest pays +1 PACK')
-check(isWhite(rows[1].Reward.PackTile)and isWhite(rows[2].Reward.PackTile)and isWhite(rows[3].Reward.PackTile)and dark(rows[1].Reward.PackTile)==true and dark(rows[3].Reward.PackTile)==true,'R153: the reward is a mystery pack: a near-black pack silhouette on a white tile, the same for every quest')
+check(noTile(rows[1].Reward.PackTile)and noTile(rows[2].Reward.PackTile)and noTile(rows[3].Reward.PackTile)and dark(rows[1].Reward.PackTile)==true and dark(rows[3].Reward.PackTile)==true,'R153 / R157: the reward is a mystery pack: a near-black pack silhouette with no white tile behind it, the same for every quest')
+check(rimOK(rows[1].Reward.PackTile)and rimOK(rows[2].Reward.PackTile)and rimOK(rows[3].Reward.PackTile),'R157: ... with the thin light edge')
 local qsil=true;for i=1,3 do local a=asked[rows[i].Reward.PackTile];if not(a and a.Pack and a.Silhouette==true and a.Shape==nil and a.Stage==1 and a.Variant=='Pack01')then qsil=false end end
 check(qsil,'R153: the quest reward pictures ask for the same silhouette proxy as the login days (no hint of the pack)')
 check(rows[4].Reward.Amount.Text=='+2'and rows[4].Reward.Gem~=nil and rows[4].Reward:GetAttribute('AccessibleLabel')=='+2 💎'and rows[4].Bar.Count.Text=='0 / 3'and not rows[4].Claim.Visible and not rows[4].Done.Visible,'ALL DONE: +2 (gem icon), 0 / 3 claimed, nothing to claim yet')

@@ -171,8 +171,9 @@ function P.Attach(Data)
  function Data:CanReceiveMechPacks(player,count,receipt)
   local offer=Catalog.Offer(count)
   if not offer or not self:IsLoaded(player)then return false,'HOLD ON, YOUR DATA IS LOADING!'end
-  if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
-  if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end
+  -- R157: a full Bag says one simple thing on every Mech path (the shop's state flag BagFull, a gem purchase, a Robux prompt): MechCatalog.BagFull.Notice
+  if #self:GetChestRecords(player)+offer.Count>self.Config.MaxSavedChests then return false,Catalog.BagFull.Notice end
+  if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,Catalog.BagFull.Notice end
   return true
  end
  function Data:GrantMechPacks(player,paid,count,receipt)
@@ -205,6 +206,7 @@ function P.Attach(Data)
   if player:GetAttribute('PaidRandomAllowed')~=true then return false,'CAN\'T BUY THIS PACK RIGHT NOW'end
   if Catalog.EventOver()then return false,Catalog.Event.Refused end -- R155: the limited event is over: nothing is charged, nothing is granted
   if not Catalog.OnSale()then return false,'THIS PACK IS OFF SALE'end
+  local fits,full=self:CanReceiveMechPacks(player,offer.Count);if not fits then return false,full end -- R157: a full Bag is told first (before "not enough gems"), with the same words as the Robux path
   local state=self:GetPremium(player)
   if state.Gems<offer.GemPrice then return false,'NOT ENOUGH GEMS'end
   local packs,why=self:GrantMechPacks(player,true,offer.Count);if not packs then return false,why end

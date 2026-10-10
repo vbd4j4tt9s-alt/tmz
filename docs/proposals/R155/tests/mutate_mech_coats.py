@@ -36,8 +36,16 @@ M = {
     'fruit_inherit_half': ('1', [(RSD + 'BalanceRules.lua', "B.MutationInheritance=.20", "B.MutationInheritance=.50")]),
     'shop_never_ticks': ('2', [(SP + 'GamePassClient.client.lua', "if value then if changed then startTicking()end else tickToken+=1 end", "if value then else tickToken+=1 end")]),
     'shop_buttons_stay_on': ('2', [
-        (SP + 'GamePassClient.client.lua', "local gemLive=available.GemAvailable==true and not over", "local gemLive=available.GemAvailable==true"),
-        (SP + 'GamePassClient.client.lua', "packInfo.IsForSale~=false and not over", "packInfo.IsForSale~=false")]),
+        (SP + 'GamePassClient.client.lua', "local gemLive=available.GemAvailable==true and not over and not bagFull", "local gemLive=available.GemAvailable==true and not bagFull"),
+        (SP + 'GamePassClient.client.lua', "packInfo.IsForSale~=false and not over and not bagFull", "packInfo.IsForSale~=false and not bagFull")]),
+    # R157: a full Bag says "Bag full" (the flag, the words, a press that only shows the notice)
+    'bagfull_flag_missing': ('1', [(SS + 'PremiumService.lua', "RobuxPrice=info and info.PriceInRobux,BagFull=ready and not allowed and why==Catalog.BagFull.Notice or nil}", "RobuxPrice=info and info.PriceInRobux}")]),
+    'bagfull_robux_old_words': ('1', [(SS + 'PremiumService.lua', "   elseif offer and entry and entry.BagFull then okay=false;message=Catalog.BagFull.Notice -- R157: a full Bag is told plainly (no prompt)\n", "")]),
+    'bagfull_gems_old_words': ('1', [(SS + 'PremiumProgress.lua', "if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,Catalog.BagFull.Notice end", "if type(self.RoomFor)=='function'and not self:RoomFor(player,offer.Count,{Receipt=receipt==true})then return false,'MAKE ROOM FOR '..offer.Count..' PACKS FIRST!'end")]),
+    'bagfull_flag_when_off_sale': ('1', [(SS + 'PremiumService.lua', "local ready=saveReady and Catalog.OnSale()and player:GetAttribute('PaidRandomAllowed')==true", "local ready=saveReady and player:GetAttribute('PaidRandomAllowed')==true")]),
+    'shop_bagfull_press_buys': ('2', [(SP + 'GamePassClient.client.lua', "gemBuy.Activated:Connect(function()if gemBuy:GetAttribute('BagFull')then bagFullPress()elseif gemBuy.Active then act('BuyPack',packCount)end end)", "gemBuy.Activated:Connect(function()if gemBuy.Active then act('BuyPack',packCount)end end)")]),
+    'shop_bagfull_no_notice': ('2', [(SP + 'GamePassClient.client.lua', "Feed.Plain(Catalog.BagFull.Notice,require(RS:WaitForChild('SimpleGameText')).Red,2.5)", "")]),
+    'shop_bagfull_says_unavailable': ('2', [(SP + 'GamePassClient.client.lua', "or bagFull and Catalog.BagFull.Button or(gemLive", "or(gemLive")]),
     'shop_no_coat_line': ('2', [(SP + 'GamePassClient.client.lua', "Art.Text(pack,'CoatNote',Catalog.CoatLine(),15", "Art.Text(pack,'CoatNote','',15")]),
     'keep_flag_removed': ('3', [(RSD + 'MechPackArt153.lua', "  if s.Keep then p:SetAttribute('MechCoatKeep',true)end -- R155: a Gold / Diamond coat leaves this part's colour alone\n", "")]),
     'coat_paints_the_lit_parts': ('3', [(RSD + 'SeedPackVisuals.lua', " and not p:GetAttribute('MechCoatKeep')then", " then")]),

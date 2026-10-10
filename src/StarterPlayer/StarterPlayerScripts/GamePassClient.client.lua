@@ -164,6 +164,13 @@ local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
 local waysTitle=Art.Text(ways,'Title','FILL YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
 local waysDetail=Art.Text(ways,'Detail','Grab Gems from your plant index!',15);waysDetail.ZIndex=4;waysDetail.TextXAlignment=Enum.TextXAlignment.Left
 local function active(b,enabled)b.Interactable=enabled;b.Active=enabled;b.AutoButtonColor=enabled;b.BackgroundTransparency=enabled and 0 or .45 end
+-- R157 (owner: "if bag is full and player tries to buy a pack ... it says bag full"): with a full Bag both Mech buttons read "Bag full" (the dim look of "Unavailable" / "Off sale") but
+-- can still be pressed, only to show the game's red notice with the Denied click; they never send a purchase and never open a prompt. Event over / Off sale come first.
+local Feed;local lastBagNotice=-10
+local function bagFullPress()
+ Audio.Play('Denied');local now=os.clock();if now-lastBagNotice<.7 then return end;lastBagNotice=now
+ pcall(function()Feed=Feed or require(RS:WaitForChild('NoticeFeed83'));Feed.Plain(Catalog.BagFull.Notice,require(RS:WaitForChild('SimpleGameText')).Red,2.5)end)
+end
 local layoutKey;local content;local frame
 local function setPrice(b,text,icon,color)Art.SetCaption(b,text,icon,color)end
 -- R155: the limited event's clock (the server's) -> the card's words and its two buy buttons. Writes only a change; a flip (the event ending while the shop is open) refreshes the buttons.
@@ -178,11 +185,13 @@ end
 refresh=function()
  local offer=Catalog.Offer(packCount);local available=state.PackOffers and state.PackOffers[tostring(packCount)]or{}
  local over=Catalog.EventOver(workspace:GetServerTimeNow());eventOver=over -- R155: after the end both buy buttons say "Event over" and are off (the server refuses a new purchase too)
- local gemLive=available.GemAvailable==true and not over
- setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
+ local bagFull=available.BagFull==true and not over and state.OnSale~=false -- R157: the server says the Bag is the only thing in the way
+ local gemLive=available.GemAvailable==true and not over and not bagFull
+ setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or bagFull and Catalog.BagFull.Button or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
  local packInfo=packInfos[packCount];local packPrice=packInfo and packInfo.PriceInRobux
- local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false and not over
- setPrice(robuxBuy,over and Catalog.Event.Button or packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false and not over and not bagFull
+ setPrice(robuxBuy,over and Catalog.Event.Button or bagFull and Catalog.BagFull.Button or packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
+ for _,b in ipairs({gemBuy,robuxBuy})do b:SetAttribute('BagFull',bagFull or nil);if bagFull and not busy then b.Interactable=true;b.Active=true end end -- (dim, but pressable for the notice)
  for count,b in pairs(quantityButtons)do Bright.Button(b,count==packCount and C(255,186,40)or C(70,74,96));Art.Stroke(b,Art.Ink,2.5,'BrightOutline');b:SetAttribute('Selected',count==packCount);active(b,not busy)end
  for key,row in pairs(bundleButtons)do
   local quote=state.Bundles and state.Bundles[key]
@@ -226,8 +235,8 @@ local function act(action,value,onDone)
   if pendingState and not busy then pendingState=false;if panel.Visible then act('State')end end
  end)
 end
-gemBuy.Activated:Connect(function()if gemBuy.Active then act('BuyPack',packCount)end end)
-robuxBuy.Activated:Connect(function()if robuxBuy.Active then act('RobuxPack',packCount)end end)
+gemBuy.Activated:Connect(function()if gemBuy:GetAttribute('BagFull')then bagFullPress()elseif gemBuy.Active then act('BuyPack',packCount)end end)
+robuxBuy.Activated:Connect(function()if robuxBuy:GetAttribute('BagFull')then bagFullPress()elseif robuxBuy.Active then act('RobuxPack',packCount)end end)
 for key,row in pairs(bundleButtons)do
  if row.Gem then row.Gem.Activated:Connect(function()if row.Gem.Active then act('BuyBundle',row.Quote)end end)end
  row.Robux.Activated:Connect(function()if row.Robux.Active then act('RobuxBundle',key)end end)

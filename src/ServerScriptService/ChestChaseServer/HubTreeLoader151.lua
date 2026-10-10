@@ -75,7 +75,13 @@ function L.Run(again) -- (again: the offline tests run it more than once)
   if st.Route=='AssetService'or st.Route=='InsertService'then
    print(string.format('[R151 trees] %s "%s": loaded by %s (%d parts, %d scripts and %d fruit removed)',tostring(id),tostring(st.Name),st.Route=='AssetService'and'AssetService:LoadAssetAsync'or'InsertService:LoadAsset',st.Parts or 0,st.Scripts or 0,st.Fruit or 0))
   elseif st.Route=='already there'then print(string.format('[R151 trees] %s: already in ReplicatedStorage.%s',tostring(id),K.TreeFolder))
-  else warn(string.format('[R151 trees] %s: not loaded (%s); %s',tostring(id),tostring(st.Error),manual>0 and'using the trees placed in the folder by hand'or'the hub keeps its part-built studded trees'))end
+  else
+   -- R157 (owner: Studio's Output showed this as a warning and he called it a bug): a tree model that belongs to someone else cannot be loaded and that is fine - the hub
+   -- keeps its part-built studded trees - so it is ONE plain print (not a warn); when the error says "not authorized" it says so plainly.
+   local using=manual>0 and'using the trees placed in the folder by hand'or'using the built-in trees'
+   if tostring(st.Error):lower():find('not authorized',1,true)then print(string.format('[R151 trees] %s can\'t be loaded (not your asset); %s',tostring(id),using))
+   else print(string.format('[R151 trees] %s: not loaded (%s); %s',tostring(id),tostring(st.Error),using))end
+  end
  end
  f:SetAttribute('ScriptsRemoved',scripts);f:SetAttribute('FruitRemoved',fruit);f:SetAttribute('Loaded',loaded);f:SetAttribute('Ready',true)
  if scripts>0 then print(string.format('[R151 trees] removed %d script(s) from the tree templates',scripts))end

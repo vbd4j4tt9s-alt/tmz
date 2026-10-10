@@ -7,7 +7,7 @@
 --                  top. (The saved wood caps, 51 - 52, are hidden, like the timber strips.)
 --   Gate           the track gate: two chess-rook towers on the wall ends (stepped round base, tapering shaft, gold ring, collar, flared crown
 --                  with 8 merlons; their shafts are the ONLY new parts that collide) and a crenellated gatehouse wall between them with a
---                  raised keep carrying the sign, one big key per biome (each client ticks the keys it is fast enough for) hanging in front.
+--                  raised keep (R157: no sign on it any more), one big key per biome (each client ticks the keys it is fast enough for) hanging in front.
 --   Paths          paved streets, squares and plazas joining spawn, market, every base, the gate and the side gardens; plain cream
 --                  curbs (R153: the garden spurs lost their base-coloured curbs and welcome mats; each is a plain street).
 -- Everything is Anchored with CanTouch / CanQuery off; nothing stands on a base pad, plot, fence opening, treadmill, pedestal, spawn, the
@@ -83,8 +83,8 @@ function M.SpeedNeed(stage)
 end
 -- R152: the gate is two chess rooks and a castle gatehouse (owner: "the gate of the track has to be a castle like gate like u know a rook in
 -- chess that shape"). A rook tower: a wide stepped round base, a round shaft that tapers a little, a gold ring (at the wall's string course),
--- a neck collar, a flared crown and 8 square merlons round its rim. Between the towers: a crenellated wall with a raised keep that carries
--- the sign; the biome keys hang in front of it. Planes: no two same-facing faces share a height (every ring, step and merlon top differs).
+-- a neck collar, a flared crown and 8 square merlons round its rim. Between the towers: a crenellated wall with a raised keep;
+-- the biome keys hang in front of it. Planes: no two same-facing faces share a height (every ring, step and merlon top differs).
 local ROOK={ -- heights of the tower's rings (floor top 4)
  Base={{17.4,3.4,7.4,'Stone'},{16.2,7.4,10.4,'StoneDark'},{15.2,10.4,12.6,'Stone'}},Ring=33.6,Step=34.2,Shaft=58,Collar={15.4,58,60.4},Flare={16.4,60.4,62.6},Crown={17.4,62.6,68.4},
  MerlonH=5.4,
@@ -117,7 +117,7 @@ local function buildGate(root)
   K.Wedge(f,'Gate haunch',V(9,G.HaunchRise,G.HaunchRun),K.Frame(V(sx*(G.HaunchOuter-G.HaunchRun/2),G.BeamY0-G.HaunchRise/2,zc),V(0,-1,0),V(sx,0,0)),P.Plaster,Mat.Plaster)
  end
  -- the gatehouse: a wall between the rooks (its ends inside the shafts), a gold course under it, a stone cornice over it, merlons along the top
- -- and a raised keep in the middle with the sign and five merlons of its own
+ -- and a raised keep in the middle with five merlons of its own
  local top=G.BeamY1+1.3 -- the cornice's top (57.7 - 59.3: it clears the shafts' top, 58, and the keys' tops, 57.5)
  K.Part(f,'Gatehouse wall',V(191,G.BeamY1-G.BeamY0,9),CF(0,(G.BeamY0+G.BeamY1)/2,zc),P.Plaster,Mat.Plaster)
  K.Part(f,'Gatehouse trim',V(190,1.2,10),CF(0,G.BeamY0+.2,zc),P.Gold)
@@ -127,10 +127,7 @@ local function buildGate(root)
  local keepH=8;local keepY=top+keepH/2
  K.Part(f,'Gatehouse keep',V(52,keepH,7),CF(0,keepY,zc),P.Plaster,Mat.Plaster)
  for k=-2,2 do K.Part(f,'Gatehouse keep merlon',V(B.Size,B.Height,7),CF(k*10,top+keepH+B.Height/2,zc),P.Plaster,Mat.Plaster)end
- local sy=keepY
- local sign=K.Part(f,'Gate sign',V(46,5,.8),CF(0,sy,zc-3.5-.9-.4),{62,44,34},Mat.Wood)
- K.Part(f,'Gate sign frame',V(49,6.4,.9),CF(0,sy,zc-3.5-.45),P.Gold)
- K.Label(sign,Enum.NormalId.Front,'THE TRACK',{ink={255,236,180},pps=24})
+ -- (R157: the keep no longer carries the "THE TRACK" sign, its frame or its label; owner: "remove the track sign from the game")
  for i,b in ipairs(K.Biomes)do
   local x=G.KeyX[i];local need,escape=M.SpeedNeed(b.Stage)
   local k=K.Keycap(f,'Biome key '..i,V(G.KeySize,3.6,G.KeySize),K.KeyFrame(V(x,G.KeyY,zc-6.1)),b.Key,

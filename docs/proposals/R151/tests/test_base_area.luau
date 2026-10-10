@@ -529,8 +529,9 @@ do
   check('gate: '..#gm..' + '..#km..' gatehouse merlons (12 on the wall, 5 on the keep), the wall\'s merlon size, on the same 10-stud rhythm',#gm==12 and #km==5 and okS and evenG,#gm..' '..#km)
   local rookTop=select(2,aabb(G['Gate merlon']))[2];local keepTop=0;for _,p in ipairs(km)do keepTop=math.max(keepTop,select(2,aabb(p))[2])end
   check('gate: the rook towers are the tallest part (merlon tops '..rookTop..' over the keep\'s '..keepTop..' over the wall\'s 57)',rookTop>keepTop and keepTop>WALL_TOP+B.Height)
-  local sign=G['Gate sign'];local sa,sb=aabb(sign)
-  check('gate: the "THE TRACK" sign sits on the gatehouse keep, readable from the hub (front face, text THE TRACK)',sign.HubText and sign.HubText.Line1.Text=='THE TRACK'and sa[1]>=-26 and sb[1]<=26 and sa[2]>=WALL_TOP+8 and G['Gate sign frame']~=nil)
+  -- R157 (owner: "remove the track sign from the game"): the keep stands bare; no 'Gate sign', no frame, no 'THE TRACK' label anywhere on the gate
+  local signParts,trackText=0,0;for _,p in ipairs(kids)do if p.Name=='Gate sign'or p.Name=='Gate sign frame'then signParts+=1 end;if p.HubText and p.HubText.Line1 and p.HubText.Line1.Text=='THE TRACK'then trackText+=1 end end
+  check('gate: R157 the "THE TRACK" sign is gone (no Gate sign, no Gate sign frame, no THE TRACK label); the keep and its '..#km..' merlons stay',signParts==0 and trackText==0 and G['Gatehouse keep']~=nil and #km==5,signParts..' '..trackText)
   local nkeys=0;for _,k in ipairs(kids)do if k:GetAttribute('R151Stage')then nkeys+=1 end end
   check('gate: the seven biome speed keys stay on the gatehouse',nkeys==7)
  end

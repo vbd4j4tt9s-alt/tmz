@@ -1,5 +1,5 @@
 do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
--- R141: daily login pack/gem rewards and daily quests. R153: a quest pays one random pack and an ALL DONE row pays 2 gems once; an unclaimed random pack is a mystery pack (a near-black silhouette on a white tile).
+-- R141: daily login pack/gem rewards and daily quests. R153: a quest pays one random pack and an ALL DONE row pays 2 gems once; an unclaimed random pack is a mystery pack (a near-black silhouette with a light edge; R157: no white tile).
 -- The existing DAILY/INVITE UI, friend chip and plant-ready opt-in use server state.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Tween=game:GetService('TweenService')
 local GuiService=game:GetService('GuiService');local SocialService=game:GetService('SocialService')
@@ -8,7 +8,7 @@ local request=remotes:WaitForChild('PremiumRequest')
 local D=require(RS:WaitForChild('DailyRewards'));local Theme=require(RS.GardenTheme);local Bright=require(RS.BrightUI)
 local Fit=require(RS.GardenTextFit);local Audio=require(RS.InteractionAudio)
 local Pictures;pcall(function()Pictures=require(RS.ItemPictures)end)
-local WHITE,SILHOUETTE=Color3.new(1,1,1),Color3.fromRGB(10,9,16)
+local MYSTERY=Color3.fromRGB(228,222,255) -- R157: the '?' of a mystery pack when its picture cannot be built (the light edge colour of the silhouette, ItemPictures); no tile behind it any more
 local RGB=Color3.fromRGB
 local GOLD,MINT,SKY,GRAPE=RGB(255,206,64),RGB(110,226,96),RGB(86,182,255),RGB(150,96,255)
 local old=pg:FindFirstChild('DailyRewardsGui');if old then old:Destroy()end
@@ -72,14 +72,14 @@ for d=1,#D.Login do
  local art=new('Frame',{Name='Art',BackgroundTransparency=1,ZIndex=3},card)
  if reward.VoidPack or reward.MechPack or reward.SeedPack then
   local shown=false
-  -- R153: a random pack is a mystery until it is in the Bag: the plain pack's default shape in near-black on a white tile (no hint of which pack). The Void pack day is the real Void pack, shown as one.
-  if reward.SeedPack then art.BackgroundTransparency=0;art.BackgroundColor3=WHITE;Theme.Corner(art,10)end
+  -- R153: a random pack is a mystery until it is in the Bag: the plain pack's default shape in near-black (no hint of which pack). The Void pack day is the real Void pack, shown as one.
+  -- R157 (owner: "remove the white background"): no white tile behind it; the silhouette gets a thin light edge in ItemPictures so it reads on the dark cards.
   if Pictures then
    local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',reward.VoidPack and 7 or reward.MechPack and 8 or 1);proxy:SetAttribute('BagVariant',reward.VoidPack and 'EclipseReliquary'or reward.MechPack and 'MechLimited'or 'Pack01');proxy:SetAttribute('PackMutation','None')
    if reward.SeedPack then proxy:SetAttribute('Silhouette',true)end
    shown=pcall(Pictures.Show,art,proxy,2)
   end
-  if not shown then local e=text(art,'Emoji',reward.VoidPack and '🌑'or reward.MechPack and '🤖'or '?',30,reward.SeedPack and SILHOUETTE or nil);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  if not shown then local e=text(art,'Emoji',reward.VoidPack and '🌑'or reward.MechPack and '🤖'or '?',30,reward.SeedPack and MYSTERY or nil);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
  else
   local holder=new('CanvasGroup',{Name='Gem',BackgroundTransparency=1,Size=UDim2.fromScale(1,1)},art)
   local ok=pcall(function()require(RS.GemIcon).new(holder)end)
@@ -89,7 +89,9 @@ for d=1,#D.Login do
  local check=new('Frame',{Name='Check',AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=MINT,BorderSizePixel=0,ZIndex=8,Visible=false},card);Theme.Corner(check,40)
  stroke(check,Color3.new(1,1,1),2);local tick=text(check,'Tick','✓',26);tick.Size=UDim2.fromScale(1,1);tick.TextScaled=true;tick.ZIndex=9
  local dim=new('Frame',{Name='Dim',BackgroundColor3=Color3.new(),BackgroundTransparency=.45,Size=UDim2.fromScale(1,1),ZIndex=7,Visible=false},card);Theme.Corner(dim,12)
- local today=text(card,'Today','TODAY',13,Theme.Colors.Ink);today.BackgroundTransparency=0;today.BackgroundColor3=GOLD;today.ZIndex=9;today.Visible=false;Theme.Corner(today,8)
+ -- R157 (owner: "the TODAY is barely visible"): the letters are white with a black outline (a UIStroke, 2 thick, solid) on the same gold tag; the old dark letters and thin dark text edge are gone.
+ local today=text(card,'Today','TODAY',13,Color3.new(1,1,1));today.BackgroundTransparency=0;today.BackgroundColor3=GOLD;today.ZIndex=9;today.Visible=false;Theme.Corner(today,8)
+ today.TextStrokeTransparency=1;new('UIStroke',{Name='TodayOutline',Color=Color3.new(),Thickness=2,Transparency=0,ApplyStrokeMode=Enum.ApplyStrokeMode.Contextual},today)
  new('UIScale',{},card)
  days[d]={Card=card,Edge=edge,Day=dayText,Art=art,Amount=amount,Check=check,Dim=dim,Today=today,Big=big}
 end
@@ -117,14 +119,15 @@ for i=1,BONUS do
   gems=text(reward,'Amount','+'..D.AllDoneGems,18,GOLD)
   reward:SetAttribute('AccessibleLabel',D.BonusRewardText())
  else
-  -- R153: the reward is a mystery pack: the default-shape pack in near-black on a white tile (ItemPictures' Silhouette look), never the pack that will be rolled.
-  gem=new('Frame',{Name='PackTile',BackgroundColor3=WHITE,BorderSizePixel=0},reward);Theme.Corner(gem,8)
+  -- R153: the reward is a mystery pack: the default-shape pack in near-black (ItemPictures' Silhouette look), never the pack that will be rolled.
+  -- R157 (owner: "remove the white background"): the holder is see-through (no white tile); ItemPictures gives the silhouette a thin light edge so it reads on the dark row.
+  gem=new('Frame',{Name='PackTile',BackgroundTransparency=1,BorderSizePixel=0},reward)
   local shown=false
   if Pictures then
    local proxy=Instance.new('Folder');proxy:SetAttribute('SeedPackTool',true);proxy:SetAttribute('Stage',1);proxy:SetAttribute('BagVariant','Pack01');proxy:SetAttribute('PackMutation','None');proxy:SetAttribute('Silhouette',true)
    shown=pcall(Pictures.Show,gem,proxy,2)
   end
-  if not shown then local e=text(gem,'Emoji','?',20,SILHOUETTE);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
+  if not shown then local e=text(gem,'Emoji','?',20,MYSTERY);e.Size=UDim2.fromScale(1,1);e.TextScaled=true end
   gems=text(reward,'Amount',D.QuestRewardText(),16,GOLD)
   reward:SetAttribute('AccessibleLabel','One random pack')
  end

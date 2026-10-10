@@ -38,6 +38,9 @@ function C.OnSale(now)
 end
 -- The card's words (owner's voice, Verity's "EVENT OVER! THANKS!" style). Refused: what the server says to a purchase started after the end (as VerityConfig.Text.EventEnded).
 C.Event={Live='LIMITED TIME!',Prefix='⏳ ENDS IN ',Over='EVENT OVER!',Thanks='THANKS FOR PLAYING!',Button='Event over',Refused='EVENT\'S OVER! THANKS FOR PLAYING!'}
+-- R157 (owner: "if bag is full and player tries to buy a pack ... it says bag full"): a full Bag (the 200 cap, InventoryCap155) is not "Unavailable". Both buy buttons read Button and a
+-- press shows Notice (client, red, with the Denied click; no purchase prompt); the server refuses a gem purchase or a Robux prompt with the same Notice. Event over / Off sale come first.
+C.BagFull={Button='Bag full',Notice='BAG FULL! MAKE ROOM FIRST'}
 -- "⏳ ENDS IN 27d 04h 12m 09s" (the Index LIMITED tab's format: LimitedEvent.Text) or, after the end, "THANKS FOR PLAYING!".
 function C.TimerText(now)
  if not Limited.Active(now)then return C.Event.Thanks end
