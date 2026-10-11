@@ -17,6 +17,7 @@ local Rules=require(RS:WaitForChild('PlantRules'))
 local Packs=require(RS:WaitForChild('SeedPackRules'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'))
 local Help=require(RS:WaitForChild('StudioTestHelp'))
+local PartyRules=require(RS:WaitForChild('PartyRules158l')) -- R158l: the words of /test givepack
 local biomeIDs={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7}
 local function key(v)return tostring(v or''):lower():gsub('[^%w]','')end
 local function number(s,default,minimum,maximum,integer)
@@ -99,7 +100,7 @@ function Commands.Normalize(text)
  return '/test '..phrase
 end
 
-local GrantsItems={seed=true,seeds=true,pack=true,plant=true,plants=true,rarepacks=true,packset=true,eclipse=true,void=true,verity=true,holo=true,droppack=true}
+local GrantsItems={seed=true,seeds=true,pack=true,plant=true,plants=true,rarepacks=true,packset=true,eclipse=true,void=true,verity=true,holo=true,droppack=true,givepack=true}
 local executeFor
 executeFor=function(ctx,player,text,requester)
  if not player or player.Parent~=Players or not ctx.Data:IsLoaded(player)then return false,'Wait for your player data to load.'end
@@ -158,6 +159,18 @@ executeFor=function(ctx,player,text,requester)
   if#a~=0 then return false,'Use holo [@username].'end
   local ok1,m1=executeFor(ctx,player,'/test seed HoloMelonSeed',requester);local ok2,m2=executeFor(ctx,player,'/test seed HoloAppleTreeSeed',requester)
   return ok1 and ok2,(ok1 and ok2)and'Added the Holo Melon seed and the Holo Apple Tree seed. Plant them in your base; each harvest cycles melon / cantaloupe / pumpkin and apple / pear / orange.'or('Holo: '..tostring(ok1 and m2 or m1))
+ end
+ if action=='givepack'then
+  -- R158l (owner: "I can give packs"): /test givepack <biome|rarity|pack name> [count] [@name|@all] = the normal grant commands (/test pack, void, verity, rarepacks), so the packs are TEST packs
+  -- as always (never announced, no BEST PULL) and the usual limits hold (the owner: any count to 500 and no 200 cap; an admin: 100 / 20 and the cap). @all runs it for everyone in the server.
+  local plan,why=PartyRules.GivePlan(a);if not plan then return false,why end
+  local given=0
+  for _,step in ipairs(plan.Commands)do
+   local ok,message=executeFor(ctx,player,'/test '..step.Text,requester)
+   if not ok then return false,(given>0 and('Gave '..given..' of '..plan.Total..' packs, then: ')or'')..tostring(message)end
+   given+=step.N
+  end
+  return true,'Gave '..plan.Total..' '..plan.Label..' pack'..(plan.Total==1 and''or's')..' (TEST packs: never announced, no BEST PULL).'
  end
  if action=='fruithour'then
   -- R132: /test fruithour [fruit] [1.5-3] makes a fruit the Fruit of the Hour for 10 minutes; off returns to the clock.

@@ -23,6 +23,11 @@ function S.GetCreativeSpeed(p)
  local v=creativeSpeed[p];if v==false then return nil end
  return v or S.CreativeWalkSpeed
 end
+-- R158l (owner: "give me a command that can make me giant"): the scale /test giant gave this player (nil = normal size). Session memory only, never saved; MovementGuard reads it (a giant's
+-- hull is bigger than any wall gap, so the guard's wall sweep leaves them alone; their speed and rise are still checked). OwnerParty158l sets it.
+local giants=setmetatable({},{__mode='k'})
+function S.Giant(p)return p~=nil and giants[p]or nil end
+function S.SetGiant(p,scale)giants[p]=scale end
 function S.GetSpeed(p)
  local r=p and records[p]
  if r and r.Speed then return r.Speed end
@@ -43,6 +48,6 @@ function S.Clear(p)
 end
 -- The player left (or the owner tools stopped): creative goes with them.
 function S.Leave(p)
- S.SetCreative(p,false);S.Clear(p)
+ S.SetCreative(p,false);S.Clear(p);giants[p]=nil
 end
 return S

@@ -123,7 +123,10 @@ function M.Check(player)
     local riseAllowance=18+math.max(jump,48,ceiling*.65)*elapsed*1.5
     if offset.Y>riseAllowance and not launch(c,h,r,state,now,p,elapsed)then return correct(player,c,h,r,state,now)end
     if distance>credit+.01 then return correct(player,c,h,r,state,now)end
-    if distance>1 then
+    -- R158l: a /test giant (OwnerTestState82.Giant) is not swept against the map's barriers: its hull is wider than a gap in them and would be "corrected" on every sample next to a wall
+    -- (clipping into a wall is fine for the owner's giant). Its speed budget and rise are still checked as for everyone.
+    local giant=type(testState.Giant)=='function'and testState.Giant(player)
+    if distance>1 and not giant then
         local params,enabled=barriers(player,c,r)
         if enabled then
             local size,hullOffset=Sweep.Hull(c,h,r)

@@ -48,9 +48,12 @@ X.Actions.pyramid=true
 -- R158f: creative mode and the test commands for everything new (OwnerCreative158f); bonusrolls <n> = bonus ready <n>.
 for name in pairs(require(script.Parent.OwnerCreative158f).Actions)do X.Actions[name]=true end
 X.Actions.bonusrolls=true
+-- R158l: the owner's party commands (OwnerParty158l): giant, packrain, disco, sound (givepack is a /test pack grant: StudioTestCommands).
+for name in pairs(require(script.Parent.OwnerParty158l).Actions)do X.Actions[name]=true end
 function X.Execute(ctx,p,action,a,requester)
  local Access=require(script.Parent.OwnerCommandAccess);local owner=requester~=nil and type(Access.IsOwner)=='function'and Access.IsOwner(requester)==true -- R158f: the game owner's commands are absolute (admins keep today's limits)
  if require(script.Parent.OwnerCreative158f).Actions[action]then return require(script.Parent.OwnerCreative158f).Execute(ctx,p,action,a,requester)end
+ if require(script.Parent.OwnerParty158l).Actions[action]then return require(script.Parent.OwnerParty158l).Execute(ctx,p,action,a,requester)end -- R158l
  if action=='bonusrolls'then
   if#a~=1 or not integer(a[1],0,50)then return false,'Use bonusrolls <0-2> [@username] (the game keeps at most 2 ready; the timer pauses at 2).'end
   action='bonus';a={'ready',tostring(math.min(2,tonumber(a[1])))}
