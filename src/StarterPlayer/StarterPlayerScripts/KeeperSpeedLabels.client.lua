@@ -56,7 +56,7 @@ end
 local function paint(entry)
  local escape=tonumber(entry.Model:GetAttribute('KeeperEscapeSpeed'))
  if not escape or not entry.Placed then entry.Gui.Enabled=false;return end
- local mine=tonumber(player:GetAttribute('PhysicalWalkSpeed'))or Progress.Speed(0)
+ local mine=tonumber(player:GetAttribute('PhysicalWalkSpeed'))or Progress.Speed(Display.Floor) -- R158j: a new runner starts at the floor (walk 30)
  local fast=mine>escape;local need=needText(escape)
  local pill=entry.Gui.Pill;local color=fast and GREEN or RED
  pill.Value.Text='⚡ '..need..(fast and'  ✓'or'')

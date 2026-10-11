@@ -460,8 +460,10 @@ local expected={
  {'Snow',3,{80,92,104},{'1.2M','2.9M','7.1M'}},{'Lava',4,{128,147,166},{'16M','25M','45M'}},{'Crystal',5,{205,236,266},{'160M','370M','690M'}},
  {'Storm',7,{330,379,429},{'2.6B','7.1B','22B'}}}
 local realOk=true
-for _,row in ipairs(expected)do for i,e in ipairs(row[3])do if Route.KeeperSpeeds[row[2]][i]~=e then realOk=false end end end
-check(realOk,'(the speeds below are the live RouteBalance83.KeeperSpeeds: 20 23 26 / 32 37 42 / 50 57 65 / 80 92 104 / 128 147 166 / 205 236 266 / 330 379 429)')
+-- R158j: the live keepers moved 20,000 points up (RouteBalance83); the sign checks below keep using the R112 speeds as plain test keepers (the sign rule is unchanged).
+local live={[1]={31.21,35.9,37.54},[6]={38.11,40.51,45.51},[2]={53.51,57.48,65.48},[3]={80.48,92.06,104.06},[4]={128.06,147.03,166.01},[5]={205,236,266},[7]={330,379,429}}
+for stage,row in pairs(live)do for i,e in ipairs(row)do if Route.KeeperSpeeds[stage][i]~=e then realOk=false end end end
+check(realOk,'the live RouteBalance83.KeeperSpeeds (R158j, 20,000 points up): 31.21 35.9 37.54 / 38.11 40.51 45.51 / 53.51 57.48 65.48 / 80.48 92.06 104.06 / 128.06 147.03 166.01 / 205 236 266 / 330 379 429')
 local bySpeed={}
 for _,row in ipairs(expected)do for i,e in ipairs(row[3])do bySpeed[e]=e==20 and pre or keeper(row[1]..i,e,10,6)end end
 player:SetAttribute('PhysicalWalkSpeed',24)
@@ -483,8 +485,8 @@ player:SetAttribute('PhysicalWalkSpeed',32);check(RED(vcolor(bySpeed[32]))and no
 player:SetAttribute('PhysicalWalkSpeed',32.01);check(GREEN(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 1  ✓','32.01: green with ✓ (the number stays the speed needed)')
 player:SetAttribute('PhysicalWalkSpeed',51);check(GREEN(vcolor(bySpeed[50]))and vtext(bySpeed[50])=='⚡ 72K  ✓'and RED(vcolor(bySpeed[80])),'51 beats the Desert keeper (50), not the Snow one (80)')
 player:SetAttribute('PhysicalWalkSpeed',331);check(GREEN(vcolor(bySpeed[330]))and vtext(bySpeed[330])=='⚡ 2.6B  ✓','331 beats the Storm keeper')
-player:SetAttribute('PhysicalWalkSpeed',nil);check(vtext(bySpeed[32])=='⚡ 1'and RED(vcolor(bySpeed[32]))and GREEN(vcolor(bySpeed[20])),'no PhysicalWalkSpeed attribute: treated as a new runner (24)')
-player:SetAttribute('PhysicalWalkSpeed','fast');check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[32])),'(a text value too)')
+player:SetAttribute('PhysicalWalkSpeed',nil);check(GREEN(vcolor(bySpeed[32]))and RED(vcolor(bySpeed[50]))and GREEN(vcolor(bySpeed[20])),'no PhysicalWalkSpeed attribute: treated as a new runner (R158j: the 20,000-point start, walk about 37.5: faster than 32, slower than 50)')
+player:SetAttribute('PhysicalWalkSpeed','fast');check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[50])),'(a text value too)')
 player:SetAttribute('PhysicalWalkSpeed',24)
 -- Independent reference (plain arithmetic, for needs under 10^15): the points needed rounded up to 2 significant figures.
 local function refRound(n)

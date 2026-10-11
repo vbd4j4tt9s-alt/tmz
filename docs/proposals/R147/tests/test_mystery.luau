@@ -599,7 +599,7 @@ check(okc and out:find('15:00 to go',1,true),'reset works for him too: '..tostri
 -- 14. Keeper speed tagging (the server half of KeeperSpeedLabels) ------------------------------------------------------------------
 local Chase=server('ChaseService')
 local fakeChase=setmetatable({},{__index=Chase})
-local expected={[1]=20,[6]=32,[2]=50,[3]=80,[4]=128,[5]=205,[7]=330}
+local expected={[1]=31.21,[6]=38.11,[2]=53.51,[3]=80.48,[4]=128.06,[5]=205,[7]=330} -- R158j: the keeper speeds moved up 20,000 points with the new start
 local tagOk=true;local detail=''
 for stage=1,7 do
  local model=R.new('Model');model.Name='Keeper'..stage;model:SetAttribute('KeeperClientAnimated',true)
@@ -613,7 +613,7 @@ for stage=1,7 do
  Chase._preparePersistentGuardian(fakeChase,model,stage)
  if model:GetAttribute('KeeperEscapeSpeed')~=expected[stage]or not W.CS:HasTag(model,'BiomeKeeper')then tagOk=false;detail=detail..' re-prepare '..stage end
 end
-check(tagOk,'_preparePersistentGuardian stamps KeeperEscapeSpeed (20, 32, 50, 80, 128, 205, 330) and tags every biome keeper "BiomeKeeper"'..detail)
+check(tagOk,'_preparePersistentGuardian stamps KeeperEscapeSpeed (31.21, 38.11, 53.51, 80.48, 128.06, 205, 330) and tags every biome keeper "BiomeKeeper"'..detail)
 check(Pursuit.EscapeSpeed(8)==20 and Pursuit.EscapeSpeed(nil)==20 and Pursuit.EscapeSpeed(99)==20,'an unknown stage falls back to the Forest speed (20)')
 -- R153: the server stamps the spawn point (KeeperHome) the SPEED NEEDED sign is pinned to: the camp the chase service keeps for the stage, never where the keeper stands now.
 do
@@ -650,7 +650,7 @@ local speedOk=true;for stage=1,7 do if Config.GetGuardianChaseSpeed({},500,5,sta
 check(speedOk,'the real chase speed next to a runner (Config.GetGuardianChaseSpeed) is exactly the label\'s EscapeSpeed')
 check(W.B.ConcurrentKeeperService:find('RouteBalance83).EventSpeed',1,true)~=nil,'The Darkened chases at RouteBalance83.EventSpeed (the 600 on its label)')
 local seeds7=Balance.KeeperSpeeds
-check(seeds7[1][1]==20 and seeds7[7][1]==330,'(the numbers come from BalanceValues81.KeeperSpeeds / RouteBalance83)')
+check(seeds7[1][1]==31.21 and seeds7[7][1]==330,'(the numbers come from BalanceValues81.KeeperSpeeds / RouteBalance83)')
 -- The Darkened (VeiledEvent81).
 local Veiled=server('VeiledEvent81')
 local evFolder=R.new('Folder');evFolder.Name='VeiledFolder';evFolder.Parent=W.workspace
