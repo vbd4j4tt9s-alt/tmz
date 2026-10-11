@@ -88,7 +88,7 @@ local function join(sv,id,name,starter,noChar)
 end
 local function leave(sv,p)sv.D:FinalizePlayer(p,'PlayerRemoving');present[p.UserId]=nil;p.Parent=nil end
 local function crash(p)present[p.UserId]=nil;p.Parent=nil end -- (the server died: no save)
-local function finishTutorial(sv,p)assert(sv.D:TutorialAction(p,"Skip"),"skip");flush(2)end -- (two passes: a gift queues its notice, a refusal queues its retry)
+local function finishTutorial(sv,p)local t=sv.D:GetPremium(p).Tutorial;t.Done=true;sv.D:PublishTutorial(p);sv.D:MarkDirty(p);flush(2)end -- (R158g: no Skip request any more: the saved state is set as the owner's /test tutorial done does) -- (two passes: a gift queues its notice, a refusal queues its retry)
 local function respawn(p)spawnIn(p);flush(3)end -- (R158e: CharacterAdded -> a moment later the try -> its notice / retry)
 local function gifts(sv,p)local out={};for _,r in ipairs(sv.D:GetChestRecords(p))do if Rules.PackFloor(r)then out[#out+1]=r end end;return out end
 local function flag(sv,p)return sv.D:GetPremium(p)[Rules.Flag]end

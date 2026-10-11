@@ -4,8 +4,8 @@
 --  1  the ten steps walked by a new player: the published step (1 / 4 / 6 / 7 / 9 / 10 / 0) and what the server points at (the nearest pack; carrying: the home line; your dirt; the
 --     plant; the market; your treadmill; your base pad as "home");
 --  2  only a pack STOLEN on the track (banked) ticks the steal step (the new-player gift pack, a roll, a grant never); after it, opening ANY pack counts (the owner's rule);
---  3  the first fruit in 10 s: the plant planted in the plant step, once per player (saved); its later fruit / regrowth in the normal time; a skipped tutorial: never;
---  4  harvest -> sell -> the treadmill (TreadmillInfo only on step 10) -> done -> the free Forest pack (2x); skip at the start: nothing;
+--  3  the first fruit in 10 s: the plant planted in the plant step, once per player (saved); its later fruit / regrowth in the normal time; a finished tutorial (the owner's /test tutorial done): never;
+--  4  harvest -> sell -> the treadmill (TreadmillInfo only on step 10) -> done -> the free Forest pack (2x); R158g: there is NO skip: the 'Skip' request is refused (plain failure, nothing changes, no pack);
 --  5  old saves (R111 - R158d masks) land on the right step; a finished save stays finished; Fast / FastCrop are saved and loaded (optional fields, ProfileVersion 22);
 --  6  BeginnerGuide.Resolve over every published step walks the ten looks.
 local W=require('./world');local R=W.R
@@ -67,7 +67,7 @@ local function open(p,id)return Data:OpenSeedPack(p,id,function()return .02 end)
 local function finish(p) -- PremiumService's Tutorial request for an action (its branch is checked from source below)
  return function(action)
   if Data:TutorialAction(p,action)then Data:PublishTutorial(p)end
-  local gift;if(action=='TreadmillInfo'or action=='Skip')and p:GetAttribute('TutorialDone')==true then gift=Data:GrantStarterPack(p)end
+  local gift;if action=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then gift=Data:GrantStarterPack(p)end
   return gift
  end
 end
@@ -123,15 +123,23 @@ do local s=state(P);s.Done=false;s.Mask=bit32.bor(1,B.Pack,B.Seed);Data:PublishT
  check(ok2 and c2.MatureAt>now()+10 and step(P)==7,'3: only once per player: a second tutorial plant grows in its normal time')
  s.Done=true;Data:PublishTutorial(P)
 end
--- a skipped tutorial: no quick fruit, no free pack
-do local Q=makePlayer(502,'Skipper');finish(Q)('Skip')
+-- R158g (owner: "there will be no skip tutorial button"): the 'Skip' request is refused like 'Replay' (plain failure, nothing changes, no free pack, no quick-fruit change)
+do local Q=makePlayer(502,'Skipper');local before=state(Q).Mask
+ check(finish(Q)('Skip')==nil and Data:TutorialAction(Q,'Skip')==false,'4: the Skip request is refused (a plain failure)')
+ check(state(Q).Done==false and state(Q).Mask==before and Q:GetAttribute('TutorialDone')==false and step(Q)==1,'4: ... nothing changes: the tutorial is still on step 1, not done')
+ check(Data:GrantStarterPack(Q)==nil,'4: ... and no free pack')
+ check(Data:TutorialAction(Q,'Replay')==false,'4: (Replay is still refused too)')
  local pk=steal(Q);open(Q,pk.Id);local ok,cq=Data:PlantSeed(Q,1,pk.Id,{OffsetX=0,OffsetZ=0},now())
- check(ok and cq.MatureAt>now()+10 and not state(Q).Fast,'3: a skipped tutorial: no quick fruit')
- check(Data:GrantStarterPack(Q)==nil,'4: skipping at the start gives no free pack')
+ check(ok and cq.MatureAt==now()+10,'3: (a refused skip took nothing from the player: the tutorial plant is still the quick one)')
+ -- a finished tutorial (the owner's /test tutorial done sets the saved state directly): no quick fruit, no second pack
+ local D=makePlayer(503,'Finished');Data:GetPremium(D).Tutorial={Version=1,Mask=255,Done=true};Data:PublishTutorial(D)
+ local pk2=steal(D);open(D,pk2.Id);local ok2,cd=Data:PlantSeed(D,1,pk2.Id,{OffsetX=0,OffsetZ=0},now())
+ check(ok2 and cd.MatureAt>now()+10 and not state(D).Fast,'3: a finished tutorial: no quick fruit')
 end
 -- the PremiumService Tutorial branch (from source: PremiumService.new starts product loaders the mock can't settle)
 local src=W.B.PremiumService
-check(src:find("if(value=='TreadmillInfo'or value=='Skip')and p:GetAttribute('TutorialDone')==true then",1,true)and src:find('return require(script.Parent.TutorialTargets).State(data,chests,p)',1,true),'PremiumService: TreadmillInfo / Skip grant the free pack, every request answers with the targets')
+check(src:find("if value=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then",1,true)and src:find('return require(script.Parent.TutorialTargets).State(data,chests,p)',1,true),'PremiumService: TreadmillInfo grants the free pack, every request answers with the targets')
+check(not src:find("'Skip'",1,true)and W.B.TutorialProgress:find("if action=='Skip'then return false end",1,true),'R158g: PremiumService has no Skip path; TutorialProgress refuses it')
 
 -- 5. Old saves -----------------------------------------------------------------------------------------------------------------------------------------------------------
 do
@@ -164,6 +172,7 @@ do
  look({Stage=4,PackInHand=true});look({Stage=6,Home=false});look({Stage=6,Home=true,SeedInHand=true})
  look({Stage=7,Home=true});look({Stage=7,Home=true,Ripe=true});look({Stage=9});look({Stage=10,Home=true})
  local order={'Spawn','Track','Grab','Open','Base','Plant','Grow','Harvest','Market','Treadmill'}
+ local _,bonus=Guide.Resolve({Stage=10,Home=true,Bonus=true});check(bonus=='Bonus','6: step 10 goes on to the BONUS ROLL arrow once the treadmill is done')
  for i,k in ipairs(order)do check(seen[i]==k,('6: step %d is %s (%s)'):format(i,k,tostring(seen[i])))end
 end
 print(('%d checks, %d failures'):format(checks,fails))

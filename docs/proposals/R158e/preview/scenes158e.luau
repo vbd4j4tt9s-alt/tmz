@@ -1,13 +1,16 @@
--- R158e tutorial storyboard (not a test): appended by run_preview158e.sh to the setup part of tools/tests/test_tutorial.luau. Plays the REAL BeginnerTutorial (+ BeginnerGuide,
+-- R158e / R158g tutorial storyboard (not a test): appended by run_preview158e.sh to the setup part of tools/tests/test_tutorial.luau. Plays the REAL BeginnerTutorial (+ BeginnerGuide,
 -- HudLayout, PropCache152) through the ten steps on the mock (VIEW_NAME = 'pc' 1280x720 mouse, 'phone' 844x390 touch) and prints per moment:
 --   SCENE <moment> <layer> <x> <y> <json>  hud = a stand-in HUD (the game's own BASE / TRACK, hotbar, MENU, BONUS ROLL, market window), tut = the tutorial's ScreenGui (inside the
---                                          top bar inset, like the game), tap = its button-pointer layer, goal / spot / timer = its world billboards at the camera's projection;
+--                                          top bar inset, like the game: the edge arrow, the clicking hand), tap = its button-pointer layer (red arrow + pressing hand), spot / timer =
+--                                          its world billboards (the pressing hand on the dirt, the ring timer) at the camera's projection;
 --   WORLD <moment> <json>                  the world as projected, shaded faces: stand-in scenery (grass, the track, the home line, your base, dirt, treadmill, market, packs, the plant,
---                                          you) and the tutorial's OWN 3D pieces as the script placed them (the big red arrow, the chevrons, the ring, the beam).
+--                                          you) and the tutorial's OWN 3D piece as the script placed it (the one red arrow: hovering over the goal, or floating ahead of you).
+-- R158g: the tutorial is only arrows (and the clicking / pressing hands, the small plant timer): no card, no icon, no pop, no confetti, no skip.
 -- A perspective camera behind the player (70 degrees). Approximate: blocks for the scenery, no lighting but a simple shade.
 local dump=require('./dump_tree')
 modules[RS.GardenTheme].Corner=function(p,r)local c=new('UICorner');c.CornerRadius=R.UDim.new(0,r or 4);c.Parent=p;return c end
 local phone=VIEW_NAME=='phone'
+aimOn=false -- (this file aims the camera itself: follow)
 local W,H=phone and 844 or 1280,phone and 390 or 720;local INSET=phone and 44 or 58
 VIEW=R.Vector2.new(W,H-INSET)
 if phone then UIS.TouchEnabled=true;UIS.MouseEnabled=false;lastInput=R.Enum.UserInputType.Touch end
@@ -134,7 +137,7 @@ local function shot(moment)
  print('SCENE '..moment..' hud 0 0 '..dump(hud,W,H))
  print('SCENE '..moment..' tut 0 '..INSET..' '..dump(gui,W,H-INSET))
  print('SCENE '..moment..' tap 0 0 '..dump(pg.BeginnerTutorialTap,W,H))
- for _,name in ipairs({'Goal','TapSpot','GrowTimer'})do
+ for _,name in ipairs({'TapSpot','GrowTimer'})do
   local bb=gui[name]
   if bb.Enabled and bb.Adornee then
    local at,on=camera:WorldToViewportPoint(bb.Adornee.CFrame.Position+V3(0,bb.StudsOffsetWorldSpace.Y,0))
@@ -154,6 +157,9 @@ settle(70);if not phone then shot('01_spawn')end
 settle(60*4);pressed();shot('02_track')
 -- 3. On the track, by the pack: the arrow over it, your key.
 root.CFrame=CF(30,3,76);follow(V3(30,3,76),V3(40,3,90));settle(20);settle(60);if not phone then shot('03_steal')end
+-- 3. Turned the other way: the pack is behind you, the floating arrow would be out of sight: the one arrow is at the screen edge.
+follow(V3(30,3,76),V3(30,3,40));settle(30);if not phone then shot('03b_behind')end
+follow(V3(30,3,76),V3(40,3,90));settle(20)
 -- 3. Carrying it home.
 serverStep={Kind='Safety',Target=V3(0,3,38)};player:SetAttribute('ChestChaseSeedCarrying',true);table.remove(packAt,1);root.CFrame=CF(22,3,82);follow(V3(22,3,82),V3(0,3,38));settle(70);if not phone then shot('04_carry')end
 -- 4. Banked by the line: open it (the clicking hand).
@@ -180,5 +186,5 @@ pg:SetAttribute('SeedMenu','Economy');market.Visible=true;harvestMenu.Visible=tr
 pg:SetAttribute('SeedMenu',nil);market.Visible=false;harvestMenu.Visible=false
 -- 10. The treadmill: faster, and a bonus roll every 6:00.
 serverStep={Kind='Treadmill',Target=V3(12,1,-6)};plantOn=false;root.CFrame=CF(2,3,-22);follow(V3(2,3,-22),V3(12,3,-6));player:SetAttribute('TutorialStep',10);settle(60*2);shot('12_treadmill')
--- The end: 🏆 + 🎁 (the free pack), confetti.
-player:SetAttribute('StarterPackClaimed',false);frames(2);player:SetAttribute('TreadmillTraining',true);frames(24);if not phone then shot('13_finish')end
+-- Then the BONUS ROLL arrow (a bonus roll every 6:00), and it is done.
+player:SetAttribute('StarterPackClaimed',false);frames(2);player:SetAttribute('TreadmillTraining',true);settle(40);shot('13_bonus')

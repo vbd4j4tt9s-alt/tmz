@@ -50,7 +50,10 @@ end
 local A=makePlayer(301,'Ava')
 local function packs(p)local n,lucky=0,nil;for _,r in ipairs(Data:GetChestRecords(p))do if r.Kind=='Pack'then n+=1;if r.RateBoost then lucky=r end end end;return n,lucky end
 check(Data:GrantStarterPack(A)==nil,'nothing before the tutorial is finished')
-Data:TutorialAction(A,'Skip');check(Data:GrantStarterPack(A)==nil and select(2,packs(A))==nil,'skipping the tutorial at the start gives nothing')
+-- R158g (owner: "there will be no skip tutorial button"): the Skip request is refused (nothing changes); a tutorial the owner finishes with /test tutorial done (the saved state set directly) at the start gives nothing
+check(Data:TutorialAction(A,'Skip')==false and A:GetAttribute('TutorialDone')==false and Data:GrantStarterPack(A)==nil,'the Skip request is refused: nothing changes, nothing is given')
+do local t=Data:GetPremium(A).Tutorial;t.Done=true;Data:PublishTutorial(A)end
+check(Data:GrantStarterPack(A)==nil and select(2,packs(A))==nil,'a tutorial finished at the start gives nothing')
 -- R158c (owner: "make it so that you can't replay the tutorial"): the Replay request is refused and changes nothing; this test starts the tutorial again by hand where it used to replay
 do local before=Data:GetPremium(A).Tutorial;local done,mask=before.Done,before.Mask
  check(Data:TutorialAction(A,'Replay')==false and before.Done==done and before.Mask==mask and A:GetAttribute('TutorialDone')==true,'the Replay request is refused: TutorialDone stays true, nothing changes')
@@ -68,7 +71,7 @@ local function finish()
 end
 finish()
 local src=W.B.PremiumService
-check(src:find("if(value=='TreadmillInfo'or value=='Skip')and p:GetAttribute('TutorialDone')==true then",1,true)and src:find('data:GrantStarterPack(p)',1,true)and src:find('chests:SyncTools(p)',1,true)and src:find('StarterPack.Notice',1,true),'the Tutorial request grants it, refreshes the hotbar and shows the notice')
+check(src:find("if value=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then",1,true)and src:find('data:GrantStarterPack(p)',1,true)and src:find('chests:SyncTools(p)',1,true)and src:find('StarterPack.Notice',1,true),'the Tutorial request grants it, refreshes the hotbar and shows the notice')
 local n,gift=packs(A)
 check(A:GetAttribute('TutorialDone')==true and gift~=nil,'finishing the tutorial gives the pack ('..tostring(ok and'service up'or svc)..')')
 check(gift and gift.Stage==1 and gift.BagVariant=='Pack01'and gift.RateBoost==2 and gift.OddsVersion==Rules.OddsVersion,'a Forest pack with 2x rates')

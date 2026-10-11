@@ -21,6 +21,9 @@ function T.Attach(Data)
   -- R158c (owner: "make it so that you can't replay the tutorial, to prevent any issues"): a replay would set TutorialDone back to false. The request is refused at the door, changing nothing
   -- (an old client with the old Settings button, or an exploit, gets a plain failure from PremiumService). BeginnerGuide.Action still knows 'Replay' as plain data; nothing here reaches it.
   if action=='Replay'then return false end
+  -- R158g (owner: "there will be no skip tutorial button"): a 'Skip' request is refused the same way (plain failure, nothing changes, no free pack), so there is no way to skip it. The owner's
+  -- /test tutorial done / step / reset and newplayer set the saved state directly (OwnerCreative158f) and never come through here.
+  if action=='Skip'then return false end
   if not self:IsLoaded(player)then return false end
   local premium=self:GetPremium(player);premium.Tutorial=premium.Tutorial or G.Read()
   if not G.Action(premium.Tutorial,action)then return false end

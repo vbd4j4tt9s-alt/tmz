@@ -10,7 +10,7 @@ luau-lsp from https://github.com/JohnnyMorganz/luau-lsp/releases (+ `scripts/glo
   Sources of 100,000+ bytes are backed up as Folders of chunks (a Roblox StringValue holds under 200,000 bytes; the mock refuses more),
   and a damaged chunk is refused. `chunk_fixture.py OUTDIR` builds a synthetic release with 100 KB+ multibyte scripts and runs this test on it.
 - `test_tutorial.luau` - smoke-runs BeginnerTutorial with the real BeginnerGuide/HudLayout/PropCache152 (bundle them as tut_bundle.luau).
-- `test_guide_layout.luau`, `hud_overlap_harness.luau` - card placement / HUD overlap checks over 26 screen sizes
+- `hud_overlap_harness.luau` - HUD overlap checks over 26 screen sizes (R158g: `test_guide_layout.luau` is gone with the tutorial card)
   (require copies of the modules named as in the file headers).
 
 Run from a scratch folder that holds the bundles; paths inside the tests are relative (`./roblox`, `./inst_bundle`).

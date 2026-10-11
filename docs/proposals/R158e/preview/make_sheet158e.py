@@ -1,5 +1,5 @@
-"""R158e tutorial storyboard: turns the SCENE / WORLD lines of scenes158e.luau (SCRATCH/pc, SCRATCH/phone) into one picture. The GUI layers are drawn by Chromium (R150
-render_gui.mjs: the real tutorial GUI as the script built it); the world (stand-in scenery + the tutorial's own 3D pieces: the red arrow, the chevrons, the ring, the beam) is drawn
+"""R158e / R158g tutorial storyboard: turns the SCENE / WORLD lines of scenes158e.luau (SCRATCH/pc, SCRATCH/phone) into one picture. The GUI layers are drawn by Chromium (R150
+render_gui.mjs: the real tutorial GUI as the script built it); the world (stand-in scenery + the tutorial's own 3D piece: the red arrow) is drawn
 here from the projected, shaded faces. Each moment: sky, world faces far to near, the stand-in HUD, the world billboards, the tutorial layers.
 Usage: python3 make_sheet158e.py SCRATCH OUT.png (run_preview158e.sh calls it)."""
 import json, os, subprocess, sys
@@ -11,19 +11,20 @@ RENDER = os.path.join(HERE, '..', '..', 'R150', 'preview', 'render_gui.mjs')
 FRED = os.path.join(HERE, '..', '..', 'shop_R120', 'tests', 'FredokaOne.ttf')
 SIZES = {'pc': (1280, 720), 'phone': (844, 390)}
 CAPTIONS = {
-    '01_spawn': '1  you spawn: the big red arrow points at the pack',
-    '02_track': '2  the TRACK teleport button (arrow, ring, pressing hand)',
-    '03_steal': '3  steal: the arrow over the pack + your key (hold E)',
+    '01_spawn': '1  you spawn: one big red arrow floats ahead, pointing the way',
+    '02_track': '2  the TRACK button: a red arrow + the pressing hand',
+    '03_steal': '3  steal: near it, the arrow hovers over the pack',
+    '03b_behind': '3  pack behind you: the one arrow is at the screen edge',
     '04_carry': '3  carrying it: the arrow points home',
     '05_open': '4  open it: the clicking mouse + pips',
-    '06_base': '5  the BASE teleport button',
+    '06_base': '5  the BASE button: a red arrow + the pressing hand',
     '07_plant': '6  plant: the arrow on your dirt + the pressing hand',
-    '08_grow': '7  the first fruit: a 10-second ring timer',
-    '09_harvest': '8  harvest: the arrow on the ripe fruit + E',
-    '10_market': '9  sell: the arrow leads to the market (E there)',
+    '08_grow': '7  the first fruit: a small 10-second ring timer',
+    '09_harvest': '8  harvest: the arrow on the ripe fruit',
+    '10_market': '9  sell: the arrow leads to the market',
     '11_sell': '9  the market window: Sell crops, then Sell all',
-    '12_treadmill': '10  treadmill = faster; every 6:00 a bonus roll (more packs)',
-    '13_finish': 'done: trophy + the free pack, confetti',
+    '12_treadmill': '10  your treadmill: the arrow (you run faster)',
+    '13_bonus': '10  then BONUS ROLL: the arrow alone (a bonus roll every 6:00)',
 }
 
 scenes, layers, worlds = [], {}, {}
@@ -97,8 +98,8 @@ try:
     big, small = ImageFont.truetype(FRED, 30), ImageFont.truetype(FRED, 17)
 except Exception:
     big = small = ImageFont.load_default()
-d.text((PAD, 16), 'R158e tutorial: the real script on the mock, one frame per step (PC 1280x720, last row: phone 844x390)', font=big, fill=(255, 224, 71))
-d.text((PAD, 56), 'Approximate: block scenery and a stand-in HUD (BASE / TRACK / MENU / BONUS ROLL / the market window are the game\'s own buttons); the tutorial itself shows no words.', font=small, fill=(150, 160, 185))
+d.text((PAD, 16), 'R158g tutorial: only arrows. The real script on the mock, one frame per step (PC 1280x720, last row: phone 844x390)', font=big, fill=(255, 224, 71))
+d.text((PAD, 56), 'Approximate: block scenery and a stand-in HUD (BASE / TRACK / MENU / BONUS ROLL / the market window are the game\'s own buttons); the tutorial itself is only arrows and hands: no box, no words.', font=small, fill=(150, 160, 185))
 y = 96
 for r, rh in zip(rows, row_h):
     x = PAD

@@ -46,8 +46,8 @@ function Service.new(data,chests,passes)
    if now-(self.Last[p].Tutorial or-10)<.2 then return {Success=false}end;self.Last[p].Tutorial=now
    if value~='State'and not data:TutorialAction(p,value)then return {Success=false}end
    data:PublishTutorial(p)
-   -- R138: finishing the tutorial (the last slides) earns the free 2x-luck Forest pack, once per account.
-   if(value=='TreadmillInfo'or value=='Skip')and p:GetAttribute('TutorialDone')==true then
+   -- R138: finishing the tutorial (the treadmill step) earns the free 2x-luck Forest pack, once per account (R158g: no Skip request any more, TutorialProgress refuses it).
+   if value=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then
     local gift=data:GrantStarterPack(p)
     if gift then
      pcall(function()chests:SyncTools(p)end)

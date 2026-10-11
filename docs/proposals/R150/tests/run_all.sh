@@ -1,7 +1,7 @@
 #!/bin/sh
 # Usage: sh run_all.sh [scratch dir]. The R150 bonus UI suites (run_bonus_ui.sh) and every older suite that touches TreadmillBonus or HudLayout:
 # R123 treadmill bonus (server, client, 26-screen button placement), R128 (HUD), R129 (phone HUD), R137 (packs / pictures: reads the bonus client's
-# source), R138 (tutorial layout on 26 screens). With "mutate" as the second argument the R150 mutation check runs as well.
+# source), R138 (the starter pack and the tutorial). With "mutate" as the second argument the R150 mutation check runs as well.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);P=$(cd "$HERE/../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"

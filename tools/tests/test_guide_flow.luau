@@ -25,10 +25,10 @@ check(G.Step({Version=1,Mask=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest),Done=f
 check(G.Step({Version=1,Mask=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash),Done=false})==10,'old save that had sold -> treadmill (10)')
 check(G.Step({Version=1,Mask=bit32.bor(1,B.Harvest,B.Sell),Done=false})==1,'old R111 save with harvest / sell bits but no steal -> 1')
 check(G.Step({Version=1,Mask=0,Done=true})==0,'a finished save stays finished')
--- TreadmillInfo only on step 10; Skip always ends it; Replay is plain data (TutorialProgress refuses it, R158c).
+-- TreadmillInfo only on step 10; R158g: there is no Skip (the action does nothing); Replay is plain data (TutorialProgress refuses it, R158c).
 s={Version=1,Mask=1,Done=false};check(not G.Action(s,'TreadmillInfo')and G.Step(s)==1,'treadmill action ignored early')
 s={Version=1,Mask=bit32.bor(1,B.Pack,B.Seed,B.Plant),Done=false};check(not G.Action(s,'TreadmillInfo')and G.Step(s)==7,'... and on step 7 (harvest and sell come first)')
-check(G.Action(s,'Skip')and G.Step(s)==0,'skip ends')
+check(not G.Action(s,'Skip')and G.Step(s)==7 and not s.Done,'no skip: the action does nothing')
 -- Read: the same validation; the two new optional fields are kept when clean, dropped (never refused) when not.
 check(G.Read(nil).Mask==1 and G.Read({Version=1,Mask=300,Done=false})==nil and G.Read({Version=2,Mask=1,Done=false})==nil,'read validation unchanged')
 check(G.Read({Version=1,Mask=0,Done=true}).Done==true,'a returning player\'s finished save stays finished')
@@ -37,10 +37,11 @@ check(r.Fast==true and r.FastCrop=='guid-1'and r.Mask==7,'Fast / FastCrop are re
 r=G.Read({Version=1,Mask=7,Done=false,Fast='yes',FastCrop=string.rep('x',101)})
 check(r and r.Fast==nil and r.FastCrop==nil,'odd optional fields are dropped, the save still loads')
 r=G.Read({Version=1,Mask=7,Done=false});check(r.Fast==nil,'an old save has none of them')
--- Ten steps, one look each moment (Resolve), each with an icon.
-check(#G.Steps==10 and G.StepCount==10 and #G.Progress==10,'10 steps')
+-- Ten steps, one look each moment (Resolve).
+check(#G.Steps==10 and G.StepCount==10 and G.Progress==nil,'10 steps (no step row)')
 check(G.Steps[1].Seconds==G.IntroSeconds and G.IntroSeconds>=3 and G.IntroSeconds<=6,'the spawn arrow shows a few seconds')
-check(type(G.Steps[10].Seconds)=='number'and G.Steps[10].Seconds>=8 and G.Steps[10].Seconds<=15,'step 10 finishes by itself after about 10 s')
+check(type(G.Steps[10].Seconds)=='number'and G.Steps[10].Seconds>=8 and G.Steps[10].Seconds<=15,'the treadmill arrow shows about 10 s at most')
+check(type(G.BonusSeconds)=='number'and G.BonusSeconds>=3 and G.BonusSeconds<=8,'then the BONUS ROLL arrow shows a few seconds')
 check(G.FirstFruitSeconds==10,'the first fruit: 10 s')
 local function R(c)return table.pack(G.Resolve(c))end
 local walk={
@@ -50,46 +51,34 @@ local walk={
  {{Stage=6,Home=false},5,'Base'},{{Stage=6,Home=true},6,'PickSeed'},{{Stage=6,Home=true,SeedInHand=true},6,'Plant'},
  {{Stage=7,Home=true},7,'Grow'},{{Stage=7,Home=true,Ripe=true},8,'Harvest'},{{Stage=7,Home=false},7,'Base'},
  {{Stage=9},9,'Market'},{{Stage=9,Menu='Buy'},9,'SellTab'},{{Stage=9,Menu='Sell'},9,'SellAll'},
- {{Stage=10,Home=true},10,'Treadmill'},{{Stage=10,Home=false},10,'Base'},{{Stage=0},0,nil},
+ {{Stage=10,Home=true},10,'Treadmill'},{{Stage=10,Home=false},10,'Base'},{{Stage=10,Home=true,Bonus=true},10,'Bonus'},{{Stage=10,Home=false,Bonus=true},10,'Bonus'},{{Stage=0},0,nil},
 }
 for _,w in ipairs(walk)do local got=R(w[1]);check(got[1]==w[2]and got[2]==w[3],('resolve %s -> %s %s (got %s %s)'):format(w[3]or'done',w[2],tostring(w[3]),tostring(got[1]),tostring(got[2])))end
 local seen={};for _,w in ipairs(walk)do if w[3]then seen[G.Looks[w[3]].Step]=true end end
 for i=1,10 do check(seen[i],'step '..i..' has a look')end
--- R158e: NO WORDS. Every look, every device: icons, ➜, numbers; a key glyph only alone in a key cap (E / X / R2).
-local looks={}
-for key,l in pairs(G.Looks)do looks[#looks+1]=l;check(l.Key==key and type(l.Icon)=='string'and l.Icon~=''and G.Wordless(l.Icon),key..': an icon, no word')end
-looks[#looks+1]=G.Nice;looks[#looks+1]=G.Finished;looks[#looks+1]=G.FinishedAgain
-for _,d in ipairs({'Mouse','Touch','Gamepad'})do for _,l in ipairs(looks)do
- for _,line in ipairs(l.Rows or{l.Row})do
-  check(#line<=5,l.Key..': at most 5 pictures in a row')
-  for _,tile in ipairs(line)do
-   if type(tile)=='string'then check(G.Wordless(tile),('%s %s: "%s" has no word'):format(d,l.Key,tile))
-   else
-    local keys=0;for _ in pairs(tile)do keys+=1 end
-    if tile.Act then local a=G.Act(d,tile.Act);check(a~=nil,d..' '..l.Key..': a glyph for '..tile.Act)
-     if type(a)=='table'then check(G.KeyGlyphs[a.Key]==true and G.Wordless(a.Key,true)and not G.Wordless(a.Key),d..' '..l.Key..': key cap '..tostring(a.Key)..' is a key glyph')
-     else check(type(a)=='string'and G.Wordless(a),d..' '..l.Key..': '..tostring(a)..' is an icon')end
-    else check(tile.Pill=='Track'or tile.Pill=='Base'or tile.Timer==true or tile.Clock==true,l.Key..': a known picture')end
-   end
-  end
- end
- check(G.Wordless(l.Icon),d..' '..l.Key..': the icon has no word')
-end end
-for _,icon in ipairs(G.Progress)do check(G.Wordless(icon),'step row icon '..icon)end
-check(G.Wordless('6:00')and G.Wordless('10')and G.Wordless('⏭')and G.Wordless('❓')and not G.Wordless('NICE!!')and not G.Wordless('E')and G.Wordless('E',true)and not G.Wordless('GO',true),'Wordless: numbers / icons yes, words no, a key glyph only in a key cap')
-check(G.Clock(360)=='6:00'and G.Clock(420)=='7:00'and G.Clock(90)=='1:30','the clock')
--- The device glyphs: E / 👆 / X to steal (hold) and pick; 🖱️ / 👆 / R2 to open and plant; 🖱️ / 👆 / 🎮 for a screen button.
-check(G.Act('Mouse','Steal').Key=='E'and G.Act('Touch','Steal')=='👆'and G.Act('Gamepad','Steal').Key=='X','steal: E / 👆 / X')
-check(G.Act('Mouse','Open')=='🖱️'and G.Act('Touch','Open')=='👆'and G.Act('Gamepad','Open').Key=='R2','open: 🖱️ / 👆 / R2')
-check(G.Act('Mouse','Press')=='🖱️'and G.Act('Touch','Press')=='👆'and G.Act('Gamepad','Press')=='🎮','a screen button: 🖱️ / 👆 / 🎮')
+-- R158g: a look is only pointers. It names what it points at (a world goal, a screen button, a hotbar slot, the clicking hand) and nothing else: no icon, no picture row, no key, no
+-- bubble, no trail. One purpose each: a look never points a world arrow AND a button / slot / clicking hand at the same moment (two arrows saying the same thing), and the pressing hand
+-- and the ring timer hang on the world goal.
+local ALLOWED={Key=true,Step=true,World=true,Button=true,Slot=true,Hand=true,Timer=true,Click=true,NoPress=true}
+for key,l in pairs(G.Looks)do
+ for field in pairs(l)do check(ALLOWED[field],key..': no '..field..' (a look is only pointers)')end
+ check(l.Key==key and type(l.Step)=='number','look '..key..' knows its name and step')
+ local purposes=0;for _,f in ipairs({'World','Button','Slot','Click'})do if l[f]then purposes+=1 end end
+ check(purposes<=1,key..': one purpose per look ('..purposes..')')
+ check((not l.Hand and not l.Timer)or l.World,key..': a hand or a timer is on a world goal')
+end
+for _,gone in ipairs({'Card','Obstacles','Font','HotbarDetail','Progress','Nice','Finished','FinishedAgain','Devices','Act','Clock','Format','NiceSeconds','FinishSeconds'})do check(G[gone]==nil,'the card is gone: no G.'..gone)end
+for _,l in pairs(G.Steps)do check(l.Icon==nil,'no step icon')end
+check(G.Wordless('10')and G.Wordless('👆')and not G.Wordless('NICE!!')and not G.Wordless('E')and not G.Wordless('R2')and G.Wordless('R2',true)and not G.Wordless('GO',true),'Wordless: numbers / icons yes, words no, a key glyph only in a key cap (R2)')
 check(G.ClickHint.Mouse.Hand=='🖱️'and G.ClickHint.Touch.Hand=='👆'and G.ClickHint.Gamepad.Key=='R2'and G.ClickHint.Mouse.Word==nil,'the clicking hand has no word')
+for dev,h in pairs(G.ClickHint)do check(G.Wordless(h.Hand)and(h.Key==nil or G.Wordless(h.Key,true)),dev..': the clicking hand is wordless')end
 -- What points where.
-check(G.Looks.Spawn.Arrow3D and G.Looks.Spawn.World=='Pack'and G.Looks.Track.Button=='TrackButton'and G.Looks.Track.Arrow3D,'1 / 2: the 3D arrow at the pack, then TRACK')
-check(G.Looks.Grab.Prompt=='Steal'and G.Looks.Grab.Hold and G.Looks.Carry.World=='Safety','3: the pack with your key (hold), then home')
+check(G.Looks.Spawn.World=='Pack'and G.Looks.Track.Button=='TrackButton'and G.Looks.Track.World==nil,'1 / 2: an arrow at the pack, then just TRACK')
+check(G.Looks.Grab.World=='Pack'and G.Looks.Carry.World=='Safety','3: the pack, then home')
 check(G.Looks.PickPack.Slot=='Pack'and G.Looks.Open.Click,'4: the slot, then the clicking hand')
-check(G.Looks.Base.Button=='BaseButton'and G.Looks.Plant.Hand and G.Looks.PickSeed.Slot=='Seed','5 / 6: BASE, the dirt')
-check(G.Looks.Grow.Timer and G.Looks.Harvest.Prompt=='Prompt'and G.Looks.Market.World=='Sell'and G.Looks.SellTab.Button=='SellMode'and G.Looks.SellAll.Button=='SellAll','7 - 9: timer, harvest, market')
-check(G.Looks.Treadmill.World=='Treadmill'and G.Looks.Treadmill.Button=='BonusRollButton'and G.Looks.Treadmill.NoPress and #G.Looks.Treadmill.Rows==2,'10: the treadmill, BONUS ROLL (look), two rows')
+check(G.Looks.Base.Button=='BaseButton'and G.Looks.Plant.Hand and G.Looks.Plant.World=='Garden'and G.Looks.PickSeed.Slot=='Seed','5 / 6: BASE, the dirt')
+check(G.Looks.Grow.Timer and G.Looks.Grow.World=='Crop'and G.Looks.Harvest.World=='Crop'and G.Looks.Market.World=='Sell'and G.Looks.SellTab.Button=='SellMode'and G.Looks.SellAll.Button=='SellAll','7 - 9: timer, harvest, market')
+check(G.Looks.Treadmill.World=='Treadmill'and G.Looks.Bonus.Button=='BonusRollButton'and G.Looks.Bonus.NoPress and not G.Looks.Treadmill.Button,'10: the treadmill, then BONUS ROLL (the arrow alone)')
 check(G.Kind(1,false)=='Pack'and G.Kind(1,true)=='Safety'and G.Kind(4)==nil and G.Kind(6)=='Garden'and G.Kind(7)=='Crop'and G.Kind(9)=='Sell'and G.Kind(10)=='Treadmill','server kinds per step')
 -- The first fruit in 10 s (pure): one fruit, a whole plant, several fruit.
 local now=1000000

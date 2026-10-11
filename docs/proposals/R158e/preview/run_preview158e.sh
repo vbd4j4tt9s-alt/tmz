@@ -1,8 +1,8 @@
 #!/bin/sh
-# R158e tutorial storyboard: sh run_preview158e.sh <scratch dir> -> docs/proposals/R158e/tutorial158e.png
+# R158e / R158g tutorial storyboard: sh run_preview158e.sh <scratch dir> -> docs/proposals/R158e/tutorial158e.png
 # The REAL BeginnerTutorial (+ BeginnerGuide, HudLayout, PropCache152) runs on the tools/tests mock (scenes158e.luau drives the ten steps on a PC 1280x720 and a landscape phone
 # 844x390), its GUI is dumped (R150 dump_tree.luau) and drawn by headless Chromium (R150 render_gui.mjs, FredokaOne, Noto Color Emoji); the world (block scenery + the tutorial's own
-# 3D arrow, chevrons, ring and beam as the script placed them) is projected by a perspective camera behind the player and drawn by make_sheet158e.py. Approximate.
+# 3D arrow as the script placed it) is projected by a perspective camera behind the player and drawn by make_sheet158e.py. Approximate.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd);S=${1:?scratch dir}
 T=$REPO/tools/tests;SRC=$REPO/src

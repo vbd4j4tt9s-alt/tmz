@@ -49,13 +49,13 @@ local function lastText(p)for i=#told,1,-1 do if told[i].P==p then return told[i
 local synced=0;local Chests={SyncTools=function()synced+=1 end}
 R.clock=20727*86400+3600*5
 local function dataServer()return PDS.new(Config,Map,Notes)end
--- tutorial (R158c): the default is a player who has finished the tutorial (the real 'Skip' request, which also publishes TutorialDone = true); false = leave what the profile loaded (a brand-new profile starts at step 1)
+-- tutorial (R158c): the default is a player who has finished the tutorial (R158g: the saved state set done directly, as the owner's /test tutorial done does, which also publishes TutorialDone = true); false = leave what the profile loaded (a brand-new profile starts at step 1)
 local function makePlayer(Data,id,name,tutorial)
  local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p;order[#order+1]=p
  function p.Kick(_,why)error('kicked '..name..': '..tostring(why),0)end
  R.new('Backpack').Parent=p
  Data:PreparePlayer(p);assert(Data:Load(p),'load '..name)
- if tutorial~=false then assert(Data:TutorialAction(p,'Skip'),'skip '..name)end
+ if tutorial~=false then local t=Data:GetPremium(p).Tutorial;t.Done=true;Data:PublishTutorial(p);Data:MarkDirty(p);if Data.QueueGardenSave then Data:QueueGardenSave(p)end end
  local m=R.new('Model');m.Name=name;local root=R.new('Part');root.Name='HumanoidRootPart';root.Size=V3(2,2,1);root.CFrame=CF(0,5,-380);root.Parent=m;m.PrimaryPart=root
  local hum=R.new('Humanoid');hum.Health=100;hum.Parent=m;m.Parent=W.workspace;p.Character=m
  return p
@@ -234,7 +234,7 @@ do
 end
 
 -- 7. R158c (owner: "for the void pack there isn't a 20 minute lock anymore and requirement is just finishing the tutorial"): the tutorial rule on the REAL player data ------------------------
--- (makePlayer(Data, id, name, tutorial): the default is a player who has finished the tutorial (the real 'Skip' request); false leaves what the profile loaded: a brand-new profile starts at step 1)
+-- (makePlayer(Data, id, name, tutorial): the default is a player who has finished the tutorial (the saved state set done directly, R158g: there is no Skip request); false leaves what the profile loaded: a brand-new profile starts at step 1)
 do
  local REFUSAL='finish the tutorial to get your free void pack!'
  local profileStore=stores[Config.GetDataStoreName(false)]
@@ -255,9 +255,11 @@ do
  -- the Replay request is refused: nothing changes (here the tutorial is not finished yet, so it cannot be "reset" either)
  local mask0=D1:GetPremium(P).Tutorial.Mask
  check(D1:TutorialAction(P,'Replay')==false and P:GetAttribute('TutorialDone')==false and D1:GetPremium(P).Tutorial.Mask==mask0,'R158c: the Replay request is refused on a new profile too (nothing changes)')
- -- skipping the tutorial counts as finished (the real 'Skip' request: TutorialAction): the claim goes through with 0 minutes played
+ -- R158g (owner: "there will be no skip tutorial button"): the Skip request is refused (nothing changes); a tutorial finished some other way (the owner's /test tutorial done sets the saved state) counts as finished: the claim goes through with 0 minutes played
  local played0=played(D1,P)
- check(D1:TutorialAction(P,'Skip')==true and P:GetAttribute('TutorialDone')==true,'R158c: the Skip request finishes the tutorial (TutorialDone = true)')
+ check(D1:TutorialAction(P,'Skip')==false and P:GetAttribute('TutorialDone')==false and D1:GetPremium(P).Tutorial.Mask==mask0,'R158g: the Skip request is refused (nothing changes)')
+ do local t=D1:GetPremium(P).Tutorial;t.Done=true;D1:PublishTutorial(P);D1:MarkDirty(P)end
+ check(P:GetAttribute('TutorialDone')==true,'R158c: the tutorial finished (set directly): TutorialDone = true')
  local ok2,rec=svc1:Claim(P)
  check(ok2==true and rec and rec.BagVariant=='EclipseReliquary'and #D1:GetChestRecords(P)==1 and D1:GetPremium(P).VoidGift152==true and(played0==nil or played0<60),'R158c: ... the claim works at once with no play time: one real Void Pack and the flag')
  -- the Replay request: refused, and TutorialDone stays true (an old client's button, or an exploit)
