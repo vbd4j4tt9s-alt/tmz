@@ -255,8 +255,8 @@ for rank=6,8 do
    X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped');X.run(.05)
    check(run.Clock()>=tl.Climax-.03,tag..': straight to the hit')
    X.run(tl.Length+.5);settle()
-  elseif when=='skip late'then -- (R154: the press once the result is shown collects it)
-   X.run(L.ShownAt(tl)+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected');X.run(tl.Length+.5);settle()
+  elseif when=='skip late'then -- (R154: the press once the result is shown collects it; R158m: once its whole animation has played: CollectFrom)
+   X.run(L.CollectFrom(tl)+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected');X.run(tl.Length+.5);settle()
   elseif when=='abort'then
    X.run(tl.SceneIn+.6);M.Abort('test')
   elseif when=='death'then
@@ -280,7 +280,7 @@ for _,dt in ipairs({1/30,1/60})do
   local any=false
   X.run(hit*.25,dt);if M.Skip()then any=true end;X.run(hit*.5,dt);if M.Skip()then any=true end
   check(tl.SkipFrom==nil and not any and not run.Skipped,tag..': no SkipFrom; Enter / B / R2 skip nothing before the hit')
-  X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05,dt)
+  X.run(L.CollectFrom(tl)-run.Clock()+M.CollectAfter+.05,dt) -- (R158m: not before the card's whole animation has played)
   check(M.Skip()and run.Collected,tag..': the press after the result is shown collects it')
   X.run(tl.Length-tl.FloatEnd+.4,dt);settle(dt)
   cleanAll(tag)
@@ -304,7 +304,7 @@ for _,dt in ipairs({1/30,1/60,1/144})do
   check(#carried==0,tag..': nothing from before the jump rings on into the hit (every voice stops; a bed / riser spanning the target joins on the clock) ('..table.concat(carried,',')..')')
   local gui=X.pg:FindFirstChild('RarePullReveal');local flash=gui and X.find(gui,'Flash')
   local flashAt;local closed=false
-  X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05,dt,function()
+  X.run(L.CollectFrom(tl)-run.Clock()+M.CollectAfter+.05,dt,function() -- (R158m: CollectFrom)
    local f=Y.frames[#Y.frames];if f and flash and not flashAt and flash.BackgroundTransparency<.9 then flashAt=f.T end
   end)
   local frames=Y.stop()

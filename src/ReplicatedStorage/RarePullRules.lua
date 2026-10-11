@@ -270,6 +270,14 @@ L.LockTurns={0,.22,.44} -- Secret: the ring of lock plates turns (and clicks) th
 -- R152: when THIS presentation has shown the seed (its clock): the title on, the seed on screen and "1 in N" slammed. The director publishes
 -- it (RarePullSeedShownAt) so the puller's own chat line about the pull waits for it, also on a slow device.
 function L.ShownAt(tl)return math.max(tl.Climax or tl.Burst or 0,tl.Rise or 0,tl.Odds or 0)end
+-- R158m (owner: "pack opening animations are still really skippable if clicking very fast make sure they always play and only way to skip them is the bottom right
+-- button"): ShownAt is where the seed first APPEARS, not where its animation ends (a card's float and slam, a story scene's tail go on to FloatEnd). The moment the WHOLE
+-- result animation has played - the seed is shown AND it has floated down (FloatEnd) - is CollectFrom: a press collects the waiting result only from there (RarePullCinematic
+-- adds its CollectAfter). tl is the REAL timeline: the director's waiting beats push FloatEnd far away, so they carry the real value in tl.CollectFrom, which wins here.
+function L.CollectFrom(tl)
+ local c=tl.CollectFrom;if type(c)=='number'then return c end
+ return math.max(L.ShownAt(tl),tl.FloatEnd or 0)
+end
 -- R152: how far the game's music is ducked under a reveal (0..1 of RarePullAudio.DuckDb), on the presentation's clock: it starts with the
 -- reveal (the bed fades in at 0), is down by the cut (the story scenes) or half way through the suspense (the ladder), holds, and comes
 -- back over the way out so it is fully back on Length. Common / Uncommon do not duck.

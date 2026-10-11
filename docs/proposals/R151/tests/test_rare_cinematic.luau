@@ -22,7 +22,7 @@ local function collect(run)
  local waited=false
  if run and not run.Done and not run.Collected then
   local g=0;while not run.SawResult and not run.Done and g<900 do X.run(1/30);g+=1 end
-  X.run(M.CollectAfter+.05);waited=M.Waiting();M.Collect()
+  X.run(math.max(0,L.CollectFrom(run.TL)-run.Clock())+M.CollectAfter+.05);waited=M.Waiting();M.Collect() -- (R158m: a collect lands once the whole result animation has played: CollectFrom)
  end
  local g=0;while(M.Active()or Collect.Flying()>0)and g<900 do X.run(1/30);g+=1 end
  X.run(.1)
@@ -205,9 +205,16 @@ do
  X.run(.2);check(not skip.Visible,'King: R155: the SKIP button goes once the hit has come')
  X.run(L.ShownAt(tl)+M.CollectAfter+.05-run.Clock())
  check(W.actions[M.SkipAction]~=nil,'Space / Enter / A / B / R2 are bound while the scene runs (R155: B / R2 / Enter press the SKIP button; any of them collects)')
+ -- R158m (owner: "make sure they always play"): the seed is shown but its float has not ended: no press collects yet (B, Space, a click on the screen)
+ W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.ButtonB})
+ W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.Space})
+ button.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1});button.Activated:Fire()
+ X.run(.05)
+ check(not run.Collected and L.CollectFrom(tl)>L.ShownAt(tl)+M.CollectAfter+.1,'King: R158m: B / Space / a click after the seed is shown but before its float has ended ('..tl.FloatEnd..' s) collect nothing')
+ X.run(L.CollectFrom(tl)+M.CollectAfter+.05-run.Clock())
  W.actions[M.SkipAction](M.SkipAction,R.Enum.UserInputState.Begin,{KeyCode=R.Enum.KeyCode.ButtonB})
  X.run(.05)
- check(run.Collected,'King: a second press once the result is shown collects it (R154: it used to close it)')
+ check(run.Collected,'King: a second press once the whole result animation has played collects it (R154: it used to close it; R158m: from CollectFrom)')
  X.run(M.SceneExit+(tl.Length-tl.Back)+.3);local g=0;while Collect.Flying()>0 and g<300 do X.run(1/30);g+=1 end
  check(M.Active()==nil,'King: skipped run ends')
  restoredAll('after skip')
@@ -396,7 +403,10 @@ do -- R153: every card can be skipped by the player (R151 / R152: only the story
   X.run(L.ShownAt(tl)-run.Clock()+.1)
   check(not M.Skip()and not run.Collected,tag..': a press just as the result lands does nothing yet (R154: CollectAfter)')
   X.run(M.CollectAfter)
-  check(M.Skip()and run.Collected,tag..': a press once the result is shown collects it (R154: it used to close it; R157: Enter / B / R2 still do on Common..Mythic)')
+  -- R158m (owner: "make sure they always play"): the seed has been shown for a while but the animation (the float down to FloatEnd) has not played out: nothing collects it yet
+  check(L.CollectFrom(tl)+M.CollectAfter>run.Clock()+.05 and not M.Skip()and not run.Collected,tag..': R158m: a press after the seed is shown, before its whole animation has played ('..string.format('%.2f',L.CollectFrom(tl))..' s + CollectAfter), collects nothing')
+  X.run(L.CollectFrom(tl)+M.CollectAfter+.05-run.Clock())
+  check(M.Skip()and run.Collected,tag..': a press once the whole result animation has played collects it (R154: it used to close it; R157: Enter / B / R2 still do on Common..Mythic; R158m: from CollectFrom)')
   collect(nil)
   check(M.Active()==nil,tag..': gone');restoredAll(tag);bag:Destroy()
  end

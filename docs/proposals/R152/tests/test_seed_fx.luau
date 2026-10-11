@@ -374,7 +374,7 @@ for rank=6,8 do
   local run=start(rank);local tl=run.TL;local tag=names[rank]..' '..when
   local sc
   if when=='skip early'then X.run(tl.SkipFrom+.1);sc=run.Scene;M.Skip();X.run(tl.Length+.5);collectOut()
-  elseif when=='skip late'then X.run(L.ShownAt(tl)+M.CollectAfter+.05);sc=run.Scene;M.Skip();X.run(tl.Length+.5);collectOut() -- (R154: the press after the result collects it)
+  elseif when=='skip late'then X.run(L.CollectFrom(tl)+M.CollectAfter+.05);sc=run.Scene;M.Skip();X.run(tl.Length+.5);collectOut() -- (R154: the press after the result collects it)
   elseif when=='abort'then X.run(tl.SceneIn+.6);sc=run.Scene;M.Abort('test')
   elseif when=='death'then X.run(tl.SceneIn+.6);sc=run.Scene;X.hum.Died:Fire();X.run(.1)
   elseif when=='destroyed'then X.run(tl.SceneIn+.6);sc=run.Scene;local holder=R.new('LocalScript');M.Bind(holder);holder.Destroying:Fire()
@@ -400,7 +400,7 @@ for _,c in ipairs({{1,false},{4,false},{5,false},{6,true},{8,true}})do
  local run=start(c[1]);local tl=run.TL;local tag=names[c[1]]..(c[2]and' in place'or' card')..(c[1]<=5 and' pressed (no skip) and collected'or' skipped and closed')
  if c[1]<=5 then X.run(L.CardSkipFrom+.1);check(tl.SkipFrom==nil and not M.Skip()and not run.Skipped,tag..': R157: nothing to skip')
  else X.run(tl.SkipFrom+.1);check(M.Skip(),tag..': skipped to the hit')end
- X.run(L.ShownAt(tl)-run.Clock()+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected once the result was shown')
+ X.run(L.CollectFrom(tl)-run.Clock()+M.CollectAfter+.05);check(M.Skip()and run.Collected,tag..': collected once the result was shown (R158m: and its whole animation had played)')
  X.run(1);collectOut()
  check(M.Active()==nil and X.pg:FindFirstChild('RarePullReveal')==nil and cam:FindFirstChild('RarePullGrade')==nil and M.Fading()==0,tag..': no card, GUI or colour grade left')
  local left={};for _,d in ipairs(fxIn(W.workspace))do if not base[d]and not d:IsDescendantOf(X.char)then left[#left+1]=d.Name end end

@@ -357,7 +357,7 @@ for i=1,N do
     -- (R153: a story scene keeps the clicks, the screen and the gamepad's R2 until it is over: the next pack is opened when the player has
     -- control again; over a card (the HUD and the controls stay the player's) straight away, while the card still plays)
     -- (R154: its result waits: the player collects it, then opens the next pack)
-    if first and first.Kind=='Scene'then local g=0;while M.Active()==first and g<300 do if first.SawResult and not first.Collected and first.Clock()>=L.ShownAt(first.TL)+M.CollectAfter then skipNow()end;X.run(.2,1/30,watch);g+=1 end end
+    if first and first.Kind=='Scene'then local g=0;while M.Active()==first and g<300 do if first.SawResult and not first.Collected and first.Clock()>=L.CollectFrom(first.TL)+M.CollectAfter then skipNow()end;X.run(.2,1/30,watch);g+=1 end end
     X.run(rnd()*.3)
     local rank2=math.floor(rnd()*8)+1;local seed2=pick(seedsByRank[rank2])
     local o2=openOwn({Tag=tag..' then a fast '..names[rank2]},seed2,pick(packs),nil,1,{})
@@ -371,7 +371,7 @@ for i=1,N do
    local guard=0;local waitFor=rnd2()<.3 and 0 or rnd2()*4
    while(M.Active()or Collect.Flying()>0)and guard<1500 do
     local run=M.Active()
-    if run and run.SawResult and not run.Collected and run.Clock()>=L.ShownAt(run.TL)+M.CollectAfter+waitFor then
+    if run and run.SawResult and not run.Collected and run.Clock()>=L.CollectFrom(run.TL)+M.CollectAfter+waitFor then -- (R158m: a collect lands once the whole result animation has played)
      if run.Clock()>=run.TL.Length then stats.waited+=1 end
      skipNow()
     end

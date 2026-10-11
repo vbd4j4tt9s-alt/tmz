@@ -23,6 +23,10 @@
 --    the shots and the streams), and its own effects (its rarity sparkles ...) are off while it is hidden; R154 had them on, around a seed nobody could see. An effect of the hero
 --    seed that is off (Enabled=false) reads as on, so the comparison does not depend on when the seed shows; that the effects ARE on once the seed shows is checked by
 --    docs/proposals/R158b/tests/test_pack_leak158d.luau.
+--  * R158m (owner: "pack opening animations are still really skippable if clicking very fast make sure they always play ..."): a click collects the waiting result only once its WHOLE animation has
+--    played (RarePullRules.CollectFrom: the seed shown AND floated down), so the collect hint ("click to collect!") fades in CollectHint s after that, not after the first showing of the seed (R154:
+--    ShownAt + CollectHint). So the hint (the 'Skip hint' label and what is under it) is left out of the comparison - on both sides alike - only from the first showing of the seed to the end of its
+--    fade-in (CollectFrom + CollectHint + .3 s), and on the card fading out after a collect (RarePullRevealOut: the values it fades from); before and after that window it is compared in full as before.
 -- Everything else is compared exactly as before: the Camera outside the stage (the world's lens-only push, the restore), its type and subject, the
 -- grade and the blur, the stage itself (every part, beam, emitter, light, image), the card (but its SKIP button), the collect hint, the sounds and
 -- their schedule, Lighting, the onlookers' world effects, and every Common..Mythic reveal (no stage: their camera is compared in full on every frame).
@@ -61,6 +65,22 @@ return function(FP,W)
   end
   return false
  end
+ -- (R158m: the collect hint is on its way: the seed is shown but the animation has not played out, plus the hint's fade-in; or the card is fading out after a collect. o: the 'Skip hint'
+ -- label or an instance under it)
+ local function hintOnItsWay(o)
+  if o._class~='TextLabel'then o=o._parent end
+  if not(o and o._class=='TextLabel'and o._props.Name=='Skip hint')then return false end
+  local root=o._parent;local gui=root and root._parent
+  if not(root and root._class=='Frame'and root._props.Name=='RarePull'and gui and gui._class=='ScreenGui')then return false end
+  local gn=gui._props.Name
+  if gn=='RarePullRevealOut'then return true end
+  if gn~='RarePullReveal'then return false end
+  local okM,M=pcall(W.module,'RarePullCinematic');local run=okM and M and M.Active and M.Active()
+  if not(run and run.TL and run.Clock)then return false end
+  local tl=run.TL;local shown=math.max(tl.Climax or tl.Burst or 0,tl.Rise or 0,tl.Odds or 0);local from=math.max(shown,tl.FloatEnd or 0)
+  local t=run.Clock()
+  return t>=shown and t<from+.25+.3+.05
+ end
  FP.Normal=function(o,k,v)
   if o._class=='Camera'and CAMERA[k]and inStage()then return'(the story stage\'s camera: R155)'end
   if k=='Enabled'and v==false and HERO_EFFECT[o._class]and inHeroSeed(o)then return'true'end -- (R158d: off while the hero seed is held reads as on, as R154 had it)
@@ -73,14 +93,14 @@ return function(FP,W)
  end
  FP.Skip=function(o)
   if o._class=='DepthOfFieldEffect'and o._props.Name=='RarePullDof'and o._parent~=nil and o._parent._class=='Camera'then return true end
-  if skipUi(o)then return true end
+  if skipUi(o)or hintOnItsWay(o)then return true end
   if prevSkip then return prevSkip(o)end
   return false
  end
  local prevStream=FP.StreamSkip
  FP.StreamSkip=function(o) -- (the frame streams the seed-opening driver writes: perf152_fp.luau's FP.stream)
   if o._class=='DepthOfFieldEffect'and o._props.Name=='RarePullDof'and o._parent~=nil and o._parent._class=='Camera'then return true end
-  if skipUi(o)then return true end
+  if skipUi(o)or hintOnItsWay(o)then return true end
   if prevStream then return prevStream(o)end
   return false
  end

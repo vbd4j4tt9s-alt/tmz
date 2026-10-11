@@ -44,6 +44,14 @@
 -- but only by a press that STARTED once it had been shown for CollectAfter s (M.Tap): a burst of clicks from the animation never collects it.
 -- R157 (owner: "the skip button only appears for secret and above"): Common..Mythic (the Ladder card) have no SkipFrom (RarePullRules.CardTimeline), so no SKIP button and
 -- M.Skip answers false before the hit; "Skip pack animations" still gives them the Quick timing, and Enter / B / R2 and a click still COLLECT the shown result.
+-- R158m (owner: "pack opening animations are still really skippable if clicking very fast make sure they always play and only way to skip them is the bottom right
+-- button the click to collect for after the pack opens and the seed shows is still the same"): a press collected the result 0.25 s after the seed first SHOWED
+-- (RarePullRules.ShownAt), which is not where its animation ends (a card floats down, a story scene's tail runs to FloatEnd): spam-clicking cut the tail. Now a collect
+-- press (a click / tap, Space / A in a scene, Enter / B / R2 after the hit, M.Collect) only lands once the WHOLE result animation has played: from CollectFrom
+-- (RarePullRules.CollectFrom: the seed shown and floated down, on the REAL timeline) plus CollectAfter, for a press that BEGAN then (a burst of clicks from the
+-- animation never collects it). The collect hint counts from the same moment (RarePullCard). The SKIP button (Secret / Cosmic / King, SkipFrom until the hit,
+-- Enter / B / R2 pressing it) stays the one and only skip. Whatever takes the player away (death, a chase, a teleport, the next pack ...) still collects at once;
+-- a menu opening before CollectFrom is ignored (the animation plays on).
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Gui=game:GetService('GuiService');local UIS=game:GetService('UserInputService');local CAS=game:GetService('ContextActionService')
 local Collection=game:GetService('CollectionService');local StarterGui=game:GetService('StarterGui')
@@ -239,10 +247,10 @@ local function grade(run,b,c,s,tint,blur)
 end
 local WHITE=Color3.new(1,1,1)
 -- Finishing -----------------------------------------------------------------------------------------------------------------------------
-local finish,collect
+local finish,collect,holdNow
 -- R154: reasons that end a presentation without its seed flying in (the script going, a test, a failed start): the hold just ends
 M.NoCollect={aborted=true,destroyed=true,test=true,['start failed']=true}
-M.CollectAfter=.25 -- a press this soon after the result is shown only lands (the clicks of a skip go on for a moment)
+M.CollectAfter=.25 -- a press this soon after CollectFrom (R158m: the result's whole animation has played; it was: after the result is shown) only lands (the clicks of a skip go on for a moment)
 M.SceneExit=.35 -- a collected story scene's fade to black (R153: FloatEnd -> Back, .5-.7 s), then the world and the seed's flight
 M.TailFade=.2 -- a collect while the reveal still rings: its tail fades out over this
 M.TeleportStep=30 -- studs in one frame: a teleport (no runner moves that far in a frame) ...
@@ -250,6 +258,9 @@ M.TeleportRuns=3 -- ... and no more than this many times the distance the runner
 M.TeleportMaxDt=1 -- (seconds counted for that: a longer freeze is not a reason to stop seeing a teleport)
 M.LeaveDistance=90 -- studs from where the result was shown: the player has left
 M.Forever=1e6 -- (seconds: a beat that does not come while the result waits)
+-- R158m: when a collect press may first land on this run's clock (+ CollectAfter for a press that began): its whole result animation has played. Set at the start from the
+-- REAL timeline (run.TL: the waiting beats push FloatEnd to Forever); a skip moves the clock, never this.
+local function collectFrom(run)return run.CollectFrom or Rules.CollectFrom(run.TL)end
 local function unbind(run)
  if run.Bound then run.Bound=false;pcall(function()Run:UnbindFromRenderStep(run.BindName or M.BindName)end)end
  if run.SkipBound then run.SkipBound=false;pcall(function()CAS:UnbindAction(M.SkipAction)end)end
@@ -356,13 +367,13 @@ end
 -- A story scene collected by the player: its way out from t (the fade to black over SceneExit, the world, the grade easing back).
 local function exitBeats(run,t)
  local tl=run.TL;local b=table.clone(tl)
- b.FloatEnd=t;b.Back=t+M.SceneExit;b.Length=b.Back+(tl.Length-tl.Back);b.WaitEnd=t
+ b.FloatEnd=t;b.Back=t+M.SceneExit;b.Length=b.Back+(tl.Length-tl.Back);b.WaitEnd=t;b.CollectFrom=collectFrom(run)
  return b
 end
 -- What the card (and a story scene's screen beats) see while the result waits: nothing goes out (Out / Length, a scene's FloatEnd / Back far
 -- away). The stage, the camera, the grade of a card and the sounds keep the real timeline.
 local function waitBeats(run)
- local b=table.clone(run.TL);b.Wait=true;b.Out=M.Forever;b.Length=M.Forever
+ local b=table.clone(run.TL);b.Wait=true;b.Out=M.Forever;b.Length=M.Forever;b.CollectFrom=collectFrom(run) -- (R158m: the real value: the card's hint counts from it)
  if run.Kind=='Scene'then b.FloatEnd=M.Forever;b.Back=M.Forever end
  return b
 end
@@ -417,6 +428,13 @@ local function waitCheck(run)
   end
   run.LastPos=p;run.LastPosAt=at
  end
+ -- R158m: a menu that is open while the animation still plays is ignored for good: it is latched every frame until CollectFrom, so a slow poll (every .2 s)
+ -- that first sees it just after the animation has ended cannot count it as a menu OPENING and collect the result under the player's menu
+ local was0=run.WaitState
+ if was0 and not was0.Menu and run.Clock()<collectFrom(run)then
+  local pg=player and player:FindFirstChildOfClass('PlayerGui')
+  if pg and(pg:GetAttribute('SeedMenu')~=nil or pg:GetAttribute('TitleActive')==true)then was0.Menu=true end
+ end
  if os.clock()<(run.NextWait or 0)then return nil end
  run.NextWait=os.clock()+.2
  local s=M.Snapshot()
@@ -426,7 +444,7 @@ local function waitCheck(run)
  if not was then run.WaitPos=s.Root and s.Root.Position;return nil end
  if now.Ragdoll and not was.Ragdoll then return'ragdoll'end
  if now.Chase and not was.Chase then return'chase'end
- if now.Menu and not was.Menu then return'menu'end
+ if now.Menu and not was.Menu and run.Clock()>=collectFrom(run)then return'menu'end -- (R158m: before the animation has played the menu is ignored: it plays on)
  if now.Track~=was.Track then return'left'end
  if run.WaitPos and s.Root and(s.Root.Position-run.WaitPos).Magnitude>M.LeaveDistance then return'left'end
  return nil
@@ -484,6 +502,7 @@ function M._start(info)
   end
   run.Cues=Rules.SceneCues(rank,run.TL)
  end
+ run.CollectFrom=Rules.CollectFrom(run.TL) -- (R158m: the real timeline's: when the whole result animation has played)
  local okI,name,odds=pcall(M.SeedInfo,info.SeedId,info.Tool)
  if not okI then name,odds=tostring(info.SeedId or''),nil end
  run.SeedName,run.Odds=name,odds
@@ -548,6 +567,9 @@ function M._start(info)
   if hand and run.CameraState then run.CameraState.Fov=hand.Fov;run.FovWritten=hand.Written;run.Carry={From=hand.Fov-hand.Written,T0=os.clock()}end
  end
  table.insert(run.Connections,player.CharacterRemoving:Connect(function()finish(run,'death')end))
+ -- R158m: a tool put in the hand while this runs (the next pack) is held on the frame it arrives, not on the next render step: a click in between must not count for it
+ local charNow=player.Character
+ if charNow then table.insert(run.Connections,charNow.ChildAdded:Connect(function(c)if c:IsA('Tool')then holdNow(run)end end))end
  current=run;M._building=nil;Rules.RevealRunning=true
  -- R154: the result waits (Beats); the seed is held out of the hotbar and the hand until it has flown in, the world seed of this pack with it
  run.Beats=waitBeats(run)
@@ -643,6 +665,7 @@ local function holdTool(run,hold)
  for held in pairs(run.Held)do if held~=tool then run.Held[held]=nil;if held.ManualActivationOnly then held.ManualActivationOnly=false end end end
  if tool and not run.Held[tool]and tool.ManualActivationOnly==false then tool.ManualActivationOnly=true;run.Held[tool]=true end
 end
+holdNow=function(run)if not run.Done and run.Held then part(run,'tool',holdTool,run,armed(run,0)or run.Kind=='Scene')end end
 function M._step(run,pg)
  local t=run.Clock();local tl=run.TL;local tier=Rules.Tier(run.Rank)
  -- (R154: a card never ends by itself now: it waits for the collect; a story scene ends with its way out after the collect)
@@ -758,11 +781,12 @@ end
 -- R154: once the result is shown the press COLLECTS it (the seed flies home: collect) instead of closing it; one in its first CollectAfter
 -- seconds only lands (the clicks of a skip go on for a moment).
 -- R155: this is the SKIP button's press (and B / R2 / Enter, its keys): a click / tap anywhere is M.Tap and never skips.
+-- R158m: after the hit its press is a collect like any other: it only lands from CollectFrom + CollectAfter (the animation always plays out).
 function M.Skip()
  local run=current;if not run or run.Done or not run.Offset or run.Collected then return false end
  local t=run.Clock();local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=Rules.ShownAt(tl)
  if t>=shownAt then
-  if t<shownAt+M.CollectAfter then return false end
+  if t<collectFrom(run)+M.CollectAfter then return false end -- (R158m: not before the whole result animation has played, nor in the first CollectAfter s of it)
   collect(run,'press');return true
  end
  if t<(tl.SkipFrom or math.huge)or t>=hit-.02 then return false end
@@ -803,27 +827,33 @@ Rules.PressTaker=function()
  if run.Collected then return false end
  -- R155: every press is the reveal's while it runs (from its first frame), but a click / tap never skips: B / R2 / Enter press the SKIP
  -- button (M.Skip), a click / tap only collects the waiting result, and only when it began after the result had been shown (M.Tap)
+ -- (R158m: and after its whole animation had played: CollectFrom + CollectAfter)
  if key then if not mine then M.Skip()end -- (the listener's key has pressed it already: M.Press)
  else M.Tap(began)end
  return true
 end
 -- R154: collect the waiting result now (the seed flies home), as a press would. False when there is none (not shown yet, or collected).
+-- R158m: a player's collect (no reason, or 'press') has the gate of a press that begins now (CollectFrom + CollectAfter); any other reason (the ones that take the
+-- player away) collects at once.
 function M.Collect(why)
  local run=current
  if not run or run.Done or run.Collected or not(run.SawResult or run.Clock()>=Rules.ShownAt(run.TL))then return false end
- collect(run,why or'press');return true
+ why=why or'press'
+ if why=='press'and run.Clock()<collectFrom(run)+M.CollectAfter then return false end
+ collect(run,why);return true
 end
 -- R155: a click / tap anywhere (or Space / A in a story scene): it never skips; it collects the waiting result when it BEGAN (began: os.clock()
 -- of the press's start) at least CollectAfter s after the result was shown. A press held down from before, or a burst of clicks from the
 -- animation, does nothing. False when it did nothing.
+-- R158m: "after the result was shown" is now after its whole animation has played (collectFrom: the seed shown AND floated down / the scene's tail done).
 function M.Tap(began)
  local run=current
  if not run or run.Done or run.Collected or not(run.SawResult or run.Clock()>=Rules.ShownAt(run.TL))then return false end
  local at=run.Clock()-(os.clock()-(began or os.clock())) -- (the run's clock when the press began)
- if at<Rules.ShownAt(run.TL)+M.CollectAfter then return false end
+ if at<collectFrom(run)+M.CollectAfter then return false end -- (R158m: CollectFrom, not ShownAt: the animation always plays out)
  collect(run,'press');return true
 end
--- R154: the presentation's result is on screen and waits for its collect
+-- R154: the presentation's result is on screen and waits for its collect (R158m: from the first showing of the seed; a press only lands from CollectFrom + CollectAfter)
 function M.Waiting()local run=current;return run~=nil and not run.Done and not run.Collected and run.SawResult==true end
 -- began: when the press started (os.clock; a tap counts on its release); key: a key that presses the SKIP button (B / R2 / Enter). One
 -- physical press may come in by several routes (a mouse button, a tool's own, R2's action): RarePullRules.ClaimPress gives them one answer.

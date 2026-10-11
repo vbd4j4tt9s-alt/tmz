@@ -305,13 +305,16 @@ function Card:_fade(a)self.Set(self.Fade,'BackgroundTransparency',1-clamp01(a))e
 -- R154 the collect hint: once the result is shown and waits (tl.Wait) "click to collect!" / "tap to collect!" (owner's voice), in after
 -- CollectHint s, breathing softly (held still with Reduced Motion); it goes with the collect (tl.WaitEnd: a story scene's way out). (R153's
 -- "CLICK TO SKIP" before it is gone: R155 skips with the SKIP button only, Card:_skip.)
+-- R158m (owner: "make sure they always play"): the hint fades in CollectHint s after RarePullRules.CollectFrom (the whole result animation has played: the seed shown AND
+-- floated down), not after the moment the seed first shows: a press only lands from there, so the hint never shows while a click still does nothing. (Its breathing keeps
+-- its phase from the first showing, as before.)
 Card.CollectHint=.25
 function Card.CollectText(phone)return phone and'tap to collect!'or'click to collect!'end
 function Card:_hint(t,tl)
  local h=self.SkipHint;if not h then return end
- local S=self.Set;local hit=tl.Climax or tl.Burst or 0;local shown=Rules.ShownAt(tl)
+ local S=self.Set;local hit=tl.Climax or tl.Burst or 0;local shown=Rules.ShownAt(tl);local from=Rules.CollectFrom(tl)
  if t>=shown and(tl.Wait or tl.WaitEnd)then
-  local a=clamp01((t-shown-Card.CollectHint)/.3)*(tl.WaitEnd and 1-clamp01((t-tl.WaitEnd)/.15)or 1)*(self.Reduced and 1 or .82+.18*math.sin((t-shown)*3.2))
+  local a=clamp01((t-from-Card.CollectHint)/.3)*(tl.WaitEnd and 1-clamp01((t-tl.WaitEnd)/.15)or 1)*(self.Reduced and 1 or .82+.18*math.sin((t-shown)*3.2))
   S(h,'Text',self.CollectText);S(h,'TextTransparency',1-.9*a);S(h,'TextStrokeTransparency',1-.5*a);S(h,'Visible',a>.01)
   self.Scale(h,'Position',.5,self.Layout.Hint.Y-(self.Lift or 0)) -- (R157: under the name, lifting with it as the card goes)
   return

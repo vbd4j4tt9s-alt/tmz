@@ -52,7 +52,7 @@ wiring() {
  for w in giant givepack packrain disco sound;do grep -q "/test $w" "$RSD/StudioTestHelp.lua" && grep -q "\`$w" "$REPO/docs/COMMANDS.md" || { echo "$w is not in the F4 help / docs/COMMANDS.md";return 1; };done
  grep -q "## Party commands (R158l)" "$REPO/docs/COMMANDS.md" || { echo "docs/COMMANDS.md has no R158l party section";return 1; }
  # the runner is registered in the suite list, before the pyramid suite
- grep -q "docs/proposals/R158l/tests/run_party158l.sh docs/proposals/R156/tests/run_pyramid156.sh" "$REPO/tools/tests/run_all_suites.sh" || { echo "run_party158l.sh is not registered in tools/tests/run_all_suites.sh before run_pyramid156.sh";return 1; }
+ grep -q "docs/proposals/R158l/tests/run_party158l.sh .*docs/proposals/R156/tests/run_pyramid156.sh" "$REPO/tools/tests/run_all_suites.sh" || { echo "run_party158l.sh is not registered in tools/tests/run_all_suites.sh before run_pyramid156.sh";return 1; }
  echo "wiring ok"
 }
 frozen() {

@@ -134,7 +134,7 @@ local function finish(o,each)
  local g=0
  while(M.Active()~=nil or o.Bag.Parent or Collect.Flying()>0)and g<3000 do
   local run=M.Active()
-  if run and not run.Done and not run.Collected and run.SawResult and run.Clock()>=math.max(run.TL.Length,L.ShownAt(run.TL)+M.CollectAfter)+.05 then
+  if run and not run.Done and not run.Collected and run.SawResult and run.Clock()>=math.max(run.TL.Length,L.CollectFrom(run.TL)+M.CollectAfter)+.05 then -- (R158m: a press collects once the whole result animation has played)
    collected[run]={At=run.Clock(),Waiting=M.Waiting()}
    if run.Kind=='Scene'then local b=X.find(revealGui(),'Backdrop');if b then b.Activated:Fire()end else W.UIS.InputBegan:Fire({UserInputType=R.Enum.UserInputType.MouseButton1,KeyCode=R.Enum.KeyCode.Unknown,Position=V3(400,300,0)},false)end
   end
@@ -250,7 +250,7 @@ local function skipCase(rank,variant,how,close)
  local titleAt,seedAt,hitHeard,inWindow,beamAt=nil,nil,nil,nil,nil
  local hitSlot=rank<=3 and'PackBurst'or rank==7 and'CosmicBoom'or rank>=5 and'Impact'or'GroundImpact'
  local playsFrom=R.clock-1e-6
- untilClock(o,run,shownAt+M.CollectAfter+.05,function()
+ untilClock(o,run,L.CollectFrom(tl)+M.CollectAfter+.05,function() -- (R158m: the second press lands once the result's whole animation has played)
   local now=W.workspace:GetServerTimeNow()
   if not titleAt and titleShown()and oddsFinal(run)then titleAt=now end
   if not seedAt and seedOut()then seedAt=now end
@@ -296,8 +296,9 @@ local function noSkipCase(rank,how,close)
  local g=0;local spam=rank%2==0 and'tap'or'click'
  while run.Clock()<hit-.12 and g<400 do press(o,spam);press(o,how);step(o);g+=1 end
  check(tl.SkipFrom==nil and not run.Skipped and X.find(revealGui(),'Skip button')==nil and(L.Shift(o.Bag)or 0)==0,tag..': R157: '..g..' '..spam..'s and presses before the hit skip nothing; no SKIP button; the pack in the world keeps its own pace')
- untilClock(o,run,shownAt+M.CollectAfter+.05)
+ untilClock(o,run,shownAt+.3)
  check(not run.Skipped and not run.Collected and titleShown()and oddsFinal(run),tag..': the result is up at its own time and waits')
+ untilClock(o,run,L.CollectFrom(tl)+M.CollectAfter+.05) -- (R158m: and a press collects it only once its whole animation has played)
  local pressAt=R.clock
  press(o,close)
  check(run.Collected and not run.Skipped,tag..': the press after it collects it (the seed flies home)')
@@ -339,7 +340,7 @@ do
   local b=X.find(revealGui(),'Backdrop')
   local input={UserInputType=UT.Touch,KeyCode=KC.Unknown,Position=V3(300,200,0)}
   if b then b.InputBegan:Fire(input)end;W.UIS.InputBegan:Fire(input,b~=nil)
-  untilClock(o3,run3,L.ShownAt(tl3)+M.CollectAfter+.3)
+  untilClock(o3,run3,L.CollectFrom(tl3)+M.CollectAfter+.3) -- (R158m: through the whole animation and beyond)
   W.UIS.InputEnded:Fire(input,b~=nil);if b then b.Activated:Fire()end
   check(not run3.Collected,tag..': a press held from before the result, released after it, does not collect')
   step(o3);step(o3);step(o3);step(o3) -- (a new press: RarePullRules.ClaimPress takes presses closer than PressWindow for one)

@@ -522,9 +522,12 @@ for rank=6,8 do
    X.run(1/60,1/60)
    local s=sample(run.Cam,tl.Silence+1e-3);local e=CF(L.StageOrigin.X,L.StageOrigin.Y,L.StageOrigin.Z)*R.CFrame.lookAt(s.Eye,s.Target)
    check(run.Clock()<tl.Climax or(cam.CFrame.Position-e.Position).Magnitude<.6,tag..': the next frame is the silence frame / the hit')
+   -- R158m: the seed is shown and its float has not ended: a press does nothing yet; it collects once the whole result animation has played (L.CollectFrom + CollectAfter)
    X.run(L.ShownAt(tl)+M.CollectAfter+.05-run.Clock(),1/60)
+   check(not M.Skip()and not run.Collected,tag..': R158m: the seed is shown but its float goes on: a press collects nothing yet')
+   X.run(L.CollectFrom(tl)+M.CollectAfter+.05-run.Clock(),1/60)
    check(M.Skip()and run.Collected,tag..': the next press collects it')
-  elseif t<L.ShownAt(tl)+M.CollectAfter then check(not did,tag..': the result is on its way: nothing yet')
+  elseif t<L.CollectFrom(tl)+M.CollectAfter then check(not did,tag..': the result is on its way: nothing yet (R158m: until its whole animation has played)')
   else check(did and run.Collected,tag..': the press collects it')end
   settle();restored(tag);bag:Destroy()
  end

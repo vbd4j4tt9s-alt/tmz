@@ -173,7 +173,7 @@ do
  check(run.Kind=='InPlace'and tl.SkipFrom~=nil,tag..': (the compact card, skippable)')
  untilClock(run,tl.SkipFrom+.1);local p0=placed
  skipWith(run,'R2',press,tag,function()return placed==p0 end)
- untilClock(run,L.ShownAt(tl)+.3);press()
+ untilClock(run,L.CollectFrom(tl)+M.CollectAfter+.05);press() -- (R158m: a collect lands once the result's whole animation has played)
  check(run.Collected and placed==p0,tag..': the press that collects it plants nothing either')
  gone(run,bag)
  for _,k in ipairs(W.CS:GetTagged('BiomeKeeper'))do k:Destroy()end
@@ -189,7 +189,7 @@ for _,how in ipairs({'click','tap','R2'})do
  local run,bag=start(3);local tl=run.TL;local tag='shovel ('..how..') under a Rare card'
  untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);local r0=removes
  skipWith(run,how,press,tag,function()return not shovelOpen()and X.pg:GetAttribute('SeedMenu')==nil end)
- untilClock(run,L.ShownAt(tl)+.3);press()
+ untilClock(run,L.CollectFrom(tl)+M.CollectAfter+.05);press() -- (R158m: a collect lands once the result's whole animation has played)
  check(run.Collected and not shovelOpen()and removes==r0,tag..': the press that collects it (R154) opens none either, and nothing is removed')
  gone(run,bag)
  press();check(shovelOpen(),tag..': the card gone, the next press opens it as before');shovelClose()
@@ -205,7 +205,7 @@ do
   local run,bag=start(2);local tl=run.TL;local tag='digging ('..how..') under an Uncommon card'
   untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1);d0=digs
   skipWith(run,how,press,tag,function()return digs==d0 end)
-  untilClock(run,L.ShownAt(tl)+.3);press()
+  untilClock(run,L.CollectFrom(tl)+M.CollectAfter+.05);press() -- (R158m: a collect lands once the result's whole animation has played)
   check(run.Collected and digs==d0,tag..': nor the one that collects it (R154)')
   gone(run,bag)
   press();check(digs==d0+1,tag..': the card gone, the next press digs')
@@ -223,7 +223,7 @@ for _,how in ipairs({'click','tap'})do
  local run,bag=start(5);local tl=run.TL;local tag='giving ('..how..') under a Mythic card'
  untilClock(run,(tl.SkipFrom or L.CardSkipFrom)+.1)
  skipWith(run,how,press,tag,function()return not giftOpen()end)
- untilClock(run,L.ShownAt(tl)+.3);press()
+ untilClock(run,L.CollectFrom(tl)+M.CollectAfter+.05);press() -- (R158m: a collect lands once the result's whole animation has played)
  check(run.Collected and not giftOpen()and gifts==0,tag..': nor the one that collects it (R154); nothing is given')
  gone(run,bag);X.run(.7)
  press();check(giftOpen(),tag..': the card gone, the next press asks again');giftClose()

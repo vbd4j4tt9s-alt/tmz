@@ -240,7 +240,7 @@ for _,c in ipairs(cases)do
  local hintText;local t0=R.clock;local k=0
  while R.clock-t0<120 do
   step(o,o.Bag.Parent and 1/30 or 1/10);k+=1
-  if k%5==0 and R.clock-t0>.6 then -- (its hint comes in CollectHint s after the result)
+  if k%5==0 and run.Clock()>=L.CollectFrom(run.TL)+M.CollectAfter+.4 then -- (R158m: its hint comes in CollectHint s after the whole result animation has played)
    if M.Active()~=run or run.Done or not M.Waiting()then ok.still=false end
    if not(titleShown()and oddsFinal(run))then ok.title=false end
    if run.Kind=='Scene'then if not(run.InStage and cam.CameraType==R.Enum.CameraType.Scriptable)then ok.seed=false end elseif not cardSeed()then ok.seed=false end
@@ -300,7 +300,7 @@ end
 -- the hotbar shows the seed only after the flight lands: frame by frame
 do
  reset()
- local o=open(4);local run=o.Run;untilShown(o,run);untilT(o,run,o.Duration+.5)
+ local o=open(4);local run=o.Run;untilShown(o,run);untilT(o,run,math.max(o.Duration+.5,L.CollectFrom(run.TL)+M.CollectAfter+.05)) -- (R158m: a collect lands once the result's whole animation has played)
  local early=false;local landAt;local shownAt
  press(o,'click')
  local g=0;while Collect.Flying()>0 and g<300 do
@@ -348,10 +348,10 @@ end
 -- (R157: only Secret / Cosmic / King can be skipped: the skipper's card is Secret's, opened in place - a keeper near)
 do
  reset();X.keeper(V3(25,3,100),{})
- local o=open(6);local run=o.Run;local tl=run.TL
- check(run.Kind=='InPlace','early collect: (Secret in place)')
+ local o=open(8);local run=o.Run;local tl=run.TL -- (R158m: King: its animation takes so long that only the longest server opening (5.15 s) still runs when a skipper's collect can land; a Secret's (3.15 s) is over)
+ check(run.Kind=='InPlace','early collect: (King in place)')
  untilT(o,run,tl.SkipFrom+.3);press(o,'skip');check(run.Skipped==1,'early collect: skipped to the hit (the SKIP button)')
- untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
+ untilT(o,run,L.CollectFrom(tl)+M.CollectAfter+.05) -- (R158m: a collect lands once the result's whole animation has played)
  check(o.Bag.Parent~=nil,'early collect: the server has not ended the opening yet')
  local packSlot=slotShowing('Seed Pack')
  press(o,'click');check(run.Collected,'early collect: collected')
@@ -387,7 +387,7 @@ end
 
 -- 4. edge cases ---------------------------------------------------------------------------------------------------------------------------
 local function waiting(rank,opts)
- local o=open(rank,opts);local run=o.Run;untilShown(o,run);untilT(o,run,o.Duration+.6)
+ local o=open(rank,opts);local run=o.Run;untilShown(o,run);untilT(o,run,math.max(o.Duration+.6,L.CollectFrom(run.TL)+.3)) -- (R158m: a menu opening before the animation has played is ignored, so these wait for it)
  X.run(.5) -- (its waiting checks have seen the world as it is)
  return o,run
 end
@@ -408,7 +408,7 @@ do -- the next pack opened while a result waits: it flies in first, then the nex
  local l1=nil;local g=0;while not landingOf(o1.Id)and g<120 do step(o2);g+=1 end;l1=landingOf(o1.Id)
  check(l1 and slotShowing(o1.Name)~=nil,'next pack: the first seed has landed in the hotbar')
  check(run2.Clock()<run2.TL.Burst,'next pack: before the new pack has even burst open ('..string.format('%.2f',run2.Clock())..' s)')
- untilShown(o2,run2);untilT(o2,run2,L.ShownAt(run2.TL)+M.CollectAfter+.05);press(o2,'click');landAll(o2)
+ untilShown(o2,run2);untilT(o2,run2,L.CollectFrom(run2.TL)+M.CollectAfter+.05);press(o2,'click');landAll(o2)
  check(slotShowing(o2.Name)~=nil,'next pack: its own seed collected in turn');clean('next pack')
 end
 do
@@ -482,15 +482,15 @@ do -- R155 (owner: "... skip it by spam clicking disable this feature and u can 
  -- nothing in any phase (no SKIP button, nothing to skip); the first fresh press after its result collects it
  for _,c in ipairs({{3,'skip'},{5,'ButtonB'},{2,'ButtonR2'}})do
   reset()
-  local o=open(c[1]);local run=o.Run;local tl=run.TL;local shownAt=L.ShownAt(tl)
+  local o=open(c[1]);local run=o.Run;local tl=run.TL;local shownAt=L.ShownAt(tl);local from=L.CollectFrom(tl) -- (R158m: from: when the whole result animation has played)
   local tag='no skip on a card ('..names[c[1]]..' '..run.Kind..', '..c[2]..')'
   local k=0
   local function spamUntil(t)local g=0;while run.Clock()<t and not run.Done and g<400 do k+=1;if k%2==0 then click()else touch(o,0,2)end;if k%5==0 then press(o,c[2])end;step(o);g+=1 end;return g end
   local n=spamUntil(shownAt-.02)
   check(run.Kind=='Ladder'and tl.SkipFrom==nil and not run.Skipped and not run.Collected and not skipShows(),tag..': '..n..' presses (clicks, taps, '..c[2]..') all through the build skip nothing; no SKIP button')
-  spamUntil(shownAt+M.CollectAfter-.15)
-  check(run.SawResult and not run.Collected and not run.Skipped,tag..': the result just shown: spam presses do nothing (none began after it)')
-  untilT(o,run,shownAt+M.CollectAfter+.12);step(o);step(o);step(o);step(o)
+  spamUntil(from+M.CollectAfter-.15)
+  check(run.SawResult and not run.Collected and not run.Skipped,tag..': the result just shown: spam presses do nothing (none began after its whole animation had played: R158m)')
+  untilT(o,run,from+M.CollectAfter+.12);step(o);step(o);step(o);step(o)
   press(o,'tap')
   check(run.Collected and run.CollectWhy=='press'and not run.Skipped,tag..': the next fresh tap collects it')
   landAll(o);check(slotShowing(o.Name)~=nil,tag..': in the hotbar');clean(tag)
@@ -500,7 +500,7 @@ do -- R155 (owner: "... skip it by spam clicking disable this feature and u can 
  for _,c in ipairs(cases)do
   reset()
   if c[3]then X.keeper(V3(25,3,100),{})end
-  local o=open(c[1]);local run=o.Run;local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=L.ShownAt(tl)
+  local o=open(c[1]);local run=o.Run;local tl=run.TL;local hit=tl.Climax or tl.Burst;local shownAt=L.ShownAt(tl);local from=L.CollectFrom(tl)
   local scene=run.Kind=='Scene'
   local tag='skip then collect ('..names[c[1]]..' '..run.Kind..', '..c[2]..')'
   -- a burst of presses: clicks and taps on the world (a story scene: on its full-screen button, and Space)
@@ -523,16 +523,16 @@ do -- R155 (owner: "... skip it by spam clicking disable this feature and u can 
   local n3=spamUntil(shownAt-.02)
   check(run.Skipped==1 and not run.Collected,tag..': hit to result: '..n3..' spam presses do nothing')
   check(not skipShows(),tag..': the SKIP button is gone once the hit has played')
-  local n4=spamUntil(shownAt+M.CollectAfter-.15)
+  local n4=spamUntil(from+M.CollectAfter-.15)
   check(run.SawResult and not run.Collected,tag..': the result just shown: '..n4..' spam presses do nothing (none began after it)')
   -- a press held down from just before the collect delay ended, let go after it (still a tap: under TapSeconds, not moved)
   local input={UserInputType=UT.Touch,KeyCode=KC.Unknown,Position=V3(300,200,0)}
   local b=scene and X.find(revealGui(),'Backdrop')
   if b then b.InputBegan:Fire(input)end;W.UIS.InputBegan:Fire(input,b~=nil and b~=false)
   local heldAt=run.Clock()
-  untilT(o,run,shownAt+M.CollectAfter+.12) -- (its release, the press's claim, comes after PressWindow: a press of its own)
+  untilT(o,run,from+M.CollectAfter+.12) -- (its release, the press's claim, comes after PressWindow: a press of its own)
   W.UIS.InputEnded:Fire(input,b~=nil and b~=false);if b then b.Activated:Fire()end
-  check(heldAt<shownAt+M.CollectAfter and run.Clock()-heldAt<M.TapSeconds and not run.Collected,tag..': a press held from before ('..string.format('%.2f',heldAt-shownAt)..' s after the result), let go after the delay, does not collect')
+  check(heldAt<from+M.CollectAfter and run.Clock()-heldAt<M.TapSeconds and not run.Collected,tag..': a press held from before ('..string.format('%.2f',heldAt-shownAt)..' s after the result), let go after the delay, does not collect')
   step(o);step(o);step(o);step(o)
   press(o,scene and'button'or'tap')
   check(run.Collected and run.CollectWhy=='press',tag..': the next fresh tap collects it')
@@ -566,9 +566,11 @@ do
   reset()
   local o=open(rank);local run=o.Run;local tl=run.TL;local tag='sound ('..names[rank]..')'
   untilT(o,run,(tl.SkipFrom or L.CardSkipFrom)+.1);press(o,run.Kind=='Scene'and'button'or'click') -- (R157: a Mythic card has no SkipFrom: where R153's card skip began)
-  untilT(o,run,L.ShownAt(tl)+M.CollectAfter+.05)
+  untilT(o,run,L.CollectFrom(tl)+M.CollectAfter+.05)
   local ringing=#rarePlaying()
-  check(ringing>0 and run.Clock()<tl.Length,tag..': (the reveal still rings: '..ringing..' voices)')
+  -- (R158m: a Common..Mythic card's sheet ends on its own Length = FloatEnd + .2, before a collect can land (FloatEnd + CollectAfter): only a story scene's still rings then)
+  if run.Kind=='Scene'then check(ringing>0 and run.Clock()<tl.Length,tag..': (the reveal still rings: '..ringing..' voices)')
+  else check(ringing==0 and run.Clock()>=tl.Length and not Audio.Running(),tag..': (R158m: the card\'s sounds have ended on their own before a collect can land)')end
   local pressAt=R.clock
   press(o,run.Kind=='Scene'and'button'or'click')
   check(run.Collected and not Audio.Running()and(Audio.Fading()or #rarePlaying()==0),tag..': the collect lets the reveal\'s sheet go: its tail fades')
@@ -680,7 +682,7 @@ do -- a story scene cut short before its hit: its result card follows; when that
  local card=M.Active()
  check(run.Done and card and card~=run and card.Kind=='Result' and Collect.Held(o.Id),'follow-up: the result card follows the cut-short scene, the seed still held')
  if card then
-  untilShown(o,card);untilT(o,card,L.ShownAt(card.TL)+M.CollectAfter+.05)
+  untilShown(o,card);untilT(o,card,L.CollectFrom(card.TL)+M.CollectAfter+.05)
   press(o,'click');check(card.Collected,'follow-up: its press collects it')
   landAll(o);check(slotShowing(o.Name)~=nil and landingOf(o.Id)and landingOf(o.Id).Cue,'follow-up: the seed flies into the hotbar')
  end
