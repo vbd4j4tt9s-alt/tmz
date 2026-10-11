@@ -50,6 +50,9 @@ G.Looks={
 }
 for key,look in pairs(G.Looks)do look.Key=key end
 G.IntroSeconds=G.Steps[1].Seconds;G.RevealSeconds=2.5;G.BonusSeconds=5
+-- R158h (owner: "for this last part give players a free bonus roll once they are done"): at the BONUS ROLL arrow the server gives ONE free ready roll (once per player ever, up to 2 ready;
+-- TutorialProgress.TutorialBonusGift, the 'BonusGift' request, only at step 10); the arrow then waits for the roll to be used for up to BonusRollSeconds (BonusSeconds when there is no roll to press).
+G.BonusRollSeconds=15;G.BonusGiftRolls=1
 -- The only letters the tutorial ever draws, each alone in a key cap (the clicking hand's R2 on a gamepad).
 G.KeyGlyphs={R2=true}
 -- R138 (owner: "a clicking indicator to visually show players to keep clicking to open a pack"): the hand by the pack in your hand (no word; a gamepad shows its R2 key cap).
@@ -72,6 +75,7 @@ end
 -- Saved progress -------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- The save is {Version=1, Mask, Done} as since R111 (the same bits), plus two OPTIONAL fields (R158e; an older server drops them, ProfileVersion stays 22):
 --   Fast = true once the 10-second first fruit was given (once per player, ever);  FastCrop = that plant's id (the grow / harvest steps point at it).
+--   Bonus = true once the free bonus roll of the last step was given (R158h, once per player, ever; the owner's /test tutorial reset / step / newplayer write a fresh state, so it clears).
 -- Only a pack stolen on the track ticks the steal step (a gift or any other grant never does); after it, opening ANY pack counts (owner: "the player can open ANY pack and it will
 -- count"), and planting any seed counts.
 -- The published TutorialStep is the first step the saved bits have not done: 1 (steal: the client shows 1, 2 or 3 by where you are), 4 (open: 4), 6 (plant: 5 or 6 by
@@ -84,7 +88,7 @@ function G.Read(saved)
  if type(saved)~='table'then return {Version=1,Mask=1,Done=false}end
  local mask=saved.Mask
  if saved.Version~=1 or type(mask)~='number'or mask%1~=0 or mask<0 or mask>255 or type(saved.Done)~='boolean'then return nil end
- return {Version=1,Mask=bit32.bor(mask,1),Done=saved.Done,Fast=saved.Fast==true or nil,FastCrop=G.CleanId(saved.FastCrop)}
+ return {Version=1,Mask=bit32.bor(mask,1),Done=saved.Done,Fast=saved.Fast==true or nil,FastCrop=G.CleanId(saved.FastCrop),Bonus=saved.Bonus==true or nil}
 end
 function G.Step(state)
  if state.Done then return 0 end

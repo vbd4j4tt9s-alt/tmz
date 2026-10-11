@@ -7,7 +7,9 @@
 --  3  the first fruit in 10 s: the plant planted in the plant step, once per player (saved); its later fruit / regrowth in the normal time; a finished tutorial (the owner's /test tutorial done): never;
 --  4  harvest -> sell -> the treadmill (TreadmillInfo only on step 10) -> done -> the free Forest pack (2x); R158g: there is NO skip: the 'Skip' request is refused (plain failure, nothing changes, no pack);
 --  5  old saves (R111 - R158d masks) land on the right step; a finished save stays finished; Fast / FastCrop are saved and loaded (optional fields, ProfileVersion 22);
---  6  BeginnerGuide.Resolve over every published step walks the ten looks.
+--  6  BeginnerGuide.Resolve over every published step walks the ten looks;
+--  7  R158h: the free bonus roll of the last step: the 'BonusGift' ask gives +1 READY roll at step 10 only, once per player ever (a second ask is refused), up to the game's 2 ready, kept across
+--     a rejoin, saved; refused early and after the tutorial; a fresh state (the owner's reset writes one) can be asked once again.
 local W=require('./world');local R=W.R
 local fails,checks=0,0
 local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
@@ -37,6 +39,8 @@ local Config=server('Config');local Guide=W.module('BeginnerGuide');local B=Guid
 local Targets=server('TutorialTargets')
 local Map={GetStageAccent=function()return R.Color3.new(.5,.5,.5)end}
 local Data=server('PlayerDataService').new(Config,Map,{Show=function()end})
+-- R158h: the real treadmill bonus service (ChestChaseServerMain sets playerData.TreadmillBonus the same way)
+Data.TreadmillBonus=server('TreadmillBonusService').new(Config,Data,{TrainingSessions={}},nil,nil)
 local function makePlayer(id,name)
  local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p
  function p.Kick(_,why)error('kicked '..name..': '..tostring(why),0)end
@@ -113,9 +117,34 @@ check(Rules.FruitReadyAt(c,1)>=now()+(def.RegrowSeconds or 1)-1,'3: fruit 1 regr
 t=targets(P);check(t.Step==9 and t.Kind=='Sell'and t.Target==V3(0,3,-150),'9: the market')
 check(Data:SellHarvest(P,harvest.Id)and step(P)==10,'9 -> 10: sold')
 t=targets(P);check(t.Step==10 and t.Kind=='Treadmill'and t.Target==V3(12,1,-6),'10: your treadmill')
+-- R158h: the free bonus roll at the BONUS ROLL arrow: +1 ready roll, exactly once; refused at any other step
+do local Q0=makePlayer(504,'EarlyAsk');local bonus=Data.TreadmillBonus
+ check(Data:TutorialAction(Q0,'BonusGift')==false and bonus:GetReady(Q0)==0 and state(Q0).Bonus==nil,'7: asked at step 1: refused, no roll, no flag')
+ check(bonus:GetReady(P)==0,'7: (no roll before the ask)')
+end
+check(Data:TutorialAction(P,'BonusGift')==true and Data.TreadmillBonus:GetReady(P)==1,'7: step 10: the ask gives exactly 1 READY bonus roll')
+check(P:GetAttribute('TreadmillBonusReady')==1 and state(P).Bonus==true,'7: ... published for the BONUS ROLL button (ready, not a countdown) and flagged on the server')
+check(Data:GetPremium(P).StarterRolls158d==1,'7: ... and kept as an unused gift roll for a rejoin')
+check(Data:TutorialAction(P,'BonusGift')==false and Data.TreadmillBonus:GetReady(P)==1,'7: a second ask is refused: still 1 ready roll, once')
 local starter=finish(P)('TreadmillInfo')
 check(P:GetAttribute('TutorialDone')==true and step(P)==0,'10 -> done')
 check(starter and starter.RateBoost==2 and starter.Stage==1,'the free Forest pack (2x) for finishing')
+check(Data:TutorialAction(P,'BonusGift')==false and Data.TreadmillBonus:GetReady(P)==1,'7: after the tutorial a third ask is refused too')
+do local saved=Data:_buildSaveData(P);check(saved.Premium.Tutorial.Bonus==true,'7: the flag is saved')
+ Data.Store.Data['Player_901']=saved;local back=makePlayer(901,'BonusBack')
+ check(state(back).Bonus==true and back:GetAttribute('TutorialDone')==true,'7: ... and loaded back')
+ local R2=makePlayer(905,'Rejoiner');state(R2).Mask=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash);Data:PublishTutorial(R2)
+ check(Data:TutorialAction(R2,'BonusGift')==true,'7: (a second player at step 10 gets her own)')
+ local s2=Data:_buildSaveData(R2);Data.Store.Data['Player_906']=s2;local R3=makePlayer(906,'Rejoined')
+ Data.TreadmillBonus:Setup(R3);check(Data.TreadmillBonus:GetReady(R3)==1 and state(R3).Bonus==true and Data:TutorialAction(R3,'BonusGift')==false,'7: a rejoin before pressing it: the roll comes back, and no second one')
+end
+do -- the game's max of 2 ready holds; the flag is still spent (once per player)
+ local F=makePlayer(907,'Full');state(F).Mask=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash);Data:PublishTutorial(F);Data.TreadmillBonus:GrantReady(F,2)
+ check(Data:TutorialAction(F,'BonusGift')==true and Data.TreadmillBonus:GetReady(F)==2 and state(F).Bonus==true and Data:GetPremium(F).StarterRolls158d==nil,'7: already 2 ready: still 2 (the max), the flag is spent, nothing extra is kept')
+ local fresh=makePlayer(908,'Reset');local mask=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash)
+ Data:GetPremium(fresh).Tutorial={Version=1,Mask=mask,Done=false};Data:PublishTutorial(fresh)
+ check(Data:TutorialAction(fresh,'BonusGift')==true and Data.TreadmillBonus:GetReady(fresh)==1,'7: a fresh state (the owner\'s tutorial reset writes one) can be asked once again')
+end
 -- once per player: the tutorial put back on the plant step by hand: the next plant grows normally
 do local s=state(P);s.Done=false;s.Mask=bit32.bor(1,B.Pack,B.Seed);Data:PublishTutorial(P)
  local again=grantPack(P);open(P,again.Id)

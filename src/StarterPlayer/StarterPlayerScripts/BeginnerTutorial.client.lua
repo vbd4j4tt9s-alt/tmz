@@ -106,6 +106,7 @@ end
 S.info={};S.step=0;S.look=nil;S.lastKey=nil;S.lastStep=0;S.connections={};S.dead=false;S.busy=false
 S.poll,S.lookPoll,S.stepSeconds,S.finishRetry,S.intro=0,0,0,0,0
 S.shown,S.waitUntil,S.mode,S.bonus,S.bonusSeconds=false,0,nil,false,0
+S.bonusAsked,S.bonusReady=false,0 -- R158h: the free roll was asked for (once per run of step 10) / the most bonus rolls ready seen while the BONUS ROLL arrow shows
 S.clickSeen,S.clickPopAt=0,-math.huge
 S.ctx={}
 local fetch,render
@@ -415,7 +416,7 @@ render=function()
   S.waitUntil=now+Guide.RevealSeconds
   task.delay(Guide.RevealSeconds+.02,function()if not S.dead then render()end end)
  end
- if step~=S.lastStep then S.stepSeconds=0;S.finishRetry=0;S.bonus=false;S.bonusSeconds=0 end
+ if step~=S.lastStep then S.stepSeconds=0;S.finishRetry=0;S.bonus=false;S.bonusSeconds=0;S.bonusAsked=false;S.bonusReady=0 end
  if active then S.lastKey=key;S.lastStep=step else S.lastKey=nil;S.lastStep=0;S.waitUntil=0 end
  S.step=active and step or 0
  -- Nothing to show: the whole ScreenGui is off (no drawing). Back on: re-read the screen first.
@@ -433,7 +434,7 @@ local function adoptInfo(result)
  else S.readyFor,S.readyAt=nil,nil end
 end
 fetch=function(command)
- if S.busy or S.dead then return end;S.busy=true
+ if S.busy or S.dead then return false end;S.busy=true
  local expected=player:GetAttribute('TutorialStep');local carrying=player:GetAttribute('ChestChaseSeedCarrying')
  task.spawn(function()
   local ok,result=pcall(request.InvokeServer,request,'Tutorial',command or'State');S.busy=false;if S.dead then return end
@@ -442,6 +443,7 @@ fetch=function(command)
    render()
   elseif player:GetAttribute('TutorialStep')==nil then task.delay(1,function()if not S.dead then fetch()end end)end
  end)
+ return true -- (R158h: the request was sent)
 end
 
 local live=false -- pointers may be showing
@@ -468,15 +470,21 @@ connections[#connections+1]=Run.Heartbeat:Connect(function(dt)
   local noTreadmill=S.info.Kind=='Treadmill'and S.info.Target==nil and S.info.TargetPart==nil
   if player:GetAttribute('TreadmillTraining')==true or S.stepSeconds>=(Guide.Steps[10].Seconds or 10)or noTreadmill then S.bonus=true;render()end
  elseif S.lastKey=='Bonus'then
+  -- R158h (owner: "give players a free bonus roll once they are done"): ask the server ONCE for the free roll (it grants it only here, once per player ever, up to 2 ready); the BONUS ROLL
+  -- button then shows it ready and the arrow stays until the roll is used (the ready count drops) or BonusRollSeconds pass; with no roll to press it is the brief BonusSeconds look.
+  if not S.bonusAsked then S.bonusAsked=fetch('BonusGift')end
+  local ready=player:GetAttribute('TreadmillBonusReady')or 0
+  if ready>S.bonusReady then S.bonusReady=ready end
   if S.shown then S.bonusSeconds+=dt end
-  if S.bonusSeconds>=Guide.BonusSeconds and os.clock()>=S.finishRetry then S.finishRetry=os.clock()+1.5;fetch('TreadmillInfo')end
+  local used=S.bonusReady>0 and ready<S.bonusReady
+  if(used or S.bonusSeconds>=(S.bonusReady>0 and Guide.BonusRollSeconds or Guide.BonusSeconds))and os.clock()>=S.finishRetry then S.finishRetry=os.clock()+1.5;fetch('TreadmillInfo')end
  end
 end)
 for _,name in ipairs({'TutorialStep','ChestChaseSeedCarrying'})do connections[#connections+1]=player:GetAttributeChangedSignal(name):Connect(function()S.info={};S.readyFor,S.readyAt=nil,nil;render();task.delay(.25,function()fetch()end)end)end
 connections[#connections+1]=player:GetAttributeChangedSignal('RarePullCinematic'):Connect(render)
 -- R158f: the owner's /test tutorial reset / step / newplayer (the server counts TutorialRestart158f): start from the first look at once, as on a brand-new player's screen (a normal player never sees this change)
 connections[#connections+1]=player:GetAttributeChangedSignal('TutorialRestart158f'):Connect(function()
- S.intro=0;S.info={};S.readyFor,S.readyAt=nil,nil;S.waitUntil=0;S.lastKey=nil;S.lastStep=0;S.stepSeconds=0;S.finishRetry=0;S.bonus=false;S.bonusSeconds=0
+ S.intro=0;S.info={};S.readyFor,S.readyAt=nil,nil;S.waitUntil=0;S.lastKey=nil;S.lastStep=0;S.stepSeconds=0;S.finishRetry=0;S.bonus=false;S.bonusSeconds=0;S.bonusAsked=false;S.bonusReady=0
  render();task.delay(.25,function()if not S.dead then fetch()end end)
 end)
 for _,name in ipairs({'SeedMenu','TitleActive','GardenMenuExpanded'})do connections[#connections+1]=pg:GetAttributeChangedSignal(name):Connect(render)end

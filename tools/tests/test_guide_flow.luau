@@ -42,6 +42,8 @@ check(#G.Steps==10 and G.StepCount==10 and G.Progress==nil,'10 steps (no step ro
 check(G.Steps[1].Seconds==G.IntroSeconds and G.IntroSeconds>=3 and G.IntroSeconds<=6,'the spawn arrow shows a few seconds')
 check(type(G.Steps[10].Seconds)=='number'and G.Steps[10].Seconds>=8 and G.Steps[10].Seconds<=15,'the treadmill arrow shows about 10 s at most')
 check(type(G.BonusSeconds)=='number'and G.BonusSeconds>=3 and G.BonusSeconds<=8,'then the BONUS ROLL arrow shows a few seconds')
+check(type(G.BonusRollSeconds)=='number'and G.BonusRollSeconds>=12 and G.BonusRollSeconds<=20 and G.BonusGiftRolls==1,'R158h: with the free roll ready the arrow waits ~15 s for the press; one free roll')
+check(G.Read({Version=1,Mask=255,Done=false,Bonus=true}).Bonus==true and G.Read({Version=1,Mask=255,Done=false,Bonus='x'}).Bonus==nil and G.Read(nil).Bonus==nil,'R158h: the saved Bonus flag is read back (true only)')
 check(G.FirstFruitSeconds==10,'the first fruit: 10 s')
 local function R(c)return table.pack(G.Resolve(c))end
 local walk={

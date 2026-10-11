@@ -229,6 +229,7 @@ local function runServer()
 	local TreadmillBonusService = loadModule("TreadmillBonusService", {"new","Start","Setup","Cleanup","Roll"})
 	local treadmillBonus = construct("TreadmillBonusService", TreadmillBonusService.new, Config, playerData, baseService, chestService, notifications)
 	treadmillBonus:Start()
+	playerData.TreadmillBonus = treadmillBonus -- R158h: the tutorial's free bonus roll (TutorialProgress.TutorialBonusGift)
 	-- R158d: the new-player gift (a Verity Pack guaranteed Mythic or better + 2 bonus rolls) while the Verity event runs. A failure here never stops the server: no gift.
 	do local ok,err=pcall(function()require(modules.StarterVerity158d).new(Config,playerData,chestService,notifications,treadmillBonus):Start()end);if not ok then warn('[R158d] Starter gift failed to start: '..tostring(err))end end
 	-- R123: owner test commands reach these services through the chase service (ctx.Chase).

@@ -32,7 +32,9 @@ if sed 's/--.*$//' "$C/BeginnerTutorial.client.lua" | grep -nE "6:00|IntervalSec
 if sed 's/--.*$//' "$RSD/BeginnerGuide.lua" | grep -nE "Title *=|Chip *=|EquippedTitle|'NICE|YOU GOT|PACKS COMING|G[.]Card|G[.]Obstacles|G[.]Nice|G[.]Finished|G[.]Progress|G[.]Clock|Icon=|Row=|Rows=|action=='Skip'";then fail "a tutorial word, the card or the skip is back in BeginnerGuide";fi
 grep -q "if action=='Skip'then return false end" "$SRV/TutorialProgress.lua" || fail "TutorialAction must refuse the Skip request"
 if sed 's/--.*$//' "$SRV/PremiumService.lua" | grep -n "'Skip'";then fail "PremiumService has a Skip path";fi
-echo "ok: no card, no skip (the server refuses it), no sound, no bonus clock in the tutorial"
+grep -q "playerData.TreadmillBonus = treadmillBonus" "$S/ServerScriptService/ChestChaseServerMain.server.lua" || fail "ChestChaseServerMain must hand the bonus service to the player data (the tutorial's free roll)"
+sed 's/--.*$//' "$C/BeginnerTutorial.client.lua" | grep -q "fetch('BonusGift')" || fail "the client must ask for the free bonus roll"
+echo "ok: no card, no skip (the server refuses it), no sound, no bonus clock in the tutorial; the free bonus roll is wired"
 prep_client() { # $1 = a src tree, $2 = the run dir
  mkdir -p "$2";cp "$T/roblox.luau" "$T/test_tutorial.luau" "$T/test_guide_flow.luau" "$2/"
  cp "$1/ReplicatedStorage/BeginnerGuide.lua" "$2/new_Guide.luau";cp "$1/ReplicatedStorage/HudLayout.lua" "$2/Hud.luau"
@@ -71,6 +73,8 @@ mutant clicking_word ReplicatedStorage/BeginnerGuide.lua "Gamepad={Hand='🎮',K
 mutant two_arrows StarterPlayer/StarterPlayerScripts/BeginnerTutorial.client.lua "if mode=='Edge'or(over and look.Timer)then parkArrow()else drawArrow(root,target,now,over)end" "if over and look.Timer then parkArrow()else drawArrow(root,target,now,over)end" client
 mutant never_over StarterPlayer/StarterPlayerScripts/BeginnerTutorial.client.lua "if onScreen and dist<(S.mode=='Over'and Guide.NearArrow+4 or Guide.NearArrow)then return'Over'end" "if false then return'Over'end" client
 mutant two_purposes ReplicatedStorage/BeginnerGuide.lua "Track={Step=2,Button='TrackButton'}," "Track={Step=2,Button='TrackButton',World='Pack'}," client
+mutant bonus_twice ServerScriptService/ChestChaseServer/TutorialProgress.lua "state.Done or state.Bonus or G.Step(state)~=10" "state.Done or G.Step(state)~=10" server
+mutant bonus_any_step ServerScriptService/ChestChaseServer/TutorialProgress.lua "state.Done or state.Bonus or G.Step(state)~=10" "state.Done or state.Bonus" server
 mutant skip_accepted ServerScriptService/ChestChaseServer/TutorialProgress.lua "if action=='Skip'then return false end" "if action=='Skip'then local pr=self:GetPremium(player);pr.Tutorial=pr.Tutorial or G.Read();pr.Tutorial.Done=true;changed(self,player);return true end" server
 mutant gift_ticks_steal ServerScriptService/ChestChaseServer/PlayerDataService.lua "if type(options) == \"table\" and options.Banked == true then self:TutorialEvent(player,'Pack') end" "self:TutorialEvent(player,'Pack')" server
 mutant fast_twice ServerScriptService/ChestChaseServer/TutorialProgress.lua "if not state or state.Done or state.Fast or G.Step(state)~=6 then return false end" "if not state or state.Done or G.Step(state)~=6 then return false end" server

@@ -25,6 +25,7 @@ function T.Attach(Data)
   -- /test tutorial done / step / reset and newplayer set the saved state directly (OwnerCreative158f) and never come through here.
   if action=='Skip'then return false end
   if not self:IsLoaded(player)then return false end
+  if action=='BonusGift'then return self:TutorialBonusGift(player)end
   local premium=self:GetPremium(player);premium.Tutorial=premium.Tutorial or G.Read()
   if not G.Action(premium.Tutorial,action)then return false end
   changed(self,player);return true
@@ -37,6 +38,24 @@ function T.Attach(Data)
   if not G.FastFruit(crop,definition,now)then return false end
   state.Fast=true;state.FastCrop=G.CleanId(crop.Id)
   return true
+ end
+ -- R158h (owner: "for this last part give players a free bonus roll once they are done"): the client asks ('BonusGift') when its BONUS ROLL arrow starts. Only the SERVER grants, and only at step 10 of
+ -- an unfinished tutorial, once per player ever (state.Bonus, saved): 1 ready roll through TreadmillBonusService:GrantReady (the game's max of 2 ready holds). A roll that is gained is also kept
+ -- as an unused starter roll (R158d StarterRolls158d) so a rejoin before pressing it does not lose it. Any other ask is refused (false, nothing changes). Never yields.
+ function Data:TutorialBonusGift(player)
+  if not self:IsLoaded(player)then return false end
+  local premium=self:GetPremium(player);local state=premium.Tutorial;local bonus=self.TreadmillBonus
+  if not state or state.Done or state.Bonus or G.Step(state)~=10 or type(bonus)~='table'or type(bonus.GrantReady)~='function'then return false end
+  state.Bonus=true
+  local ok,granted=pcall(function()
+   local before=bonus:GetReady(player);local done,after=bonus:GrantReady(player,G.BonusGiftRolls)
+   if not done then return false end
+   local gain=(tonumber(after)or before)-before
+   if gain>0 then local Starter=require(game:GetService('ReplicatedStorage').StarterVerityRules158d);premium[Starter.RollsField]=math.min(2,Starter.CleanRolls(premium[Starter.RollsField])+gain)end
+   return true
+  end)
+  if not ok or not granted then state.Bonus=nil;return false end
+  changed(self,player);return true
  end
  -- R158e: a step that can't be done any more moves the tutorial on (or back), so it never sticks (asked on every state request; never yields; returns true when it changed):
  --  * stealing with a full Bag (200: a stolen pack could not be banked): go on with what you hold (open a pack, else plant a seed, else what comes next);
