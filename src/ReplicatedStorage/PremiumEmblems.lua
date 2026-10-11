@@ -34,9 +34,36 @@ function E.Draw(parent,kind)
   local points={};for i=0,15 do local a=-math.pi/2+i*math.pi/8;local r=i%2==1 and .065 or i%4==0 and .49 or .25;points[#points+1]={.5+math.cos(a)*r,.5+math.sin(a)*r}end
   polygon(root,'Starlight',points,C(231,236,255))
   box(root,'White core',.473,.473,.054,.054,C(255,255,255),true)
+ elseif kind=='Featured'then
+  -- R125 (owner): the shop's Featured logo. A gold star with a dark outline, a lighter bevel, a glint and a sparkle.
+  local function star(cx,cy,ro,ri)local pts={};for i=0,9 do local a=-math.pi/2+i*math.pi/5;local r=i%2==0 and ro or ri;pts[#pts+1]={cx+math.cos(a)*r,cy+math.sin(a)*r}end;return pts end
+  polygon(root,'Star outline',star(.47,.54,.47,.21),C(52,28,6))
+  polygon(root,'Gold',star(.47,.54,.40,.18),C(255,178,32))
+  polygon(root,'Bevel',star(.47,.52,.27,.12),C(255,226,110))
+  local glint=box(root,'Glint',.36,.42,.07,.07,C(255,255,245));glint.Rotation=45
+  local sparkle={};for i=0,7 do local a=-math.pi/2+i*math.pi/4;local r=i%2==0 and .14 or .035;sparkle[#sparkle+1]={.83+math.cos(a)*r,.2+math.sin(a)*r}end
+  polygon(root,'Sparkle',sparkle,C(255,250,225))
  elseif kind=='Star'then
   local points={};for i=0,9 do local a=-math.pi/2+i*math.pi/5;local r=i%2==0 and .44 or .19;points[#points+1]={.5+math.cos(a)*r,.5+math.sin(a)*r}end
   polygon(root,'Star',points,C(242,243,255));polygon(root,'Star core',{{.5,.2},{.58,.48},{.5,.64},{.42,.48}},C(255,255,255))
+ elseif kind=='Clover'then
+  -- R153: a 4 Leaf Clover from boxes only (the plain one: CloverIcon153 shows it until the owner's picture is there). A leaf is a heart: a square plus a circle on each of its two outer
+  -- edges; four of them meet at the middle. Dark outline pieces first (a little bigger), then the green ones, the two veins, a shine on every leaf and the stem.
+  local s,o,cx,cy=.29,.028,.5,.43
+  local function leaf(sx,sy,grow,color,tag)
+   local side=s+grow*2
+   box(root,tag..' square',cx+sx*s/2-side/2,cy+sy*s/2-side/2,side,side,color)
+   box(root,tag..' lobe',cx+sx*s-side/2,cy+sy*s/2-side/2,side,side,color,true)
+   box(root,tag..' lobe',cx+sx*s/2-side/2,cy+sy*s-side/2,side,side,color,true)
+  end
+  local stem=function(grow,color,tag)local b=box(root,tag..' stem',cx-.03-grow,cy+.05-grow,.06+grow*2,.47+grow*2,color,true);b.Rotation=-9 end
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do leaf(q[1],q[2],o,C(12,66,30),'Outline')end;stem(o,C(12,66,30),'Outline')
+  stem(0,C(54,168,58),'Green')
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do leaf(q[1],q[2],0,C(72,204,64),'Leaf')end
+  box(root,'Vein',cx-.01,cy-s*1.35,.02,s*2.7,C(30,132,48));box(root,'Vein',cx-s*1.35,cy-.01,s*2.7,.02,C(30,132,48))
+  for _,q in ipairs({{-1,-1},{1,-1},{-1,1},{1,1}})do
+   local shine=box(root,'Shine',cx+q[1]*s*1.02-.045,cy+q[2]*s*.55-.045,.09,.09,C(176,248,112),true);shine.BackgroundTransparency=.25
+  end
 
  end
  return root

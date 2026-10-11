@@ -1,0 +1,122 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mystery pedestal preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_pedestal.luau scene: Roblox parts as boxes / cylinders / balls (the pack's stand-in Body as a rounded pouch), neon as
+// unlit colour with a soft additive glow, particle emitters as clouds of sparkle dots (steady ones by rate x lifetime, bursts by count), the point light
+// as a light, and the BillboardGui sign drawn like Roblox would (rounded pill, outline, caption / state line / bar) as a camera-facing sprite sized in
+// studs. A design preview: no Roblox materials, textures or Future lighting.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,40,28),geoPouch=new RoundedBoxGeometry(1,1,1,6,.16);
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,56);geoCyl.rotateZ(Math.PI/2);
+function groundTexture(){
+  const cv=document.createElement('canvas');cv.width=cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#589e44';g.fillRect(0,0,256,256);g.fillStyle='rgba(0,0,0,.045)';g.fillRect(0,0,128,128);g.fillRect(128,128,128,128);
+  g.strokeStyle='rgba(255,255,255,.07)';g.lineWidth=3;g.strokeRect(0,0,256,256);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(60,60);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+const glowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.3,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=gr;c.fillRect(0,0,64,64);return new THREE.CanvasTexture(cv)})();
+function rnd(seed){let s=seed;return()=>{s=(s*16807)%2147483647;return s/2147483647}}
+function glow(s,pos,color,size,opacity){
+  const m=new THREE.SpriteMaterial({map:glowTex,color:col(color),transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending});
+  const sp=new THREE.Sprite(m);sp.position.set(pos[0],pos[1],pos[2]);sp.scale.set(size,size,1);s.add(sp);
+}
+// The sign: BillboardGui items drawn on a canvas (Roblox's layout: scale positions / sizes inside the gui's studs size), shown as a sprite.
+function guiSprite(g){
+  const PX=260;const W=Math.round(g.w*PX),H=Math.round(g.h*PX);
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const c=cv.getContext('2d');
+  const rgb=(a,al)=>`rgba(${a[0]},${a[1]},${a[2]},${al})`;
+  const items=g.items.slice().sort((a,b)=>a.z-b.z);
+  // The parent frame of an item is the gui, except for the bar's fill (inside the bar): resolve by name.
+  const byName={};for(const it of items)byName[it.name]=it;
+  const box=it=>{
+    let px=0,py=0,pw=W,ph=H;
+    if(it.name==='Fill'&&byName.Bar){const b=box(byName.Bar);px=b.x;py=b.y;pw=b.w;ph=b.h}
+    const w=it.w*pw,h=it.h*ph;return {x:px+it.x*pw-it.ax*w,y:py+it.y*ph-it.ay*h,w,h}
+  };
+  const rr=(x,y,w,h,r)=>{r=Math.min(r,w/2,h/2);c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+  for(const it of items){
+    const b=box(it);
+    if(it.cls==='Frame'){
+      const radius=it.corner!=null?it.corner*Math.min(b.w,b.h):0;
+      const a=1-it.bgT;
+      if(it.grad){const gr=c.createLinearGradient(0,b.y,0,b.y+b.h);
+        const k=(v,m)=>[Math.round(it.bg[0]*v[0]/255),Math.round(it.bg[1]*v[1]/255),Math.round(it.bg[2]*v[2]/255)];
+        gr.addColorStop(0,rgb(k(it.grad.a),a));gr.addColorStop(1,rgb(k(it.grad.b),a));c.fillStyle=gr}else c.fillStyle=rgb(it.bg,a);
+      rr(b.x,b.y,b.w,b.h,radius);c.fill();
+      if(it.stroke){c.lineWidth=it.stroke.w*2.2;c.strokeStyle=rgb(it.stroke.c,1-it.stroke.t);rr(b.x,b.y,b.w,b.h,radius);c.stroke()}
+    }else if(it.cls==='TextLabel'&&it.text){
+      let size=b.h*.86;const font=s=>`bold ${s}px "DejaVu Sans","Noto Color Emoji",sans-serif`;
+      c.font=font(size);while(c.measureText(it.text).width>b.w&&size>8){size-=2;c.font=font(size)}
+      c.textAlign='center';c.textBaseline='middle';
+      c.lineWidth=Math.max(2,size*.12);c.strokeStyle=rgb(it.tsc,.85);c.lineJoin='round';c.strokeText(it.text,b.x+b.w/2,b.y+b.h/2+size*.04);
+      c.fillStyle=rgb(it.tc,1);c.fillText(it.text,b.x+b.w/2,b.y+b.h/2+size*.04);
+    }
+  }
+  const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,toneMapped:false}));
+  sp.position.set(g.p[0],g.p[1],g.p[2]);sp.scale.set(g.w,g.h,1);return sp;
+}
+window.shoot=function(scene,Wd,Ht,opts){
+  opts=opts||{};renderer.setSize(Wd,Ht);
+  const s=new THREE.Scene();s.background=new THREE.Color(opts.bg||0xa9d8f5);
+  s.fog=new THREE.Fog(opts.bg||0xa9d8f5,260,700);
+  const v=scene.view;const T=new THREE.Vector3(...v.at);const C=new THREE.Vector3(...v.cam);const dist=C.distanceTo(T);
+  s.add(new THREE.HemisphereLight(0xeaf6ff,0x5f8f55,opts.hemi||1.15));
+  const sun=new THREE.DirectionalLight(0xfff2dd,opts.sun||2.2);sun.position.set(T.x-30,T.y+70,T.z-35);sun.target.position.copy(T);
+  sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const ex=Math.max(14,dist*.7);Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:260});sun.shadow.bias=-.0006;
+  s.add(sun,sun.target);
+  if(!opts.noGround){
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({map:groundTexture(),roughness:.95}));
+    ground.rotation.x=-Math.PI/2;ground.position.y=opts.groundY??4.98;ground.receiveShadow=true;s.add(ground);
+  }
+  for(const p of scene.parts){
+    if(p.t>=.995)continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const geo=p.sh==='Ball'?geoSphere:p.sh==='Cylinder'?geoCyl:p.sh==='Pouch'?geoPouch:geoBox;
+    let mat;const neon=p.m==='Neon';
+    if(neon)mat=new THREE.MeshBasicMaterial({color:col(p.c).multiplyScalar(1.1),transparent:p.t>0,opacity:1-p.t,toneMapped:false,depthWrite:p.t<.5});
+    else if(p.m==='Glass'||p.m==='Ice')mat=new THREE.MeshPhysicalMaterial({color:col(p.c),roughness:p.m==='Ice'?.25:.08,transparent:true,opacity:p.m==='Ice'?.9:.55,clearcoat:1,envMap:envTex,envMapIntensity:.7,depthWrite:p.m==='Ice'});
+    else{
+      const rough={Wood:.7,Marble:.28,Slate:.82,Basalt:.9,Sandstone:.92,Metal:.32,SmoothPlastic:.5,Plastic:.6}[p.m]??.7;
+      mat=new THREE.MeshStandardMaterial({color:col(p.c),roughness:rough,metalness:p.m==='Metal'?.8:0,transparent:p.t>0,opacity:1-p.t});
+      if(p.m==='Metal'){mat.envMap=envTex;mat.envMapIntensity=.9}
+    }
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.s[0],p.s[1],p.s[2]));
+    mesh.castShadow=!neon&&p.t<.3;mesh.receiveShadow=!neon;s.add(mesh);
+    if(neon&&p.t<.95){const sz=Math.max(p.s[0],p.s[1],p.s[2]);if(sz<7)glow(s,p.p,p.c,Math.max(1.4,sz*3.2),.38*(1-p.t));}
+  }
+  for(const l of scene.lights||[]){
+    const pl=new THREE.PointLight(col(l.color),l.brightness*l.range*2.2,l.range*1.6,1.4);pl.position.set(...l.p);s.add(pl);
+    glow(s,l.p,l.color,l.range*.55,.22*Math.min(1.5,l.brightness));
+  }
+  let seed=11;const R=rnd(seed);
+  for(const e of scene.emitters||[]){
+    const pts=[];const cols=[];const c=col(e.color);
+    if(e.kind==='steady'){
+      const n=Math.min(80,Math.round(e.rate*e.life));
+      for(let i=0;i<n;i++){const u=R();pts.push(e.p[0]+(R()-.5)*e.size[0],e.p[1]+u*e.speed*e.life*.85,e.p[2]+(R()-.5)*e.size[2])}
+    }else{
+      for(let i=0;i<e.count;i++){const th=R()*Math.PI*2,ph=Math.acos(2*R()-1),r=(.3+R()*.7)*e.speed*e.life*.7;pts.push(e.p[0]+Math.sin(ph)*Math.cos(th)*r,e.p[1]+Math.cos(ph)*r,e.p[2]+Math.sin(ph)*Math.sin(th)*r)}
+    }
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+    s.add(new THREE.Points(g,new THREE.PointsMaterial({map:glowTex,color:c,size:e.kind==='burst'?.5:.42,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,sizeAttenuation:true})));
+  }
+  for(const g of scene.guis||[])s.add(guiSprite(g));
+  const cam=new THREE.PerspectiveCamera(v.fov,Wd/Ht,.2,2000);cam.position.copy(C);cam.lookAt(T);
+  renderer.render(s,cam);const url=renderer.domElement.toDataURL('image/png');
+  s.traverse(o=>{if(o.material){if(o.material.map&&o.material.map!==glowTex)o.material.map.dispose();o.material.dispose()}});return url;
+};
+window.ready=true;
+</script></body></html>

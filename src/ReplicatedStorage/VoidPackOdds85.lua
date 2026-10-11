@@ -1,6 +1,8 @@
 -- All regular obtainable Secret/Cosmic/King seeds, plus a nested normal Mech roll.
 -- A single server random ticket selects both branches without rerolling rewards.
+-- R147: the Verity seed (also a King) is never in the Void pack; the Verity pack gives it (VerityPackOdds).
 local Mech=require(script.Parent.MechCatalog)
+local Verity=require(script.Parent.VerityCatalog)
 local V={MechChance=.005,DirectChance=.995}
 local cache=setmetatable({},{__mode='k'})
 function V.Pools(config,rules)
@@ -8,7 +10,7 @@ function V.Pools(config,rules)
  local direct,all,seen={},{},{}
  for _,spec in ipairs(rules.SeedDesigns)do
   local seed=config.GetSeedById(spec.id);local rarity=rules.GetRarity(spec.id)
-  if seed and not Mech.Is(spec.id)and not rules.IsRetired(spec.id)and(rarity=='Secret'or rarity=='Cosmic'or rarity=='King')and not seen[seed.Id]then
+  if seed and not Mech.Is(spec.id)and not Verity.Is(spec.id)and not rules.IsRetired(spec.id)and(rarity=='Secret'or rarity=='Cosmic'or rarity=='King')and not seen[seed.Id]then
    seen[seed.Id]=true;table.insert(direct,seed);table.insert(all,seed)
   end
  end

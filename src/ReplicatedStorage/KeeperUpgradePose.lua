@@ -7,7 +7,14 @@ for stage,rig in pairs(Data)do
  pivots[stage]={};for name,p in pairs(rig.Pivots)do pivots[stage][name]=V(table.unpack(p))end
 end
 local function turn(p,x,y,z)return CF(p)*CFrame.Angles(x,y,z)*CF(-p)end
-function Pose.Frames(stage,t,awake,moving,phase,urgency,speed,turning)
+-- R152: variant 'R152' (the baked rev 6 model, KeeperRigConfig152) grounds with that model's feet; nil = today's.
+local floors={}
+local function floor(stage,rig,variant)
+ if variant~='R152'then return rig.FloorSamples end
+ local f=floors[stage];if not f then f=require(script.Parent.KeeperRigConfig152).Stages[stage].FloorSamples;floors[stage]=f end
+ return f
+end
+function Pose.Frames(stage,t,awake,moving,phase,urgency,speed,turning,variant)
  local rig=Data[stage];if not rig then return nil end
  local scale=rig.Scale or 1
  local a=math.clamp(awake,0,1);local blend=a*a*(3-2*a)
@@ -24,7 +31,7 @@ function Pose.Frames(stage,t,awake,moving,phase,urgency,speed,turning)
  end
  -- Ground only the actual feet; preserve torso weight and lifting recovery foot.
  local low=math.huge
- for group,samples in pairs(rig.FloorSamples)do
+ for group,samples in pairs(floor(stage,rig,variant))do
   for _,point in ipairs(samples)do low=math.min(low,(frames[group]*V(table.unpack(point))).Y)end
  end
  local lift=CF(0,-4-low,0)

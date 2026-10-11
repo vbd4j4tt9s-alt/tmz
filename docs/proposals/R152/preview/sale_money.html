@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Sale money</title>
+<style>
+ :root{color-scheme:dark}
+ body{margin:0;background:#10151c;font:12px/1.3 system-ui,sans-serif;color:#cfd8e3}
+ #stage{display:inline-block}
+ .scene{position:relative;overflow:hidden;background:linear-gradient(#6aa6d8 0%,#8cc4e8 38%,#6fb35a 38%,#4f8f3f 100%);border:1px solid #0006}
+ .shade{position:absolute;inset:0;background:rgba(10,14,20,.0)}
+ .row{position:absolute;border-radius:10px;background:rgba(14,18,26,.55)}
+ .amt{position:absolute;font:700 var(--fs) "Fredoka One","Fredoka",system-ui,sans-serif;color:var(--c);text-shadow:0 0 0 #000,1px 1px 0 #000,-1px 1px 0 #000,1px -1px 0 #000,-1px -1px 0 #000;white-space:nowrap}
+ .ico{position:absolute}
+ .bill{position:absolute;border-radius:12%;background:linear-gradient(#58c05a,#2c8a3b);border:2px solid #14602a;box-sizing:border-box;display:flex;align-items:center;justify-content:center;color:#d9ffc9;font-weight:800}
+ .bill:before{content:"";position:absolute;left:8%;right:8%;top:50%;height:22%;transform:translateY(-50%);background:#ffd94a;border-radius:3px;opacity:.9}
+ .gem{position:absolute;background:linear-gradient(135deg,#bff4ff,#4cc3ff 55%,#2c7be0);clip-path:polygon(50% 0,100% 36%,50% 100%,0 36%)}
+ .bolt{position:absolute;background:#fff;clip-path:polygon(55% 0,15% 55%,45% 55%,35% 100%,85% 42%,55% 42%)}
+ .total{position:absolute;transform:translate(-50%,-50%);font:700 var(--fs) "Fredoka One","Fredoka",system-ui,sans-serif;color:#ffd94a;white-space:nowrap;text-shadow:1px 1px 0 #3a2a00,-1px 1px 0 #3a2a00,1px -1px 0 #3a2a00,-1px -1px 0 #3a2a00}
+ .cap{position:absolute;right:6px;bottom:4px;font:600 11px system-ui;color:#fff;background:#0007;padding:1px 6px;border-radius:6px}
+ .cell{display:inline-block;margin:3px;vertical-align:top}
+ h3{margin:10px 6px 2px;font-size:13px;color:#e9eef5}
+</style></head><body>
+<div id="stage"></div>
+<script>
+ function scene(f,k,caption){
+  const d=f.data,w=d.w*k,h=d.h*k;const s=document.createElement('div');s.className='scene';s.style.width=w+'px';s.style.height=h+'px';
+  const fs=Math.max(8,d.boxes.Cash.h*.62*k);
+  const kinds={Speed:{c:'#fff',v:'123K'},Cash:{c:'#72ff39',v:d.cash},Gems:{c:'#73deff',v:d.gems}};
+  for(const key of ['Speed','Cash','Gems']){
+   const b=d.boxes[key];const r=document.createElement('div');r.className='row';r.style.cssText=`left:${b.x*k}px;top:${b.y*k}px;width:${b.w*k}px;height:${b.h*k}px`;s.appendChild(r);
+   const bump=key==='Cash'?d.bumpCash:key==='Gems'?d.bumpGems:0;const sc=1+.13*bump;
+   const ic=document.createElement('div');ic.className=key==='Cash'?'bill':key==='Gems'?'gem':'bolt';
+   const cx=(b.x+b.ix+b.iw/2)*k,cy=(b.y+b.iy+b.ih/2)*k,iw=b.iw*k*sc,ih=b.ih*k*sc;
+   ic.style.cssText=`left:${cx-iw/2}px;top:${cy-ih/2}px;width:${iw}px;height:${ih}px`;if(key==='Cash'){ic.style.transform='rotate(-12deg)';ic.style.width=iw*.9+'px';ic.style.height=ih*.62+'px';ic.style.top=cy-ih*.31+'px'}
+   s.appendChild(ic);
+   const a=document.createElement('div');a.className='amt';a.style.setProperty('--fs',fs+'px');a.style.setProperty('--c',kinds[key].c);
+   a.style.left=(b.x+b.ix+b.iw+6)*k+'px';a.style.top=(b.y+b.h/2)*k-fs*.62+'px';a.textContent=key==='Speed'?'':kinds[key].v;if(key==='Cash'||key==='Gems')a.style.transform=`scale(${1+.25*(bump>0?bump:0)})`;a.style.transformOrigin='left center';s.appendChild(a);
+  }
+  for(const l of d.labels){const t=document.createElement('div');t.className='total';t.style.setProperty('--fs',26*k+'px');t.style.left=l.x*k+'px';t.style.top=l.y*k+'px';t.style.opacity=l.a;t.textContent=l.t;s.appendChild(t)}
+  for(const c of d.coins){
+   const e=document.createElement('div');const sz=c.s*k;e.className=c.c==='Gems'?'gem':'bill';
+   e.style.left=(c.x*k-sz/2)+'px';e.style.top=(c.y*k-(c.c==='Gems'?sz/2:sz*.31))+'px';e.style.width=sz+'px';e.style.height=(c.c==='Gems'?sz:sz*.62)+'px';e.style.transform=`rotate(${c.r}deg)`;if(c.c!=='Gems')e.textContent='$';
+   s.appendChild(e)}
+  if(caption){const cp=document.createElement('div');cp.className='cap';cp.textContent=caption;s.appendChild(cp)}
+  return s;
+ }
+ window.show=function(f,k,caption){const st=document.getElementById('stage');st.innerHTML='';st.appendChild(scene(f,k,caption));return true};
+ window.strip=function(frames,k,captions){const st=document.getElementById('stage');st.innerHTML='';frames.forEach((f,i)=>{const c=document.createElement('div');c.className='cell';c.appendChild(scene(f,k,captions[i]));st.appendChild(c)});return true};
+ window.__ready=true;
+</script></body></html>

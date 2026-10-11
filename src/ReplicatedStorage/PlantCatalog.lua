@@ -129,9 +129,17 @@ for _,id in ipairs({'SunflowerBloomSeed','WinterPineSeed','LavaLotusSeed','DateP
  local d=Catalog[id];d.Regrows=false;d.SingleHarvestBonus=4;d.Value*=4
 end
 require(game:GetService('ReplicatedStorage'):WaitForChild('MechCatalog')).ApplyPlants(Catalog)
+require(game:GetService('ReplicatedStorage'):WaitForChild('VerityCatalog')).ApplyPlants(Catalog) -- R147: before the SeedValues loop
 for id,value in pairs(require(script.Parent.BalanceValues81).SeedValues)do
  local plant=assert(Catalog[id],'Missing approved seed '..id);plant.Value=value;if plant.Regrows==false then plant.SingleHarvestBonus=6 end
 end
 for id,seconds in pairs(require(script.Parent.EconomyBalance90).RegrowSeconds)do Catalog[id].RegrowSeconds=seconds end
+-- R125: slower growth above Uncommon (up to 4 h for King); Forest, Common, Uncommon and Mech plants unchanged.
+require(script.Parent.GrowthPace125).Apply(Catalog)
+-- R148 (owner): the Aloe and the Sand Fruit palm are new, Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary. Their
+-- numbers are final as written and applied AFTER the pacing (the order is what keeps the pacing off them: it overwrites Fire Pepper's and
+-- Moon Melon's paced time / regrow / value, and the two new plants never go through it; pacing them would re-spread every Rare / Legendary /
+-- Mythic plant's time and value). Roster149.ApplyPlants also gives Fire Pepper its x2 metadata.
+require(script.Parent.Roster149).ApplyPlants(Catalog)
 return Catalog
 

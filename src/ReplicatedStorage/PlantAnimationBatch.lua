@@ -22,10 +22,11 @@ function Batch:Flush()
  table.clear(self.Parts);table.clear(self.Frames);table.clear(self.Index);self.Requested=0
  return count,requested
 end
-function Batch.Capture(model,origin)
+-- R149: `skip` (optional, a set of parts) leaves out the parts another system poses (a growing plant's parts, which PlantGrowth.Place moves).
+function Batch.Capture(model,origin,skip)
  local parts={}
  for _,part in ipairs(model:GetDescendants())do
-  if part:IsA('BasePart')and part.Name~='Effect anchor'and not part:FindFirstAncestor('ApprovedFruitEffects')then
+  if part:IsA('BasePart')and part.Name~='Effect anchor'and not(skip and skip[part])and not part:FindFirstAncestor('ApprovedFruitEffects')then
    table.insert(parts,{Part=part,Frame=origin:ToObjectSpace(part.CFrame)})
   end
  end

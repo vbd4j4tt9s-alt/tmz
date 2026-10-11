@@ -1,0 +1,207 @@
+# R158 bat hit mock: TODAY (real BatHitbox, one check at request+Windup on server copies) vs PROPOSED (BatLagComp158)
+swings per cell: 1500; victim ping 120 ms; client interpolation delay Bc = 0.10 s (the proposal assumes 0.10)
+
+## crossing: victim runs across in front of a standing swinger
+| speed (studs/s) | ping 60 ms: counted today / proposed | ping 120 ms: counted today / proposed | ping 200 ms: counted today / proposed | ping 300 ms: counted today / proposed |
+|---|---|---|---|---|
+| 24 | 83% / 100% | 78% / 100% | 77% / 100% | 67% / 100% |
+| 60 | 57% / 100% | 52% / 100% | 34% / 100% | 15% / 100% |
+| 141 | 7% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 226 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 363 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 500 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 575 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+
+ghost hits (server hit, screen showed a miss), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 12% / 0% | 22% / 0% | 31% / 0% | 31% / 0% |
+| 60 | 46% / 0% | 50% / 0% | 66% / 0% | 85% / 0% |
+| 141 | 93% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 226 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 363 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 500 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 575 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+
+click window (ms during which a click lands a hit), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 650 / 1147 | 678 / 1183 | 671 / 1073 | 655 / 1151 |
+| 60 | 286 / 535 | 260 / 509 | 255 / 485 | 254 / 521 |
+| 141 | 113 / 300 | 117 / 258 | 103 / 287 | 115 / 296 |
+| 226 | 71 / 192 | 64 / 209 | 69 / 227 | 57 / 209 |
+| 363 | 48 / 187 | 47 / 182 | 52 / 179 | 47 / 183 |
+| 500 | 25 / 151 | 29 / 154 | 33 / 162 | 31 / 149 |
+| 575 | 36 / 166 | 33 / 128 | 25 / 160 | 28 / 143 |
+
+## head-on: victim runs straight at a standing swinger (passes 0-6 studs to the side)
+| speed (studs/s) | ping 60 ms: counted today / proposed | ping 120 ms: counted today / proposed | ping 200 ms: counted today / proposed | ping 300 ms: counted today / proposed |
+|---|---|---|---|---|
+| 24 | 82% / 100% | 78% / 100% | 73% / 100% | 60% / 100% |
+| 60 | 52% / 100% | 39% / 100% | 24% / 100% | 4% / 100% |
+| 141 | 6% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 226 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 363 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 500 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 575 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+
+ghost hits (server hit, screen showed a miss), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 21% / 0% | 27% / 0% | 26% / 0% | 44% / 0% |
+| 60 | 46% / 0% | 58% / 0% | 76% / 0% | 95% / 0% |
+| 141 | 94% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 226 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 363 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 500 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 575 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+
+click window (ms during which a click lands a hit), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 581 / 705 | 595 / 738 | 569 / 714 | 600 / 705 |
+| 60 | 215 / 367 | 202 / 376 | 221 / 358 | 230 / 380 |
+| 141 | 108 / 230 | 94 / 246 | 91 / 242 | 114 / 227 |
+| 226 | 62 / 162 | 49 / 207 | 63 / 192 | 59 / 172 |
+| 363 | 33 / 159 | 41 / 158 | 46 / 155 | 40 / 157 |
+| 500 | 22 / 188 | 35 / 163 | 33 / 126 | 23 / 143 |
+| 575 | 19 / 158 | 28 / 166 | 32 / 144 | 22 / 134 |
+
+## drive-by: swinger runs past a standing victim (0-6 studs to the side)
+| speed (studs/s) | ping 60 ms: counted today / proposed | ping 120 ms: counted today / proposed | ping 200 ms: counted today / proposed | ping 300 ms: counted today / proposed |
+|---|---|---|---|---|
+| 24 | 89% / 100% | 86% / 100% | 79% / 100% | 62% / 100% |
+| 60 | 75% / 100% | 64% / 100% | 47% / 100% | 29% / 100% |
+| 141 | 45% / 100% | 16% / 100% | 0% / 100% | 0% / 100% |
+| 226 | 7% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 363 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 500 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 575 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+
+ghost hits (server hit, screen showed a miss), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 14% / 0% | 11% / 0% | 22% / 0% | 31% / 0% |
+| 60 | 33% / 0% | 40% / 0% | 46% / 0% | 73% / 0% |
+| 141 | 57% / 0% | 85% / 0% | 100% / 0% | 100% / 0% |
+| 226 | 94% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 363 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 500 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 575 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+
+click window (ms during which a click lands a hit), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 540 / 702 | 600 / 817 | 559 / 753 | 578 / 760 |
+| 60 | 210 / 339 | 244 / 420 | 240 / 394 | 249 / 380 |
+| 141 | 94 / 216 | 110 / 237 | 91 / 231 | 95 / 223 |
+| 226 | 61 / 194 | 60 / 184 | 53 / 169 | 70 / 182 |
+| 363 | 35 / 156 | 44 / 180 | 41 / 169 | 35 / 154 |
+| 500 | 20 / 139 | 22 / 139 | 27 / 139 | 30 / 159 |
+| 575 | 13 / 126 | 20 / 144 | 30 / 145 | 23 / 135 |
+
+## both-head-on: both run at each other at that speed
+| speed (studs/s) | ping 60 ms: counted today / proposed | ping 120 ms: counted today / proposed | ping 200 ms: counted today / proposed | ping 300 ms: counted today / proposed |
+|---|---|---|---|---|
+| 24 | 94% / 100% | 87% / 100% | 93% / 100% | 91% / 100% |
+| 60 | 82% / 100% | 81% / 100% | 79% / 100% | 72% / 100% |
+| 141 | 48% / 100% | 45% / 100% | 61% / 100% | 56% / 100% |
+| 226 | 21% / 100% | 28% / 100% | 29% / 100% | 29% / 100% |
+| 363 | 5% / 100% | 13% / 100% | 7% / 100% | 13% / 100% |
+| 500 | 14% / 100% | 0% / 100% | 0% / 100% | 18% / 100% |
+| 575 | 6% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+
+ghost hits (server hit, screen showed a miss), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 6% / 0% | 9% / 0% | 13% / 0% | 11% / 0% |
+| 60 | 23% / 0% | 17% / 0% | 26% / 0% | 22% / 0% |
+| 141 | 45% / 0% | 49% / 0% | 55% / 0% | 40% / 0% |
+| 226 | 77% / 0% | 73% / 0% | 69% / 0% | 72% / 0% |
+| 363 | 94% / 0% | 89% / 0% | 92% / 0% | 90% / 0% |
+| 500 | 92% / 0% | 100% / 0% | 100% / 0% | 88% / 0% |
+| 575 | 86% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+
+click window (ms during which a click lands a hit), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 291 / 452 | 291 / 439 | 290 / 422 | 239 / 408 |
+| 60 | 134 / 263 | 119 / 275 | 125 / 240 | 118 / 239 |
+| 141 | 49 / 167 | 50 / 186 | 49 / 196 | 50 / 161 |
+| 226 | 28 / 148 | 28 / 179 | 31 / 162 | 39 / 151 |
+| 363 | 18 / 143 | 20 / 150 | 13 / 158 | 21 / 133 |
+| 500 | 12 / 133 | 17 / 141 | 9 / 127 | 17 / 124 |
+| 575 | 7 / 134 | 15 / 126 | 12 / 121 | 10 / 142 |
+
+## chase: swinger chases the victim at the same speed (any gap)
+| speed (studs/s) | ping 60 ms: counted today / proposed | ping 120 ms: counted today / proposed | ping 200 ms: counted today / proposed | ping 300 ms: counted today / proposed |
+|---|---|---|---|---|
+| 24 | 68% / 100% | 61% / 100% | 47% / 100% | 33% / 100% |
+| 60 | 34% / 100% | 7% / 100% | 0% / 100% | 0% / 100% |
+| 141 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 226 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 363 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 500 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+| 575 | 0% / 100% | 0% / 100% | 0% / 100% | 0% / 100% |
+
+ghost hits (server hit, screen showed a miss), today / proposed:
+| speed | ping 60 ms | ping 120 ms | ping 200 ms | ping 300 ms |
+|---|---|---|---|---|
+| 24 | 29% / 0% | 38% / 0% | 53% / 0% | 66% / 0% |
+| 60 | 68% / 0% | 93% / 0% | 100% / 0% | 100% / 0% |
+| 141 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 226 | 100% / 0% | 100% / 0% | 100% / 0% | 100% / 0% |
+| 363 | 100% / 0% | 100% / 0% | 100% / 0% | - / 0% |
+| 500 | 100% / 0% | 100% / 0% | 100% / 0% | - / 0% |
+| 575 | 100% / 0% | 100% / 0% | 100% / 0% | - / 0% |
+
+## sensitivity: the real client interpolation delay is not the assumed 0.10 s (ping 120 ms), counted today / proposed
+| scenario | speed | Bc 0.05 s | Bc 0.10 s | Bc 0.15 s |
+|---|---|---|---|---|
+| crossing | 141 | 22% / 100% | 0% / 100% | 0% / 100% |
+| crossing | 363 | 0% / 100% | 0% / 100% | 0% / 100% |
+| crossing | 575 | 0% / 96% | 0% / 100% | 0% / 100% |
+| chase | 141 | 0% / 98% | 0% / 100% | 0% / 100% |
+| chase | 363 | 0% / 96% | 0% / 100% | 0% / 100% |
+| chase | 575 | 0% / 91% | 0% / 100% | 0% / 100% |
+| both-head-on | 141 | 92% / 100% | 38% / 100% | 7% / 100% |
+| both-head-on | 363 | 67% / 100% | 8% / 100% | 0% / 100% |
+| both-head-on | 575 | 25% / 96% | 6% / 100% | 0% / 100% |
+
+## fairness: real distance between the players when the hit lands (90% of hits are closer), ping 120 ms, today / proposed (studs)
+| scenario | 24 | 60 | 141 | 226 | 363 | 500 | 575 |
+|---|---|---|---|---|---|---|---|
+| crossing | 11 / 18 | 13 / 27 | 17 / 49 | 25 / 73 | 33 / 109 | 46 / 147 | 52 / 168 |
+| head-on | 11 / 8 | 8 / 17 | 10 / 41 | 17 / 63 | 29 / 102 | 40 / 137 | 46 / 160 |
+| drive-by | 12 / 12 | 8 / 10 | 10 / 9 | 19 / 14 | 30 / 21 | 39 / 30 | 43 / 34 |
+| both-head-on | 9 / 9 | 8 / 22 | 20 / 48 | 35 / 76 | 60 / 122 | 73 / 172 | 89 / 202 |
+| chase | 13 / 17 | 14 / 25 | 14 / 43 | 14 / 62 | 16 / 92 | 20 / 121 | 17 / 138 |
+
+## the rewind cap: counted (proposed) and the real distance when the hit lands (90%), swinger first (MaxRewind 0.30 s) vs runner first (0.12 s)
+| scenario | speed | ping | swinger first: counted, real distance | runner first: counted, real distance |
+|---|---|---|---|---|
+| crossing | 141 | 120 ms | 100%, 50 studs | 100%, 48 studs |
+| crossing | 141 | 300 ms | 100%, 75 studs | 96%, 73 studs |
+| crossing | 141 | 450 ms | 100%, 96 studs | 69%, 84 studs |
+| crossing | 363 | 120 ms | 100%, 111 studs | 100%, 107 studs |
+| crossing | 363 | 300 ms | 100%, 173 studs | 91%, 171 studs |
+| crossing | 363 | 450 ms | 100%, 231 studs | 0%, - studs |
+| crossing | 575 | 120 ms | 100%, 170 studs | 100%, 166 studs |
+| crossing | 575 | 300 ms | 100%, 271 studs | 88%, 263 studs |
+| crossing | 575 | 450 ms | 100%, 357 studs | 0%, - studs |
+| chase | 141 | 120 ms | 100%, 43 studs | 100%, 43 studs |
+| chase | 141 | 300 ms | 100%, 56 studs | 68%, 52 studs |
+| chase | 141 | 450 ms | 100%, 66 studs | 9%, 53 studs |
+| chase | 363 | 120 ms | 100%, 92 studs | 100%, 91 studs |
+| chase | 363 | 300 ms | 100%, 124 studs | 22%, 117 studs |
+| chase | 363 | 450 ms | 100%, 152 studs | 0%, - studs |
+| chase | 575 | 120 ms | 100%, 139 studs | 100%, 138 studs |
+| chase | 575 | 300 ms | 100%, 190 studs | 1%, 178 studs |
+| chase | 575 | 450 ms | 100%, 233 studs | 0%, - studs |
+
+## proposed: why the server refused a screen hit (count over every cell above)
+- crossing: out of reach 429
+- head-on: none
+- drive-by: none
+- both-head-on: out of reach 5
+- chase: out of reach 678

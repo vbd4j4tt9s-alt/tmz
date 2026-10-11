@@ -31,14 +31,18 @@ function Style.Key(id,crop)
  if id~='EmberEmperorSeed'and id~='StormSovereignSeed'and id~='PrismMonarchSeed'then return ''end
  return ':'..tostring(crop and(crop.SourceCropId or crop.Id)or'preview')
 end
-function Style.Apply(id,def,source,crop)
+-- `skipped` (R151, optional): the positions of art-list parts that were removed from the source (the shine patches); the parts after them keep the
+-- position-based tints they had, so removing a patch changes nothing else about the plant.
+function Style.Apply(id,def,source,crop,skipped)
  local seed=137;local identity=tostring(crop and(crop.SourceCropId or crop.Id)or'preview')
  for i=1,#identity do seed=(seed*33+identity:byte(i))%2147483647 end
  -- Avalanche neighbouring saved IDs so their crack paths differ visibly.
  for _=1,4 do seed=(seed*48271)%2147483647 end
  local function rand(salt)return ((seed%65521)*salt+7919)%65521/65520 end
  local result={};local palette=palettes[id];local spots=0;local crest;local infusions={};local grains=0
- for i,original in ipairs(source)do
+ local shift=0
+ for position,original in ipairs(source)do
+  local i=position+shift;while skipped and skipped[i]do shift+=1;i+=1 end
   local s=table.clone(original);s.k=table.clone(s.k);local name=string.lower(s.f or '')
   local leaf=s.r=='Leaf'or s.r=='Canopy'or name:find('canopy')or name:find('crown')or name:find('leaf')or name:find('frond')
   local bark=def.Tree and s.g==0 and(s.r=='Stem'or name:find('trunk')or name:find('bark')or name:find('branch'))

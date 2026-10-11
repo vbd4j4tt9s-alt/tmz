@@ -1,0 +1,59 @@
+# R155 installer split (2 parts). Part 1 tree = the R154 release tree + these files at the release commit + their MANIFEST rows (filtered from the release MANIFEST) + Config.Version 'V150 R155p1'.
+# Nothing in the part 1 tree requires these modules yet, so they are inert until part 2. Part 2 = the release tree.
+# Local tree commit: part1 b01c360 (base 8aa15fd = R154 release), built in a worktree at it with --base 8aa15fd; part 2 is built in the release tree with --base b01c360.
+# The single-file build (~356 KB) is over the owner's ~324,000-character paste limit, hence the split.
+## part 1
+src/ReplicatedStorage/DiscardDialog155.lua
+src/ReplicatedStorage/InventoryPanel155.lua
+src/ReplicatedStorage/InventoryStacks155.lua
+src/ReplicatedStorage/ItemTooltip155.lua
+src/ReplicatedStorage/PackPity155.lua
+src/ReplicatedStorage/PityBars155.lua
+src/ReplicatedStorage/RarePullCamera155.lua
+src/ServerScriptService/ChestChaseServer/InventoryCap155.lua
+src/ServerScriptService/ChestChaseServer/InventoryService155.lua
+src/ServerScriptService/ChestChaseServer/PackPityData155.lua
+## part 2 (the rest of the release, incl. Config.lua and the new LocalScript PityBarsClient155)
+src/ReplicatedStorage/BalanceValues81.lua
+src/ReplicatedStorage/CloverIcon153.lua
+src/ReplicatedStorage/GardenInventoryState.lua
+src/ReplicatedStorage/KeyboardTrack.lua
+src/ReplicatedStorage/MechCatalog.lua
+src/ReplicatedStorage/MechPackArt153.lua
+src/ReplicatedStorage/NotifyBadge151.lua
+src/ReplicatedStorage/PackLuck154.lua
+src/ReplicatedStorage/PackOdds112.lua
+src/ReplicatedStorage/PackOdds137.lua
+src/ReplicatedStorage/PremiumLayout.lua
+src/ReplicatedStorage/RarePullCard.lua
+src/ReplicatedStorage/RarePullCinematic.lua
+src/ReplicatedStorage/SeedPackRules.lua
+src/ReplicatedStorage/SeedPackVisuals.lua
+src/ReplicatedStorage/SpeedPopupStyle.lua
+src/ReplicatedStorage/StudioTestHelp.lua
+src/ReplicatedStorage/WorldStatusHud.lua
+src/ServerScriptService/ChestChaseServer/ChestService.lua
+src/ServerScriptService/ChestChaseServer/Config.lua
+src/ServerScriptService/ChestChaseServer/DailyProgress.lua
+src/ServerScriptService/ChestChaseServer/FruitGiftService.lua
+src/ServerScriptService/ChestChaseServer/HarvestToolService.lua
+src/ServerScriptService/ChestChaseServer/HubDisplayService.lua
+src/ServerScriptService/ChestChaseServer/OwnerPlayerCommands.lua
+src/ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua
+src/ServerScriptService/ChestChaseServer/PlayerDataService.lua
+src/ServerScriptService/ChestChaseServer/PremiumProgress.lua
+src/ServerScriptService/ChestChaseServer/PremiumService.lua
+src/ServerScriptService/ChestChaseServer/PurchaseAnnouncer.lua
+src/ServerScriptService/ChestChaseServer/RarePackTests.lua
+src/ServerScriptService/ChestChaseServer/SecurityGate.lua
+src/ServerScriptService/ChestChaseServer/StudioSeedCommands.lua
+src/ServerScriptService/ChestChaseServer/StudioTestCommands.lua
+src/ServerScriptService/ChestChaseServer/VoidGiveaway152.lua
+src/ServerScriptService/ChestChaseServerMain.server.lua
+src/StarterPlayer/StarterPlayerScripts/DailyRewardsClient.client.lua
+src/StarterPlayer/StarterPlayerScripts/GamePassClient.client.lua
+src/StarterPlayer/StarterPlayerScripts/Hotbar.client.lua
+src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua
+src/StarterPlayer/StarterPlayerScripts/PityBarsClient155.client.lua
+src/StarterPlayer/StarterPlayerScripts/SpeedGainPopup.client.lua
+src/StarterPlayer/StarterPlayerScripts/TreadmillBonusClient.client.lua

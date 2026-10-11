@@ -1,0 +1,59 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Z-fighting preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// R149 z-fighting close-ups: the parts around a view (Block / Wedge / Cylinder / Ball, plain lighting) with the detector's flagged
+// overlaps drawn on top (magenta: fixed in R149, orange: left for other files). The camera uses Roblox's 0.5-stud near plane, so
+// truly coplanar faces may also show WebGL's own z-fighting noise; the overlays mark every flagged spot either way.
+import * as THREE from 'three';
+const W=800,H=450;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.1;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(.5,24,16),cyl=new THREE.CylinderGeometry(.5,.5,1,36);cyl.rotateZ(-Math.PI/2);
+const ycyl=new THREE.CylinderGeometry(.5,.5,1,36);
+// Roblox wedge: full bottom, full back (+Z), slope from the front-bottom edge to the back-top edge.
+const wedge=(()=>{const g=new THREE.BufferGeometry();const P=[];const tri=(a,b,c)=>P.push(...a,...b,...c);
+  const A=[-.5,-.5,-.5],B=[-.5,-.5,.5],C=[-.5,.5,.5],D=[.5,-.5,-.5],E=[.5,-.5,.5],F=[.5,.5,.5];
+  tri(A,C,B);tri(D,E,F);tri(A,B,E);tri(A,E,D);tri(B,C,F);tri(B,F,E);tri(A,D,F);tri(A,F,C);
+  g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));g.computeVertexNormals();return g})();
+window.shoot=function(data,view){
+  const s=new THREE.Scene();s.background=new THREE.Color(0xa9d6f0);
+  s.add(new THREE.HemisphereLight(0xeef6ff,0x6f8f60,1.25));
+  const sun=new THREE.DirectionalLight(0xfff2dd,2.0);sun.position.set(60,110,-80);s.add(sun);
+  const fill=new THREE.DirectionalLight(0xdde8ff,.55);fill.position.set(-70,40,90);s.add(fill);
+  for(const p of data.parts){
+    let geo=box;
+    if(p.sh==='Wedge')geo=wedge;else if(p.sh==='Ball'||p.mesh==='Sphere')geo=sphere;else if(p.sh==='Cylinder')geo=cyl;else if(p.mesh==='Cylinder')geo=ycyl;
+    const neon=p.m==='Neon';const glass=p.m==='Glass'||p.m==='Ice';
+    const mat=neon?new THREE.MeshBasicMaterial({color:col(p.c).multiplyScalar(1.15)}):new THREE.MeshStandardMaterial({color:col(p.c),roughness:p.m==='Metal'?.45:.8,metalness:p.m==='Metal'?.35:0});
+    if(p.t>0.02||glass){mat.transparent=true;mat.opacity=Math.max(.15,1-p.t-(glass?.15:0));mat.depthWrite=p.t<.5}
+    const m=new THREE.Mesh(geo,mat);
+    const r=p.r;
+    m.matrixAutoUpdate=false;
+    m.matrix.set(r[0]*p.s[0],r[1]*p.s[1],r[2]*p.s[2],p.p[0],r[3]*p.s[0],r[4]*p.s[1],r[5]*p.s[2],p.p[1],r[6]*p.s[0],r[7]*p.s[1],r[8]*p.s[2],p.p[2],0,0,0,1);
+    s.add(m);
+  }
+  const over={ours:new THREE.MeshBasicMaterial({color:0xff1fd2,transparent:true,opacity:.78,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6,depthWrite:false}),
+              theirs:new THREE.MeshBasicMaterial({color:0xff9a1a,transparent:true,opacity:.78,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6,depthWrite:false})};
+  const line={ours:new THREE.LineBasicMaterial({color:0x8a0070}),theirs:new THREE.LineBasicMaterial({color:0x9a4a00})};
+  for(const q of data.polys){
+    const n=q.n;const lift=.02;
+    const pts=q.pts.map(v=>new THREE.Vector3(v[0]+n[0]*lift,v[1]+n[1]*lift,v[2]+n[2]*lift));
+    const g=new THREE.BufferGeometry();const P=[];
+    for(let i=1;i+1<pts.length;i++){P.push(pts[0].x,pts[0].y,pts[0].z,pts[i].x,pts[i].y,pts[i].z,pts[i+1].x,pts[i+1].y,pts[i+1].z)}
+    g.setAttribute('position',new THREE.Float32BufferAttribute(P,3));
+    s.add(new THREE.Mesh(g,over[q.kind]));
+    const lg=new THREE.BufferGeometry().setFromPoints([...pts,pts[0]]);s.add(new THREE.Line(lg,line[q.kind]));
+  }
+  const cam=new THREE.PerspectiveCamera(view.fov,W/H,.5,4000);
+  cam.position.set(...view.cam);cam.lookAt(new THREE.Vector3(...view.at));
+  renderer.render(s,cam);
+  const url=renderer.domElement.toDataURL('image/png');
+  s.traverse(o=>{if(o.isMesh&&o.material&&!Object.values(over).includes(o.material))o.material.dispose()});
+  return url;
+};
+window.ready=true;
+</script></body></html>

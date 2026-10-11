@@ -9,6 +9,10 @@ local function queue(fn)
   running=false
  end)
 end
+-- R153 perf (lag audit D2): an icon's fallback strips (one Frame + UIGradient per pixel strip, ~400 instances an icon) are only in its holder while
+-- no image of it is shown: they go when the image shows and come back (a clone of the kind's one template) if the image is ever unloaded again.
+-- Until an image has loaded they are drawn exactly as before; without image APIs they never go.
+local rootEntry=setmetatable({},{__mode='k'})
 local function refresh(root)
  local fallback=root:FindFirstChild('SmoothFallback')
  local generated=root:FindFirstChild('Artwork');local uploaded=root:FindFirstChild('UploadedArtwork')
@@ -16,7 +20,9 @@ local function refresh(root)
  local useGenerated=not useUpload and generated and generated.IsLoaded
  if uploaded then uploaded.Visible=useUpload==true end
  if generated then generated.Visible=useGenerated==true end
- if fallback then fallback.Visible=not(useUpload or useGenerated)end
+ if useUpload or useGenerated then if fallback then fallback:Destroy()end
+ elseif fallback then fallback.Visible=true
+ else local e=rootEntry[root];if e and e.Template and root.Parent then e.Template:Clone().Parent=root end end
 end
 local function watchImage(root,image)
  local loaded,destroyed
@@ -47,7 +53,7 @@ local function draw(entry,kind,data)
   local g=Instance.new('UIGradient');g.Color=ColorSequence.new(c);g.Transparency=NumberSequence.new(t);g.Parent=p;p.Parent=f
  end
  entry.Template=f
- for root in pairs(entry.Roots)do if root.Parent and not root:FindFirstChild('SmoothFallback')then f:Clone().Parent=root;refresh(root)end end
+ for root in pairs(entry.Roots)do if root.Parent and not root:FindFirstChild('SmoothFallback')then refresh(root)end end -- (R153 perf: a holder whose image shows gets none)
 end
 local function load(entry,kind,data)
  if entry.Image then return end
@@ -76,7 +82,7 @@ function A.Attach(parent,kind,data,id)
  local root=Instance.new('Frame');root.Name='Generated'..kind;root.BackgroundTransparency=1;root.Size=UDim2.fromScale(1,1);root.Active=false;root.ClipsDescendants=true;root.Parent=parent
  local e=entries[kind]
  if not e then e={Kind=kind,Roots=setmetatable({},{__mode='k'}),Attempts=0};entries[kind]=e end
- e.Roots[root]=true
+ e.Roots[root]=true;rootEntry[root]=e
  -- Every prepared icon is visible immediately, even if image APIs never become available.
  if not e.Template then draw(e,kind,data)end
  if e.Template and not root:FindFirstChild('SmoothFallback')then e.Template:Clone().Parent=root end

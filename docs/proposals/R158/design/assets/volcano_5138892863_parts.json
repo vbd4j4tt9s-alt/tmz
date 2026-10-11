@@ -1,0 +1,48 @@
+[
+ {
+  "ref": 0,
+  "parent": -1,
+  "ClassName": "Model",
+  "Name": "Valcano"
+ },
+ {
+  "ref": 1,
+  "parent": 0,
+  "ClassName": "MeshPart",
+  "Name": "MeshPart",
+  "size": [
+   69.97479248046875,
+   52.653690338134766,
+   59.81602096557617
+  ],
+  "CFrame": {
+   "pos": [
+    -38.30560302734375,
+    30.32684326171875,
+    1238.612548828125
+   ],
+   "rot": [
+    1,
+    0,
+    0,
+    0,
+    1,
+    0,
+    0,
+    0,
+    1
+   ]
+  },
+  "Color3uint8": [
+   163,
+   162,
+   165
+  ],
+  "Material": 256,
+  "Transparency": 0.0,
+  "Anchored": false,
+  "CanCollide": true,
+  "MeshId": "rbxassetid://5138886694",
+  "TextureID": "http://www.roblox.com/asset/?id=5138888007"
+ }
+]

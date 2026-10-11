@@ -1,8 +1,14 @@
 -- Stable stage IDs; world distances are independent of saved progression.
 local R={Order={1,6,2,3,4,5,7},Start=-100,OldLengths={[1]=225,[6]=270,[2]=292.5,[3]=315,[4]=360,[5]=405,[7]=450},
  Lengths={[1]=180,[6]=450,[2]=650,[3]=850,[4]=1050,[5]=1300,[7]=1600},
- KeeperSpeeds={[1]={20,23,26},[6]={32,37,42},[2]={50,57,65},[3]={80,92,104},[4]={128,147,166},[5]={205,236,266},[7]={330,379,429}}, -- R112: close speed x1.6 per biome; mid x1.15, far x1.3
- EventSpeed=600,EventReturnSpeed=600,SpawnWeights={38,25,15,7,10,5}}
+ -- R158j (owner: "increase the forest and jungle speed according to the speed changes ... and all other keepers"): R158i gave everyone 20,000 more points at the start (walk 24 -> about 37.5).
+ -- Every keeper speed moved the same 20,000 points up the PointCurve on the live curve (BalanceValues81.PointCurve; below the old start, x37.46/24), so each keeper is exactly as hard for a new player as before
+ -- and its SPEED NEEDED sign shows the same number as before R158i. Was {20,23,26},{32,37,42},{50,57,65},{80,92,104}; Crystal and Storm move by less than 0.01 (20,000 points is nothing there).
+ KeeperSpeeds={[1]={31.21,35.9,37.54},[6]={38.11,40.51,45.51},[2]={53.51,57.48,65.48},[3]={80.48,92.06,104.06},[4]={128.06,147.03,166.01},[5]={205,236,266},[7]={330,379,429}}, -- R112: close speed x1.6 per biome; mid x1.15, far x1.3
+ EventSpeed=600,EventReturnSpeed=600,
+ -- R127 (owner): world pack spawns Legendary (Pack05) 3%, Mythic (Pack06) 1% (were 10 / 5); the other 96% keep the old
+ -- 38:25:15:7 shape. The scheduled floors (a Legendary every 5th refresh, a Mythic every 10th) are unchanged.
+ SpawnWeights={42.92,28.24,16.94,7.9,3,1}}
 R.OldStart={};R.NewStart={};local old,new=R.Start,R.Start
 for _,id in ipairs(R.Order)do R.OldStart[id]=old;R.NewStart[id]=new;old+=R.OldLengths[id];new+=R.Lengths[id]end
 R.OldEnd=old;R.End=new

@@ -28,17 +28,65 @@ function M.Stage(map,point,previous)
  end
  return 0
 end
-function M.Palette(stage,weather,low,refresh)
+-- R151 (owner: "make the other default weather cloudy where it just dims the lighting so that the lanterns around the map can create a warm
+-- ambience"): the Cloudy sky, the other half of the default weather (WeatherCycle151 alternates Clear <-> Cloudy). Like M.Dark it is a look any biome
+-- palette is blended toward by a level k (0..1), through the SAME mechanism as the rest (EnvironmentLighting writes the result; nothing else touches
+-- Lighting). It is only a dimmer, cooler, hazier day: no particles, no sun rays, bright enough to play (the keepers, the keyboard letters and the UI
+-- read as in a storm or better: Brightness 1.73 of 2.55 against the rain's 1.45 and the thunderstorm's 1.15). Numbers are scales / blends of the
+-- biome's own palette, so every biome keeps its mood (Forest greener, Desert warmer ...) just dimmer and greyer.
+M.CloudyLook={
+ Brightness=.68,                     -- x the palette's Lighting.Brightness (2.55 -> 1.73)
+ Exposure=-.135,                     -- added to ExposureCompensation (.015 -> -.12)
+ Ambient={C(104,118,148),.6},        -- Lighting.Ambient moves this share toward a cooler, dimmer grey-blue
+ OutdoorAmbient={C(136,152,184),.6},
+ Tint={C(226,235,250),.6},           -- ColorCorrection tint: cooler
+ Saturation=-.1,                     -- "slightly desaturated"
+ GradeBrightness=-.012,
+ Contrast=-.012,                     -- a flatter, softer light
+ AirColor={C(150,164,186),.75},      -- a darker, greyer sky (the Atmosphere is what colours the sky dome)
+ AirDecay={C(104,118,144),.75},
+ Density=.06,DensityMax=.3,          -- a gentle haze: denser, never more than .3
+ Haze=.55,
+ Bloom=1.15,                         -- the lamps' neon blooms a little more against the dimmer day
+ Clouds={Cover=.78,Density=.62,Color=C(172,178,192)}, -- the Terrain Clouds (WorldEvents): thicker, greyer (the storms: .86-.92 cover, dark grey)
+}
+-- Blend a palette (from Palette) toward the Cloudy look by k (0..1). k = 0 returns it untouched.
+function M.Overcast(out,k)
+ k=math.clamp(tonumber(k)or 0,0,1);if k<=0 then return out end
+ local L=M.CloudyLook
+ out.Light.Brightness*=1+(L.Brightness-1)*k
+ out.Light.ExposureCompensation+=L.Exposure*k
+ out.Light.Ambient=out.Light.Ambient:Lerp(L.Ambient[1],L.Ambient[2]*k)
+ out.Light.OutdoorAmbient=out.Light.OutdoorAmbient:Lerp(L.OutdoorAmbient[1],L.OutdoorAmbient[2]*k)
+ out.Grade.TintColor=out.Grade.TintColor:Lerp(L.Tint[1],L.Tint[2]*k)
+ out.Grade.Saturation+=L.Saturation*k;out.Grade.Brightness+=L.GradeBrightness*k;out.Grade.Contrast+=L.Contrast*k
+ out.Air.Color=out.Air.Color:Lerp(L.AirColor[1],L.AirColor[2]*k)
+ out.Air.Decay=out.Air.Decay:Lerp(L.AirDecay[1],L.AirDecay[2]*k)
+ out.Air.Density=math.max(out.Air.Density,math.min(L.DensityMax,out.Air.Density+L.Density*k))
+ out.Air.Haze+=L.Haze*k;out.Air.Glare*=1-k
+ out.Sun*=1-k
+ out.Bloom=(out.Bloom or 0)*(1+(L.Bloom-1)*k)
+ return out
+end
+-- cloud: the Cloudy level 0..1 (WeatherCycle151; the caller passes 0 while event weather is on, but event weather ignores it here too).
+function M.Palette(stage,weather,low,refresh,cloud)
  local p=M.Profiles[stage]or M.Profiles[0]
  local out={Light=table.clone(p.Light),Grade=table.clone(p.Grade),Air=table.clone(p.Air),Bloom=p.Bloom,Sun=.008}
+ local event=weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'
+ if not event and cloud and cloud>0 then M.Overcast(out,cloud)end
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
+  -- R129 (owner): a real overcast: the sky and the light go dark grey under the storm clouds (snow: pale grey).
   local snow=weather=='Blizzard';local storm=weather=='Thunderstorm'
-  out.Grade.TintColor=out.Grade.TintColor:Lerp(snow and C(235,245,255)or C(233,241,252),.35)
-  out.Grade.Saturation=snow and .015 or .025
-  out.Air.Color=out.Air.Color:Lerp(snow and C(226,239,253)or C(191,207,227),.40)
-  out.Air.Density=math.min(.22,out.Air.Density+(snow and .035 or .025))
-  out.Air.Haze=math.min(.85,out.Air.Haze+.12);out.Air.Glare=0;out.Sun=0
-  out.Light.Brightness=storm and 2.3 or 2.45
+  out.Grade.TintColor=out.Grade.TintColor:Lerp(snow and C(226,236,250)or C(200,210,228),.6)
+  out.Grade.Saturation=snow and -.08 or storm and -.2 or -.14;out.Grade.Brightness=snow and -.01 or storm and -.05 or -.03
+  out.Air.Color=out.Air.Color:Lerp(snow and C(196,206,220)or storm and C(66,72,88)or C(96,104,120),.8)
+  out.Air.Decay=out.Air.Decay:Lerp(snow and C(160,172,190)or storm and C(46,50,64)or C(70,78,94),.8)
+  out.Air.Density=math.min(.42,out.Air.Density+(snow and .16 or storm and .2 or .14))
+  out.Air.Haze=math.min(2.2,out.Air.Haze+(snow and .9 or .7));out.Air.Glare=0;out.Sun=0;out.Bloom=(out.Bloom or 0)*.5
+  out.Light.Brightness=snow and 1.9 or storm and 1.15 or 1.45
+  out.Light.ExposureCompensation=snow and -.05 or storm and -.35 or -.22
+  out.Light.Ambient=out.Light.Ambient:Lerp(snow and C(150,158,172)or C(92,98,112),.5)
+  out.Light.OutdoorAmbient=out.Light.OutdoorAmbient:Lerp(snow and C(170,178,192)or C(104,110,126),.5)
  end
  if stage==4 or stage==5 or stage==7 then out.Sun=0 end
  if low then out.Bloom=0;out.Sun=0;out.Air.Density*=.75;out.Air.Haze*=.5;out.Air.Glare=0 end
@@ -55,7 +103,13 @@ M.Audio={
  {Key='Wind',Name='BiomeWind',Id='3308152153',Attribute='WindAssetId'},
  {Key='Crystal',Name='BiomeCrystalHum',Id='9125719267',Attribute='CrystalAssetId'},
  {Key='Rumble',Name='BiomeLowRumble',Id='9120018695',Attribute='RumbleAssetId'},
+ -- R156 (owner): one looping ambience per event weather (see M.WeatherBeds); BiomeMood:SetAttribute('RainBedAssetId', id) etc. swaps one.
+ {Key='RainBed',Name='WeatherRainAmbience',Id='107960597100236',Attribute='RainBedAssetId'},
+ {Key='ThunderBed',Name='WeatherThunderAmbience',Id='137593145026034',Attribute='ThunderBedAssetId'},
+ {Key='BlizzardBed',Name='WeatherBlizzardAmbience',Id='87749574738390',Attribute='BlizzardBedAssetId'},
 }
+-- R156 (owner): the weather's own ambience, by GlobalWeather. Volume is the target (0..1, before the Ambience slider); louder / quieter = change it here.
+M.WeatherBeds={Rain={Key='RainBed',Volume=.3},Thunderstorm={Key='ThunderBed',Volume=.32},Blizzard={Key='BlizzardBed',Volume=.3}}
 function M.AudioId(row)
  local value=script:GetAttribute(row.Attribute)
  if value==nil then value=row.Id end
@@ -63,23 +117,43 @@ function M.AudioId(row)
  if not value or value%1~=0 or value<=0 or value>=9007199254740991 then return nil end
  return 'rbxassetid://'..string.format('%.0f',value)
 end
+-- R156 (owner: "for the track ambience ... increase the volume by a bit"): the track stages 1-7 are x1.25 (TRACK_GAIN: louder / quieter = change it); stage 0, the weather / refresh / chase rules and M.WeatherBeds are as they were.
+local TRACK_GAIN=1.25
 function M.SoundTargets(stage,weather,refresh,chase,alive)
- local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0}
+ local t={Birds=0,Leaves=0,Wind=0,Crystal=0,Rumble=0,RainBed=0,ThunderBed=0,BlizzardBed=0}
  if not alive then return t end
  if stage==0 then t.Birds=.018;t.Leaves=.022
- elseif stage==1 then t.Birds=.040;t.Leaves=.035
- elseif stage==6 then t.Birds=.033;t.Leaves=.045
- elseif stage==2 then t.Wind=.035
- elseif stage==3 then t.Wind=.045
- elseif stage==5 then t.Crystal=.008;t.Wind=.012
- elseif stage==4 then t.Rumble=.018;t.Wind=.016
- elseif stage==7 then t.Wind=.055;t.Rumble=.025 end
+ elseif stage==1 then t.Birds=.040*TRACK_GAIN;t.Leaves=.035*TRACK_GAIN
+ elseif stage==6 then t.Birds=.033*TRACK_GAIN;t.Leaves=.045*TRACK_GAIN
+ elseif stage==2 then t.Wind=.035*TRACK_GAIN
+ elseif stage==3 then t.Wind=.045*TRACK_GAIN
+ elseif stage==5 then t.Crystal=.008*TRACK_GAIN;t.Wind=.012*TRACK_GAIN
+ elseif stage==4 then t.Rumble=.018*TRACK_GAIN;t.Wind=.016*TRACK_GAIN
+ elseif stage==7 then t.Wind=.055*TRACK_GAIN;t.Rumble=.025*TRACK_GAIN end
  if weather=='Rain'or weather=='Thunderstorm'or weather=='Blizzard'then
   t.Birds*=.15;t.Leaves*=.65;t.Wind=math.max(t.Wind,weather=='Blizzard'and .055 or .040)
   if weather=='Thunderstorm'then t.Rumble=math.max(t.Rumble,.022)end
  end
+ local bed=stage==0 and M.WeatherBeds[weather] -- R156 (owner): base / hub only (the track has no weather); one bed, the weather's own
+ if bed then t[bed.Key]=bed.Volume end
  if refresh then t.Birds=0;t.Leaves*=.4;t.Wind=math.max(t.Wind,.018)end
  if chase then for key,value in pairs(t)do t[key]=value*.12 end end
  return t
+end
+-- R127 (owner): The Darkened's arrival turns the lights off. The air goes black a short way from the camera, so only
+-- nearby things can be seen and everything further away is black; no sun, dim ambient, drained colour.
+-- Blackout(palette,k) blends any biome palette toward it (k 0..1); k=0 returns the palette untouched.
+M.Dark={Light={Brightness=0,ExposureCompensation=-.35,Ambient=C(12,10,20),OutdoorAmbient=C(16,14,26),ColorShift_Top=C(0,0,0),ColorShift_Bottom=C(0,0,0)},
+ Air={Color=C(0,0,0),Decay=C(0,0,0),Density=.7,Offset=0,Haze=0,Glare=0},
+ Grade={TintColor=C(214,206,240),Brightness=-.04,Contrast=.1,Saturation=-.3}}
+function M.Blackout(out,k)
+ k=math.clamp(tonumber(k)or 0,0,1);if k<=0 then return out end
+ local function mix(dst,src)
+  if type(dst)~='table'then return end
+  for name,v in pairs(src)do local a=dst[name];if a~=nil then dst[name]=typeof(v)=='Color3'and a:Lerp(v,k)or a+(v-a)*k end end
+ end
+ mix(out.Light,M.Dark.Light);mix(out.Air,M.Dark.Air);mix(out.Grade,M.Dark.Grade)
+ out.Bloom=(out.Bloom or 0)*(1-k);out.Sun=(out.Sun or 0)*(1-k)
+ return out
 end
 return M

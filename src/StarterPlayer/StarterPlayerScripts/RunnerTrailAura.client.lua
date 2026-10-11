@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- R117: client trail auras (RunnerTrailAuraFx) for the local runner and a capped set of nearby on-screen runners.
 -- Follows the server's ChestChaseCosmetics folder (TrailId84/TrailLow84/TrailHigh84): new/changed/removed trails,
 -- respawns and leaving players are picked up by the scan. Budget: ClientFxBudget (FastMode = low), graphics level,
@@ -16,7 +17,9 @@ local function graphicsLevel()
  local ok,level=pcall(function()return UserSettings():GetService('UserGameSettings').SavedQualityLevel.Value end)
  return ok and level or nil
 end
-local heartbeat=RunService.Heartbeat:Connect(function(dt)
+-- R153 (owner: "fix all jittery type effects"): the step runs in RenderStepped (was Heartbeat), every rendered frame: the head pieces' orbits,
+-- the swirls and the colour shimmer move with the frame that is drawn.
+local render=RunService.RenderStepped:Connect(function(dt)
  scan+=dt
  if scan>=.25 then
   scan=0
@@ -25,4 +28,4 @@ local heartbeat=RunService.Heartbeat:Connect(function(dt)
  fx:Step(dt,os.clock())
 end)
 local removing=Players.PlayerRemoving:Connect(function(player)fx:Release(player)end)
-script.Destroying:Connect(function()heartbeat:Disconnect();removing:Disconnect();fx:Destroy()end)
+script.Destroying:Connect(function()render:Disconnect();removing:Disconnect();fx:Destroy()end)

@@ -3,12 +3,22 @@ local RS=game:GetService('ReplicatedStorage')
 local Catalog=require(RS:WaitForChild('GamePassCatalog'))
 local Growth=require(RS:WaitForChild('GrowthBoostRules'))
 local S={};S.__index=S
+-- R148: the "✅ Purchased: ...!" notice + PurchaseDone event. A missing or broken module only means no celebration.
+local function announcer(data)
+ local okay,made=pcall(function()return require(script.Parent.PurchaseAnnouncer).new(data)end)
+ if okay then return made end
+ warn('[R148] purchase feedback is unavailable: '..tostring(made));return nil
+end
 function S.new(data,bases,chests)
- local self=setmetatable({Data=data,Bases=bases,Chests=chests,Busy={}},S)
+ local self=setmetatable({Data=data,Bases=bases,Chests=chests,Busy={},Announcer=announcer(data)},S)
  data.PassOwnership=function(player,key)return self:Owns(player,key)end
  self.Connection=Marketplace.PromptGamePassPurchaseFinished:Connect(function(player,id,purchased)
   if purchased then for _,pass in ipairs(Catalog)do if Catalog.Id(pass)==id then
-   if player.Parent then player:SetAttribute(pass.Attribute,true);player:SetAttribute(pass.Key..'OwnershipReady',true)end
+   if player.Parent then
+    player:SetAttribute(pass.Attribute,true);player:SetAttribute(pass.Key..'OwnershipReady',true)
+    -- Roblox says this purchase went through (the event fires once per finished prompt).
+    if self.Announcer then self.Announcer:Announce(player,'Pass',pass.Key)end
+   end
    task.spawn(function()self:Refresh(player)end);break
   end end end
  end)

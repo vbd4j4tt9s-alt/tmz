@@ -5,7 +5,7 @@
 --     FastTravelService=<src>/ServerScriptService/ChestChaseServer/FastTravelService.lua \
 --     MovementGuard=<src>/ServerScriptService/ChestChaseServer/MovementGuard.lua \
 --     SecurityGate=<src>/ServerScriptService/ChestChaseServer/SecurityGate.lua \
---     HudLayout=<src>/ReplicatedStorage/HudLayout.lua VectorIcons91=<src>/ReplicatedStorage/VectorIcons91.lua \
+--     HudLayout=<src>/ReplicatedStorage/HudLayout.lua \
 --     TravelButtons=<src>/StarterPlayer/StarterPlayerScripts/TravelButtons.client.lua
 local R=require('./roblox');local B=require('./tp_bundle')
 local new,V3,CF=R.new,R.Vector3.new,R.CFrame.new
@@ -56,8 +56,11 @@ local motion=module(RS,'RunnerMotion',{Allowance=function(s,e)return s*e end,Bur
  Flat=function(v)return V3(v.X,0,v.Z)end,TravelAllowance=function(s,_,_,e)return s*e*1.2,s end})
 motion:SetAttribute('TrackBoundaryZ',-99.28);motion:SetAttribute('TrackCenterX',0);motion:SetAttribute('TrackHalfWidth',114)
 module(RS,'RunnerSweep',{Hull=function()return V3(2,5,1),V3()end,Cast=function(_,_,_,o)return o.Magnitude,false end})
-module(RS,'HudLayout',nil,'HudLayout');module(RS,'VectorIcons91',nil,'VectorIcons91')
+module(RS,'HudLayout',nil,'HudLayout') -- (R153 perf: VectorIcons91 was retired; TravelButtons never required it)
 module(RS,'GardenTextFit',{Attach=function()end})
+-- R150: TravelButtons plays a whoosh on arrival through LocalSfx (a recorder here) and the server marks its refusals kind 'Denied'.
+local whooshes={}
+module(RS,'LocalSfx',{WhooshId='rbxassetid://9120768742',Preload=function()end,Play=function(id,pos,vol,pitch)whooshes[#whooshes+1]={Id=id,Pos=pos,Vol=vol,Pitch=pitch};return true end})
 local brightButtons={}
 module(RS,'BrightUI',{Button=function(b,c)brightButtons[#brightButtons+1]=b;b.BackgroundColor3=c;local g=new('Frame');g.Name='GlassHighlight';g.BackgroundTransparency=.86;g.Parent=b end,Text=function(l,s)l.TextSize=s end})
 env=setmetatable({game=game,workspace=workspace,Instance=R.Instance,Vector3=R.Vector3,Vector2=R.Vector2,CFrame=R.CFrame,UDim=R.UDim,UDim2=R.UDim2,Color3=R.Color3,Enum=R.Enum,
@@ -65,7 +68,7 @@ env=setmetatable({game=game,workspace=workspace,Instance=R.Instance,Vector3=R.Ve
 -- Server ---------------------------------------------------------------------------------
 local line=new('Part');line.Name='BaseBoundaryLine';line.CFrame=CF(0,4.12,-99.28);line.Size=V3(180,.24,1)
 local mapRoot=new('Folder');mapRoot.Name='ChestChaseMap';mapRoot.Parent=workspace
-local notes={}
+local notes,kinds={},{}
 local busy,opening=false,false
 local base={Index=3,Spawn={CFrame=CF(-168,5.55,-358)}}
 local Bases={TrainingSessions={},GetPlayerBase=function()return base end,Map={MapRoot=mapRoot}}
@@ -76,7 +79,7 @@ local speedValue={Value=0}
 local Data={IsLoaded=function()return true end,GetOrCreateSpeedValue=function()return speedValue end}
 local Guard=req(folder.MovementGuard);Guard.Start(Config,Data,Bases)
 local FT=req(folder.FastTravelService)
-local service_=FT.new(Config,Map,Bases,Chase,{Show=function(_,p,msg)notes[#notes+1]=msg end})
+local service_=FT.new(Config,Map,Bases,Chase,{Show=function(_,p,msg,_,_,kind)notes[#notes+1]=msg;kinds[#notes]=kind end})
 service_:Start()
 local remotes=RS:FindFirstChild('ChestChaseRemotes')
 check(remotes and remotes:FindFirstChild('RequestBaseTeleport')and remotes:FindFirstChild('RequestTrackTeleport'),'both remotes exist')
@@ -110,7 +113,12 @@ check(trackButton.Position.X.Offset==baseButton.Size.X.Offset+8,'TRACK beside BA
 local function inside()local half=pair.Size.X.Offset/2;local x=pair.Position.X.Offset;local i=Gui.TopbarInset;return x-half>=i.Min.X and x+half<=i.Max.X end
 check(inside(),'pair stays between Roblox buttons (PC)')
 inset(60,0,330,44);gui.AbsoluteSize=R.Vector2.new(390,844);frames()
-check(pair.Position.X.Offset==195 and inside()and baseButton.Size.Y.Offset>=30,'phone: centred and fits')
+do -- R140: the DAILY / INVITE squares shared the row (the pair narrowed, the GROUP centred); R157: DAILY / INVITE are options of the menu wheel, so the row holds
+ -- BASE / TRACK alone: no squares, the pair centred on the screen and inside the free part of the row
+ local left=pair.Position.X.Offset-pair.Size.X.Offset/2;local right=left+pair.Size.X.Offset
+ check(gui:FindFirstChild('TopIcons')==nil and inside()and baseButton.Size.Y.Offset>=30 and baseButton.Size.X.Offset>=72 and left>=60+8 and right<=330-8
+  and math.abs(pair.Position.X.Offset-195)<=1,'phone: the pair (R157: alone, no DAILY / INVITE squares) is centred and fits')
+end
 inset(150,0,330,44);gui.AbsoluteSize=R.Vector2.new(390,844);frames()
 check(inside()and pair.Position.X.Offset==240,'screen centre too close to Roblox buttons: centres in the free row')
 inset(260,0,1180,58);gui.AbsoluteSize=R.Vector2.new(1280,720);frames()
@@ -130,6 +138,7 @@ check(near(look.Z,1)and near(look.X,0),'TRACK faces down the track (+Z)')
 check(#rays>0 and rays[#rays][1].Y<=line.Position.Y+8+1e-6,'ground ray starts low (no landing on arches)')
 check((player:GetAttribute('MovementResetSerial')or 0)>serialBefore,'MovementGuard reset after teleport')
 check(player:GetAttribute('FastTravelReadyAt')~=nil and player:GetAttribute('FastTravelCooldown')==4,'cooldown published')
+check(#whooshes==1 and whooshes[1].Id=='rbxassetid://9120768742' and whooshes[1].Pos==nil,'R150: arriving at TRACK plays one 2D whoosh (FastTravelReadyAt rose to a future time)')
 check(baseButton.Cooldown.Visible and trackButton.Cooldown.Visible,'cooldown shade shown')
 -- Anti-cheat stays quiet across the jump.
 local corrections=Guard.Corrections or 0
@@ -142,6 +151,7 @@ local z=root.CFrame.Position.Z
 baseButton.Activated:Fire()
 check(near(root.CFrame.Position.Z,z),'cooldown refuses BASE')
 check(notes[#notes]:match('^TELEPORT READY IN'),'cooldown notice: '..tostring(notes[#notes]))
+check(kinds[#notes]=='Denied' and #whooshes==1,'R150: the cooldown refusal is marked Denied (the client clicks it) and no arrival whoosh plays')
 for _=1,30 do tick(.11)end
 check(not baseButton.Cooldown.Visible,'cooldown shade cleared')
 -- BASE --------------------------------------------------------------------------------------
@@ -149,6 +159,7 @@ baseButton.Activated:Fire()
 p=root.CFrame.Position
 check(near(p.X,-168)and near(p.Y,9.55)and near(p.Z,-358),'BASE lands 4 studs above own spawn: '..tostring(p))
 check(notes[#notes]=='RETURNED TO BASE 3','BASE notice')
+check(kinds[#notes]==nil and #whooshes==2,'R150: the BASE success notice is not a refusal, and BASE has its arrival whoosh')
 for _=1,10 do tick(.11)end
 check((Guard.Corrections or 0)==corrections,'no MovementGuard correction after BASE teleport')
 -- Control: the same jump without a reset IS corrected (proves the guard is live in this mock).
@@ -160,14 +171,14 @@ local function refused(setup,undo,remote,expect,label)
  local before=root.CFrame.Position;setup()
  remotes[remote]:FireServer()
  check(root.CFrame.Position==before,label..' refused')
- if expect then check(notes[#notes]==expect,label..' notice: '..tostring(notes[#notes]))end
+ if expect then check(notes[#notes]==expect,label..' notice: '..tostring(notes[#notes]));check(kinds[#notes]=='Denied',label..' notice is marked Denied (R150)')end
  undo()
 end
 refused(function()busy=true end,function()busy=false end,'RequestTrackTeleport','FAST TRAVEL IS DISABLED WHILE CARRYING A SEED','carrying (chase busy) / tutorial run home')
 refused(function()player:SetAttribute('ChestChaseSeedCarrying',true)end,function()player:SetAttribute('ChestChaseSeedCarrying',nil)end,'RequestBaseTeleport','FAST TRAVEL IS DISABLED WHILE CARRYING A SEED','carrying attribute')
-refused(function()player:SetAttribute('GuardianRagdollActive',true)end,function()player:SetAttribute('GuardianRagdollActive',nil)end,'RequestBaseTeleport','WAIT UNTIL YOU CAN MOVE!','ragdoll')
-refused(function()player:SetAttribute('GuardianFlingActive',true)end,function()player:SetAttribute('GuardianFlingActive',nil)end,'RequestTrackTeleport','WAIT UNTIL YOU CAN MOVE!','fling')
-refused(function()Bases.TrainingSessions[player]={}end,function()Bases.TrainingSessions[player]=nil end,'RequestBaseTeleport','STEP OFF THE TREADMILL FIRST!','treadmill')
+refused(function()player:SetAttribute('GuardianRagdollActive',true)end,function()player:SetAttribute('GuardianRagdollActive',nil)end,'RequestBaseTeleport','WAIT TILL YOU CAN MOVE!','ragdoll')
+refused(function()player:SetAttribute('GuardianFlingActive',true)end,function()player:SetAttribute('GuardianFlingActive',nil)end,'RequestTrackTeleport','WAIT TILL YOU CAN MOVE!','fling')
+refused(function()Bases.TrainingSessions[player]={}end,function()Bases.TrainingSessions[player]=nil end,'RequestBaseTeleport','GET OFF THE TREADMILL FIRST!','treadmill')
 refused(function()opening=true end,function()opening=false end,'RequestBaseTeleport','FINISH OPENING YOUR PACK FIRST!','pack opening')
 refused(function()Map.Refreshing=true end,function()Map.Refreshing=false end,'RequestTrackTeleport','THE TRACK IS REFRESHING!','track refresh')
 refused(function()humanoid.Health=0 end,function()humanoid.Health=100 end,'RequestBaseTeleport',nil,'dead')

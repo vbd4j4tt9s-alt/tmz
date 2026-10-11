@@ -19,7 +19,7 @@ function Service.Sync(chests,player)
   end
  end end end
  if not shovel then
-  shovel=Instance.new('Tool');shovel.Name='Shovel';shovel.ToolTip='Remove a plant • Dig a hole on the track';shovel.CanBeDropped=false;shovel.RequiresHandle=true;shovel.ManualActivationOnly=true
+  shovel=Instance.new('Tool');shovel.Name='Shovel';shovel.ToolTip='Remove a plant • Dig holes on the track to trap players';shovel.CanBeDropped=false;shovel.RequiresHandle=true;shovel.ManualActivationOnly=true
   shovel:SetAttribute('GardenShovel',true);shovel:SetAttribute('InventoryKey','shovel');shovel:SetAttribute('ShovelAssetId',Shovel.AssetId)
   local h=handle(shovel);local appearance
   shovel.Equipped:Connect(function()if appearance then appearance:Destroy()end;appearance=Shovel.Build(shovel,h)end)
@@ -40,6 +40,8 @@ function Service.Install(Chests)
  local sync=Chests.SyncTools
  function Chests:SyncTools(player)
   sync(self,player);Service.Sync(self,player)
+  -- R155: the player's items are all here (the Hotbar puts each back on its saved slot until this, then treats what comes as new)
+  if player.Parent and self.PlayerData:IsLoaded(player)and player:GetAttribute('InventorySynced155')~=true then player:SetAttribute('InventorySynced155',true)end
   if not watchers[player]and player.Parent then
    local queued=false;watchers[player]=player:GetAttributeChangedSignal('GardenRevision'):Connect(function()
     if queued then return end;queued=true;task.defer(function()queued=false;if player.Parent then self:SyncTools(player)end end)

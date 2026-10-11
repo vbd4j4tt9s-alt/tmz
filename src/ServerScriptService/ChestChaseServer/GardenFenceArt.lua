@@ -1,5 +1,6 @@
 -- Static native geometry; all skins share the same boundary and open entrance.
 local Rules=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenFenceRules'))
+local Shadow=require(game:GetService('ReplicatedStorage'):WaitForChild('SmallShadow154')) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 local Players=game:GetService('Players')
 local thumbnails={}
 local A={};local V,CF=Vector3.new,CFrame.new;local RGB=Color3.fromRGB
@@ -13,7 +14,25 @@ local themes={
  {Body=RGB(47,60,77),Trim=RGB(116,145,161),Accent=RGB(117,219,246),Material=Enum.Material.Metal},
 }
 local function part(parent,name,size,cf,color,material,collide,class)
- local p=Instance.new(class or'Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=true;p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
+ local p=Instance.new(class or'Part');p.Name=name;p.Size=size;p.CFrame=cf;p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanCollide=false;p.CanTouch=false;p.CanQuery=false;p.CastShadow=Shadow.Keeps(size);p.TopSurface=Enum.SurfaceType.Smooth;p.BottomSurface=Enum.SurfaceType.Smooth;p.Parent=parent;return p
+end
+-- R131 (owner): the badges were a fixed 210x128 px drawn on top of everything, so from a distance one covered the
+-- garden under it and gardens in front of it. Now the size is in studs (11 x 7) plus a small pixel floor, so a badge
+-- shrinks with distance like the garden below it, and nearer things are drawn over it. With no avatar picture (Studio
+-- test players), only the name shows instead of a blank circle. Older badges are restyled when the owner updates.
+local BADGE_REVISION=131
+local function styleBadge(gui)
+ if gui:GetAttribute('BadgeRevision')==BADGE_REVISION then return end
+ gui:SetAttribute('BadgeRevision',BADGE_REVISION)
+ gui.Size=UDim2.new(11,34,7,22);gui.AlwaysOnTop=false
+ local portrait=gui:FindFirstChild('Portrait')
+ if portrait then
+  portrait.AnchorPoint=Vector2.new(.5,0);portrait.Position=UDim2.fromScale(.5,.02);portrait.Size=UDim2.fromScale(.6,.6)
+  local square=portrait:FindFirstChildOfClass('UIAspectRatioConstraint')or Instance.new('UIAspectRatioConstraint')
+  square.AspectRatio=1;square.DominantAxis=Enum.DominantAxis.Height;square.Parent=portrait
+  local outline=portrait:FindFirstChildOfClass('UIStroke');if outline then outline.Thickness=2 end
+ end
+ local name=gui:FindFirstChild('OwnerName');if name then name.Position=UDim2.fromScale(0,.64);name.Size=UDim2.fromScale(1,.34)end
 end
 -- R99: a fixed high landmark; exceptional plants never move the owner marker.
 local function ownerBadge(base,root,pad,front)
@@ -26,6 +45,7 @@ local function ownerBadge(base,root,pad,front)
  local name=Instance.new('TextLabel');name.Name='OwnerName';name.Position=UDim2.fromOffset(4,85);name.Size=UDim2.new(1,-8,0,38);name.BackgroundTransparency=1;name.Font=Enum.Font.FredokaOne;name.TextColor3=RGB(255,255,255);name.TextScaled=true;name.TextWrapped=false;name.RichText=false;name.TextTruncate=Enum.TextTruncate.AtEnd;name.Parent=gui
  local edge=Instance.new('UIStroke');edge.Thickness=2;edge.Color=RGB(24,29,36);edge.Parent=name
  local fit=Instance.new('UITextSizeConstraint');fit.MinTextSize=10;fit.MaxTextSize=28;fit.Parent=name
+ styleBadge(gui)
  return gui
 end
 function A.UpdateOwner(base,displayName)
@@ -33,7 +53,8 @@ function A.UpdateOwner(base,displayName)
  local root=base:FindFirstChild('GardenFence34');local gui=root and root:FindFirstChild('GardenOwnerBadge',true)
  if not gui then return end
  local name=base:GetAttribute('BaseOwnerDisplayName')or'';local id=base:GetAttribute('BaseOwnerUserId')or 0
- gui.Enabled=name~='';gui.OwnerName.Text=name
+ styleBadge(gui)
+ gui.Enabled=name~='';gui.OwnerName.Text=name;gui.Portrait.Visible=id>0;gui.OwnerName.Position=UDim2.fromScale(0,id>0 and .64 or .33)
  -- Names stay readable even while Roblox is preparing a new portrait.
  if gui:GetAttribute('PortraitUserId')==id then return end
  gui:SetAttribute('PortraitUserId',id)
@@ -61,9 +82,12 @@ function A.Build(base,level)
  local function p(name,size,frame,color,material,collide,class)return part(root,name,size,cf*frame,color or theme.Body,material or theme.Material,collide,class)end
  -- The soil keeps its saved footprint. Fence feet sit outside its trim on a grounded sill.
  local side=pad.Size.X/2+2;local back=-pad.Size.Z/2-2;local front=pad.Size.Z/2-2
- local depth=pad.Size.Y+.02;local footingY=(.02-pad.Size.Y)/2
+ -- R149: the sill stands .08 above the pad (was .02: the front sills lie on the pad and flickered against it).
+ local depth=pad.Size.Y+.08;local footingY=(.08-pad.Size.Y)/2
+ -- R154: the side sills stop at the front and back sills (they ran under them: Slate is a textured material, so the overlapping corners flickered
+ -- even in one colour); the sills' outline and collision are unchanged.
  for _,sign in ipairs({-1,1})do
-  p('Fence foundation',V(3.2,depth,front-back),CF(sign*side,footingY,(back+front)/2),theme.Body,Enum.Material.Slate,true)
+  p('Fence foundation',V(3.2,depth,front-back-3.8),CF(sign*side,footingY,(back+front)/2-.3),theme.Body,Enum.Material.Slate,true)
   p('Fence foundation',V(side-16+3.8,depth,4.4),CF(sign*(side+16-.6)/2,footingY,front),theme.Body,Enum.Material.Slate,true)
  end
  p('Fence foundation',V(side*2+3.2,depth,3.2),CF(0,footingY,back),theme.Body,Enum.Material.Slate,true)
@@ -90,7 +114,7 @@ function A.Build(base,level)
    if level==7 then
     p('Electric panel inset',V(length-3.5,1.3,.08),frame*CF(0,1.75,.61),RGB(31,46,59),Enum.Material.Metal)
     p('Electric light strip',V(length-4,.10,.09),frame*CF(0,2.1,.67),theme.Accent,Enum.Material.Neon)
-    p('Panel contact',V(.35,.8,.12),frame*CF(length*.22,1.75,.69),RGB(245,209,113),Enum.Material.Metal)
+    p('Panel contact',V(.35,.8,.12),frame*CF(length*.22,1.72,.69),RGB(245,209,113),Enum.Material.Metal) -- R149: 1.72 (its top was the light strip's top)
    elseif level==6 then p('Lava channel',V(length-3,.12,.09),frame*CF(0,1.2,.61),theme.Accent,Enum.Material.Neon)
    elseif level==5 then
     for _,x in ipairs({-.22,.22})do p('Crystal inset',V(.85,1.25,.14),frame*CF(length*x,1.75,.63)*CFrame.Angles(0,0,math.pi/4),theme.Accent,Enum.Material.Neon)end
@@ -103,7 +127,8 @@ function A.Build(base,level)
  for _,sign in ipairs({-1,1})do for i=1,#zs-1 do span(V(sign*side,0,zs[i]),V(sign*side,0,zs[i+1]))end end
  for i=0,5 do span(V(-side+i*side/3,0,back),V(-side+(i+1)*side/3,0,back))end
  for _,sign in ipairs({-1,1})do span(V(sign*side,0,front),V(sign*(side+16)/2,0,front));span(V(sign*(side+16)/2,0,front),V(sign*16,0,front))end
- -- The 32-stud opening has no arch, tall posts, beam, name board or roof.
+ -- The 32-stud opening itself stays clear (no posts, beam or roof inside it). R151 (owner approved): HubDecor151 stands a name arch
+ -- just outside it - two posts beside the opening and a beam 14 studs over the pad with the owner's name.
  ownerBadge(base,root,pad,front)
  -- Compact framed plaque mounted on the entrance's right fence span.
  local boardFrame=CF(35,5.6,front-1.3)*CFrame.Angles(math.rad(10),math.pi,0)

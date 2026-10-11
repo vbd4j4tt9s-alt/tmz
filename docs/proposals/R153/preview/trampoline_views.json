@@ -1,0 +1,13 @@
+{
+ "note": "Cameras for R153's before / after garden-nook previews (render_base_area.mjs of R151). pos / look are world studs (the track runs to +Z; hub floor top y = 4); fov is the vertical field of view; ortho = [centre x, centre z, half width, half height] (+Z up the image, -X to the right). avatars: [x, y (feet), z, yaw, shirt colour] (yaw 1.57 looks towards -X).",
+ "views": [
+  {"name": "nook_top", "title": "The Lava garden nook from above", "ortho": [-312, -269, 26, 14.625], "clip": [-345, -280, -295, -243], "shadowAt": [-312, 4, -269], "shadowExtent": 45,
+   "caption": "The plaza at the end of the Lava garden walk, straight down. BEFORE: a flower bed (cream rim, dark soil) in the middle and two teal benches on its edge. AFTER: the benches and the bed are gone; a round trampoline (red frame, ring of gold springs, teal mat, cream badge) stands in the middle with a 7-stud ring of paving all round."},
+  {"name": "nook", "title": "The nook from the garden walk", "fov": 50, "pos": [-266, 13, -260], "look": [-312, 5, -270], "shadowAt": [-312, 4, -269], "shadowExtent": 60, "avatars": [[-286, 4.2, -267, 1.57, 4245975]],
+   "caption": "From the garden walk. The trampoline is 0.9 studs high over the floor: a player walks onto it like onto a kerb, and each landing or step on it bounces them about 30 studs."},
+  {"name": "closeup", "title": "The trampoline up close", "fov": 40, "pos": [-299, 8.2, -259], "look": [-312, 5.2, -269], "shadowAt": [-312, 4, -269], "shadowExtent": 30, "avatars": [[-316, 4.9, -273.5, 0.8, 13775418]],
+   "caption": "Six stubby feet, a red frame (a 16-sided ring), 16 gold springs standing in a dark gap, the teal mat and a cream badge, in the hub's own colours."},
+  {"name": "bounce", "title": "A bounce", "fov": 62, "pos": [-280, 25, -250], "look": [-312, 19, -269], "shadowAt": [-312, 4, -269], "shadowExtent": 60, "avatars": [[-312, 34, -269, 1.57, 4245975], [-318, 4.9, -264, 0.5, 13775418]],
+   "caption": "The apex of a bounce: the feet rise 30 studs over the mat (a launch speed of 108.5 studs per second under the default gravity) - over the lamps and the trees, still under the 51-stud wall."}
+ ]
+}

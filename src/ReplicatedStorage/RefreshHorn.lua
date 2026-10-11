@@ -11,7 +11,7 @@ function H.New()
  function object:Stop()serial+=1;if tween then tween:Cancel();tween=nil end;sound:Stop()end
  function object:Play()
   if dead or not sound.IsLoaded then return false end
-  self:Stop();local token=serial;sound.Volume=.82;sound.TimePosition=tonumber(script:GetAttribute('StartTime'))or 0;sound:Play()
+  self:Stop();local token=serial;sound.Volume=.82;sound.TimePosition=tonumber(script:GetAttribute('StartTime'))or require(script.Parent.SoundTiming).Offset(sound);sound:Play() -- R150: StartTime still wins; otherwise the shared SoundTiming lead-in
   task.delay(2.1,function()
    if dead or token~=serial then return end
    tween=game:GetService('TweenService'):Create(sound,TweenInfo.new(.5),{Volume=0});tween:Play()

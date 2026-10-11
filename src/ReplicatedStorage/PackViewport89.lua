@@ -69,7 +69,7 @@ function A.Create(parent)
  view.Ambient=RGB(255,255,255);view.LightColor=Color3.new(1,1,1);view.LightDirection=Vector3.new(-.4,-.5,1);view.Parent=parent
  local world=Instance.new('WorldModel');world.Parent=view
  local visuals=require(script.Parent.SeedPackVisuals);local b=visuals.Bounds(8,'MechLimited',1)
- local bag=visuals.Bag(CFrame.Angles(0,.22,-.025),world,1,nil,8,'MechLimited',1,1,'None')
+ local bag=visuals.Bag(CFrame.Angles(0,.22,-.025),world,1,nil,8,'MechLimited',1,1,'None',nil,true)
  game:GetService('CollectionService'):RemoveTag(bag,'BiomeSeedPackVisual');bag:SetAttribute('WorldPack',false)
  -- Viewports lack environment reflections. Keep the shared colours and geometry,
  -- using matte metal only in this preview so the small seal trim stays readable.
@@ -82,12 +82,9 @@ function A.Create(parent)
  camera.CFrame=CFrame.lookAt(target+Vector3.new(0,.06,-math.max(b.MaxY-b.MinY,b.Radius*2)*1.95),target)
  if Run:IsClient()then
   local motion=require(script.Parent.SpecialPackArt89).CaptureMotion(bag)
-  local clock=0;local connection;local destroyed
+  local connection;local destroyed
+  -- R153 (owner: "fix all jittery type effects"): the pack's moving parts every rendered frame while it is visible (30 Hz, 15 Hz FastMode before)
   connection=Run.RenderStepped:Connect(function(dt)
-   clock+=dt
-   local player=game:GetService('Players').LocalPlayer
-   if clock<(player and player:GetAttribute('FastMode')and 1/15 or 1/30)then return end
-   clock=0
    if visible(view)then motion:Step(Gui.ReducedMotionEnabled and 0 or workspace:GetServerTimeNow(),bag.PrimaryPart.CFrame)end
   end)
   destroyed=view.Destroying:Connect(function()

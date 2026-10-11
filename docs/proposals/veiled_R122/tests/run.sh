@@ -4,8 +4,8 @@
 #                      3 unstolen refreshes -> reroll (counter rules), drops / leaving / lost copy, VeiledNextAt.
 #  test_art.luau     - Void Pack art on every render path (world, carried, dropped, inventory picture,
 #                      viewport preview, opening copy) + part budget, bounds, client FX budgets.
-#  test_arrival.luau - arrival sound once per spawn, 1 s lights-out restored (interrupt / respawn / 2nd spawn),
-#                      late joiner and stale timestamps never replay.
+#  test_arrival.luau - arrival sound once per spawn; R127 lights-out (flicker, black air close in, lantern, lights
+#                      back exactly: interrupt / respawn / 2nd spawn / teardown), late joiner and stale never replay.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/../../../.." && pwd)

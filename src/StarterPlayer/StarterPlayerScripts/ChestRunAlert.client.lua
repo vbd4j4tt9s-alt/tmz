@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 -- V104: clearer green reward wash; existing one-shot token and cleanup guards.
 -- Replace the complete ChestRunAlert LocalScript in StarterPlayerScripts.
 local Players = game:GetService("Players")
@@ -262,8 +263,7 @@ local function showSuccess()
 	visualStrength = 0
 	if successSoundReady then
 		successSound:Stop()
-		successSound.TimePosition = 0
-		successSound:Play()
+		SoundTiming.Play(successSound) -- R150: through the shared lead-in table like the alarm (0 until 82180364878410 is measured)
 	end
 end
 

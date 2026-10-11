@@ -10,7 +10,7 @@ function L.Calculate(width,height,top,flags)
  local function row(name,h,w,font)
   result[name]={X=width/2,Y=y,Width=math.min(maxWidth,w),Height=h,Font=font};y+=h+gap
  end
- if flags.Biome then row('Biome',compact and 58 or 94,490,34)end
+ if flags.Biome then row('Biome',compact and 40 or 46,240,34)end -- R153: B (text only) is 37 to 44 px high and at most ~150 wide; the row used to be 94 / 58 x 490 for the box
  if flags.Run then row('Run',compact and 30 or 42,420,compact and 26 or 34)end
  if flags.Banner then row('Banner',compact and 34 or 44,680,compact and 15 or 18)end
  if flags.Feedback then row('Feedback',compact and 34 or 40,540,compact and 14 or 17)end

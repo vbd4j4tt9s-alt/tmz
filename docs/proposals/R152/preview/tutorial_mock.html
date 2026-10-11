@@ -1,0 +1,246 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>R152 tutorial mock</title>
+<!-- R152 tutorial mock-up (drawn before the code): every step on a landscape phone (844x390, notch inset) and a PC (1280x720).
+     The world is a stand-in drawing (sky, keyboard track, base, garden, treadmill); the HUD is shown faded so the card's spot is clear.
+     Rendered by render_tutorial_mock.mjs -> docs/proposals/R152/tutorial.png. -->
+<style>
+@font-face{font-family:'Fredoka';src:url('../../shop_R120/tests/FredokaOne.ttf');}
+html,body{margin:0;background:#0d1220;color:#e8edf6;font-family:'Fredoka','Noto Color Emoji',sans-serif;}
+#sheet{padding:22px 26px 30px;width:max-content;}
+h1{font-size:34px;margin:0 0 4px;color:#ffe047;letter-spacing:.5px;font-weight:400}
+.sub{font-size:17px;color:#aeb8cc;margin-bottom:18px;font-family:'DejaVu Sans',sans-serif}
+.row{display:flex;gap:22px;align-items:flex-start;margin-bottom:22px}
+.meta{width:250px;flex:none;padding-top:6px}
+.meta .n{font-size:30px;color:#ffe047}
+.meta .w{font-size:22px;margin:6px 0 8px;line-height:1.15}
+.meta .t{font-family:'DejaVu Sans',sans-serif;font-size:13px;color:#aeb8cc;line-height:1.4}
+.meta .t b{color:#9cff8a;font-weight:600}
+.cap{font-family:'DejaVu Sans',sans-serif;font-size:12px;color:#8793ab;margin:0 0 4px 2px}
+.frame{position:relative;overflow:hidden;border-radius:14px;box-shadow:0 0 0 2px #2a3350}
+.phone{width:844px;height:390px;transform:scale(.78);transform-origin:0 0}
+.pc{width:1280px;height:720px;transform:scale(.56);transform-origin:0 0}
+.box-phone{width:659px;height:305px}
+.box-pc{width:717px;height:404px}
+svg.world{position:absolute;left:0;top:0}
+.hud{position:absolute;opacity:.55}
+.slot{position:absolute;border-radius:10px;background:rgba(18,24,44,.82);border:2px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:26px}
+.slot .num{position:absolute;left:4px;top:1px;font-size:11px;color:#aab}
+.tb{position:absolute;border-radius:9px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;text-shadow:0 2px 0 #0008;box-shadow:0 3px 0 #0006}
+.card{position:absolute;border-radius:18px;background:linear-gradient(#4a58a5,#1b2046);border:3px solid #ffd64f;box-shadow:0 6px 18px #0007}
+.card .icon{position:absolute;border-radius:50%;background:linear-gradient(#ffec78,#ffaa28);border:3px solid #fff;display:flex;align-items:center;justify-content:center}
+.card .title{position:absolute;color:#ffec78;-webkit-text-stroke:0;text-shadow:0 2px 0 #080d18,0 0 3px #080d18;white-space:nowrap}
+.card .chip{position:absolute;display:flex;align-items:center;gap:7px;background:rgba(10,14,34,.7);border-radius:99px;padding:0 12px 0 5px;color:#fff;white-space:nowrap}
+.key{background:linear-gradient(#fff,#c4ccde);color:#080d18;border-radius:7px;border:2px solid #080d18;padding:0 7px;display:flex;align-items:center;justify-content:center}
+.key.track{background:linear-gradient(#ffb05a,#e2892f);color:#fff;text-shadow:0 1px 0 #0008}
+.key.base{background:linear-gradient(#7fd88f,#4ea860);color:#fff;text-shadow:0 1px 0 #0008}
+.dots{position:absolute;display:flex;align-items:center}
+.dot{border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #080d18}
+.link{height:3px;background:rgba(255,255,255,.3)}
+.avatar{position:absolute;border-radius:50%;background:linear-gradient(#beff78,#3abe48);border:2px solid #fff;display:flex;align-items:center;justify-content:center}
+.x{position:absolute;border-radius:50%;background:rgba(16,20,48,.65);color:#e3e8f0;display:flex;align-items:center;justify-content:center}
+.ring{position:absolute;border:4px solid #ffe848;border-radius:14px;box-shadow:0 0 14px #ffe848}
+.hand{position:absolute;filter:drop-shadow(0 3px 2px #0009)}
+.ripple{position:absolute;border:3px solid #ffec78;border-radius:50%}
+.popword{position:absolute;color:#ffec78;text-shadow:0 2px 0 #080d18,0 0 4px #080d18;white-space:nowrap}
+.bubble{position:absolute;border-radius:50%;background:#fff;border:3px solid #ff4848;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px #0006}
+.dist{position:absolute;color:#ffeca0;text-shadow:0 1px 0 #000,0 0 3px #000;white-space:nowrap}
+.legend{display:flex;gap:26px;flex-wrap:wrap;font-family:'DejaVu Sans',sans-serif;font-size:14px;color:#c9d2e4;margin:6px 0 20px}
+.legend span b{color:#ffe047}
+.safe{position:absolute;border:1.5px dashed rgba(255,255,255,.35);pointer-events:none}
+</style></head>
+<body><div id="sheet">
+<h1>R152 tutorial: 5 steps, each one readable in a glance</h1>
+<div class="sub">One idea per step: a big icon, at most 6 words, the button to press, and a beam + ring + ghost path on the exact thing. Each step moves on by itself the moment you do it (✓ NICE!! pop). No welcome page, no NEXT, no slides.</div>
+<div class="legend"><span><b>yellow beam + ring</b> = the exact thing</span><span><b>red chevrons</b> = ghost path to walk</span><span><b>👆 pressing hand</b> = what to tap / click</span><span><b>key cap</b> = E / CLICK / TAP / X / R2 per device</span><span><b>dashed line</b> = phone safe area</span></div>
+<div id="rows"></div>
+</div>
+<script>
+// ---------- step specs ----------
+const PROG=['🎒','🏠','🎁','🌱','⚡'];
+const STEPS=[
+ {n:'1',sub:'not on the track yet',scene:'hub',now:1,icon:'🏃',title:'GO TO THE TRACK!',
+  chip:{phone:{key:'TRACK',cls:'track',label:'tap it'},pc:{key:'TRACK',cls:'track',label:'click it'}},
+  world:{beam:[.74,.62],marker:'🏃',dist:'64 studs',path:true},ui:'track',
+  why:'Shown only while you are <b>off the track</b>: the TRACK button gets a ring + pressing hand (teleport taught when it is needed). A beam + ghost path also lead to the track gate on foot.',next:'you are <b>on the track</b> (pop, then step 1)'},
+ {n:'1',sub:'grab a pack',scene:'track',now:1,icon:'🎒',title:'GRAB A PACK!',
+  chip:{phone:{key:'👆',label:'hold it'},pc:{key:'E',label:'hold'}},
+  world:{beam:[.73,.64],marker:'🎒',dist:'18 studs',path:true,pack:true},
+  why:'Beam + ring on the <b>nearest pack</b>, chevrons from your feet to it. Gamepad: [X] hold.',next:'you <b>pick it up</b> (carrying)'},
+ {n:'2',sub:'bring it home',scene:'trackBack',now:2,icon:'🏠',title:'RUN HOME!!',
+  chip:{phone:{arrow:true,label:'to ur base'},pc:{arrow:true,label:'to ur base'}},
+  world:{beam:[.27,.6],marker:'🏠',dist:'40 studs',path:true,keeper:true,carry:true},
+  why:'Beam on the <b>home line</b> (crossing it banks the pack). A keeper chasing you shows why: run!!',next:'the pack is <b>banked</b> (server step 3)'},
+ {n:'3',sub:'pick the pack',scene:'base',now:3,icon:'🎁',title:'OPEN IT!',
+  chip:{phone:{key:'TAP',label:'ur pack'},pc:{key:'CLICK',label:'ur pack'}},
+  world:{},ui:'slot',
+  why:'Ring + pressing hand on the <b>hotbar slot</b> holding the pack. Gamepad: [R1] ur pack.',next:'the pack is <b>in your hand</b>'},
+ {n:'3',sub:'tap it open',scene:'base',now:3,icon:'🎁',title:'KEEP TAPPING!!',titlePc:'KEEP CLICKING!!',
+  chip:{phone:{key:'TAP',label:'open it'},pc:{key:'CLICK',label:'open it'}},
+  world:{held:true},ui:'click',
+  why:'Hand + TAP! + 5 pips right next to the pack in your hand, a pip lights per tap. Gamepad: [R2].',next:'the pack <b>opens</b> (server step 4); the card waits while the reveal plays'},
+ {n:'4',sub:'plant it',scene:'garden',now:4,icon:'🌱',title:'PLANT IT!',
+  chip:{phone:{key:'TAP',label:'the dirt'},pc:{key:'CLICK',label:'the dirt'}},
+  world:{beam:[.66,.66],path:true,soilHand:true,seed:true},
+  why:'Beam + ring + a pressing hand <b>on your garden dirt</b>. The seed is already in your hand after the reveal (if not: ring + hand on its hotbar slot, "tap ur seed").',next:'the seed is <b>planted</b> (server step 5)'},
+ {n:'4·5',sub:'only if you ran off',scene:'track',now:4,icon:'🏠',title:'GO HOME!',
+  chip:{phone:{key:'BASE',cls:'base',label:'tap it'},pc:{key:'BASE',cls:'base',label:'click it'}},
+  world:{},ui:'base',
+  why:'Only when the next goal is at your base and you are <b>on the track</b>: ring + hand on BASE (teleport taught when it is needed).',next:'you are <b>back home</b>'},
+ {n:'5',sub:'get faster',scene:'treadmill',now:5,icon:'⚡',title:'GET FASTER!',
+  chip:{phone:{arrow:true,label:'hop on it'},pc:{arrow:true,label:'hop on it'}},
+  world:{beam:[.77,.66],marker:'⚡',dist:'12 studs',path:true,treadmill:true},
+  why:'Beam on <b>your treadmill</b> (a few steps from the garden). Speed lets you run further down the track.',next:'you <b>step on it</b> (or after 40 s anyway) = done'},
+ {n:'✓',sub:'between steps (0.7 s)',scene:'base',now:3,done:true,icon:'✓',title:'NICE!!',chip:null,world:{},
+  why:'The tiny pop: the icon flips to a green ✓, NICE!!, a bubble sound, then the next step bounces in. The world guides hide for that beat.',next:'automatic'},
+ {n:'🏆',sub:'finished',scene:'base',now:6,icon:'🏆',title:'U GOT THIS!!',
+  chip:{phone:{label:'🎁 FREE PACK!'},pc:{label:'🎁 FREE PACK!'}},world:{},confetti:true,
+  why:'Confetti + the gem sound for 4 s, then everything is gone. The free Forest pack lands in the Bag once per account (still secretly 2x). A replay says "have fun Alex!".',next:'—'},
+];
+// ---------- world drawing ----------
+function lerp(a,b,t){return a+(b-a)*t}
+function world(spec,W,H){
+ const hz=H*.36;let s=`<svg class="world" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>
+ <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7cc7ff"/><stop offset="1" stop-color="#d8f0ff"/></linearGradient>
+ <linearGradient id="grass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#78c25a"/><stop offset="1" stop-color="#3f8a3a"/></linearGradient>
+ <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff59a" stop-opacity="0"/><stop offset=".5" stop-color="#fff59a" stop-opacity=".85"/><stop offset="1" stop-color="#fff59a" stop-opacity="0"/></linearGradient>
+ <linearGradient id="key" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f6fb"/><stop offset="1" stop-color="#c9cfdc"/></linearGradient>
+ </defs><rect width="${W}" height="${H}" fill="url(#sky)"/>
+ <ellipse cx="${W*.2}" cy="${hz*.45}" rx="${W*.08}" ry="${H*.04}" fill="#fff" opacity=".8"/><ellipse cx="${W*.78}" cy="${hz*.3}" rx="${W*.1}" ry="${H*.035}" fill="#fff" opacity=".7"/>
+ <rect y="${hz}" width="${W}" height="${H-hz}" fill="url(#grass)"/>`;
+ const vx=W/2;
+ const trackish=spec.scene==='track'||spec.scene==='trackBack';
+ if(trackish){ // the giant keyboard running to the horizon
+  const rows=14;
+  for(let r=rows-1;r>=0;r--){const t0=r/rows,t1=(r+1)/rows;const y0=lerp(H*1.05,hz,Math.pow(t0,.55)),y1=lerp(H*1.05,hz,Math.pow(t1,.55));
+   const half0=lerp(W*.62,W*.04,Math.pow(t0,.55)),half1=lerp(W*.62,W*.04,Math.pow(t1,.55));const cols=9;
+   for(let c=0;c<cols;c++){const a0=-half0+2*half0*c/cols,a1=-half0+2*half0*(c+1)/cols,b0=-half1+2*half1*c/cols,b1=-half1+2*half1*(c+1)/cols;const g=.08;
+    s+=`<polygon points="${vx+lerp(a0,a1,g)},${lerp(y0,y1,g)} ${vx+lerp(a1,a0,g)},${lerp(y0,y1,g)} ${vx+lerp(b1,b0,g)},${lerp(y1,y0,g)} ${vx+lerp(b0,b1,g)},${lerp(y1,y0,g)}" fill="${(r*3+c)%11===0?'#ffd96a':'url(#key)'}" stroke="#8a93a8" stroke-width="1"/>`}}
+  s+=`<rect x="0" y="${hz-6}" width="${W}" height="8" fill="#5a9a4a"/>`;
+  if(spec.scene==='trackBack')s+=`<rect x="${W*.2}" y="${H*.555}" width="${W*.6}" height="${H*.025}" fill="#ffffff" opacity=".85"/><text x="${W/2}" y="${H*.545}" font-size="${H*.035}" text-anchor="middle" fill="#2b6a2b" font-family="Fredoka">BASES</text>`;
+ }
+ if(spec.scene==='hub'){ // hub plaza + base fence, the track gate on the horizon
+  s+=`<polygon points="${W*.36},${H} ${W*.67},${H*.62} ${W*.81},${H*.62} ${W*.64},${H}" fill="#d9c9a3"/><polygon points="${W*.67},${H*.62} ${W*.72},${hz} ${W*.76},${hz} ${W*.81},${H*.62}" fill="#eef1f7"/>
+  <rect x="${W*.67}" y="${H*.62-H*.2}" width="${W*.14}" height="${H*.2}" fill="none" stroke="#ff9a3c" stroke-width="${H*.018}" rx="${H*.06}"/>
+  <text x="${W*.74}" y="${H*.62-H*.215}" font-size="${H*.04}" text-anchor="middle" fill="#e2892f" font-family="Fredoka">TRACK</text>
+  <rect x="${W*.02}" y="${H*.52}" width="${W*.25}" height="${H*.3}" fill="#8b5a2b" opacity=".5"/><rect x="${W*.74}" y="${H*.5}" width="${W*.24}" height="${H*.32}" fill="#8b5a2b" opacity=".5"/>`;
+ }
+ if(['base','garden','treadmill'].includes(spec.scene)){ // your base: wooden floor, fence, garden plots, treadmill
+  s+=`<polygon points="0,${H} ${W*.12},${hz+H*.05} ${W*.88},${hz+H*.05} ${W},${H}" fill="#c9a26a"/>
+  <rect x="${W*.12}" y="${hz+H*.02}" width="${W*.76}" height="${H*.04}" fill="#8b5a2b"/>`;
+  const plots=spec.scene==='garden'?[[.14,.6,.2,.14],[.56,.6,.2,.14]]:[[.15,.55,.16,.1],[.33,.55,.16,.1]];
+  for(const p of plots)s+=`<rect x="${W*p[0]}" y="${H*p[1]}" width="${W*p[2]}" height="${H*p[3]}" rx="8" fill="#6b4226" stroke="#4a2c16" stroke-width="3"/>`;
+  const tx=spec.scene==='treadmill'?.695:.68,ty=spec.scene==='treadmill'?.6:.5;
+  s+=`<rect x="${W*tx}" y="${H*ty}" width="${W*.15}" height="${H*.09}" rx="6" fill="#2d3142" stroke="#11131c" stroke-width="3"/>
+  <rect x="${W*(tx+.01)}" y="${H*(ty+.015)}" width="${W*.13}" height="${H*.06}" fill="#4b5068"/>
+  <rect x="${W*(tx+.12)}" y="${H*(ty-.09)}" width="${W*.02}" height="${H*.1}" fill="#2d3142"/>`;
+ }
+ // ghost path: chevrons from the feet to the goal
+ const feet=[W/2,H*.83];
+ if(spec.world.path&&spec.world.beam){const g=[W*spec.world.beam[0],H*spec.world.beam[1]];const n=9;
+  for(let i=1;i<n;i++){const t=i/n;const x=lerp(feet[0],g[0],t),y=lerp(feet[1],g[1],t);const sc=lerp(1,.45,t);const ang=Math.atan2(g[1]-feet[1],g[0]-feet[0])*180/Math.PI+90;
+   s+=`<g transform="translate(${x},${y}) rotate(${ang}) scale(${sc*H/390})"><path d="M-14,8 L0,-6 L14,8" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/><path d="M-14,8 L0,-6 L14,8" fill="none" stroke="#ff3030" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g>`}}
+ if(spec.world.beam){const g=[W*spec.world.beam[0],H*spec.world.beam[1]];const bw=H*.06;
+  s+=`<ellipse cx="${g[0]}" cy="${g[1]}" rx="${H*.11}" ry="${H*.035}" fill="none" stroke="#ffe848" stroke-width="5" opacity=".95"/>
+  <ellipse cx="${g[0]}" cy="${g[1]}" rx="${H*.15}" ry="${H*.05}" fill="none" stroke="#ffe848" stroke-width="2.5" opacity=".5"/>
+  <rect x="${g[0]-bw/2}" y="0" width="${bw}" height="${g[1]}" fill="url(#beam)" opacity=".75"/>`;
+  if(spec.world.pack)s+=packSvg(g[0],g[1]-H*.03,H*.07);
+ }
+ if(spec.world.keeper)s+=`<g transform="translate(${W*.74},${H*.66})"><ellipse rx="${H*.08}" ry="${H*.1}" fill="#7a3fb8"/><circle cx="${-H*.03}" cy="${-H*.03}" r="${H*.018}" fill="#fff"/><circle cx="${H*.03}" cy="${-H*.03}" r="${H*.018}" fill="#fff"/><circle cx="${-H*.025}" cy="${-H*.03}" r="${H*.008}" fill="#e00"/><circle cx="${H*.035}" cy="${-H*.03}" r="${H*.008}" fill="#e00"/><path d="M${-H*.04},${H*.03} l${H*.02},${-H*.015} l${H*.02},${H*.015} l${H*.02},${-H*.015} l${H*.02},${H*.015}" stroke="#fff" stroke-width="3" fill="none"/></g>`;
+ // the player (seen from behind, as the default camera does)
+ const ph=H*.2,px=W/2,py=H*.83;
+ s+=`<g><rect x="${px-ph*.18}" y="${py-ph*.42}" width="${ph*.16}" height="${ph*.42}" fill="#2b4f9e"/><rect x="${px+ph*.02}" y="${py-ph*.42}" width="${ph*.16}" height="${ph*.42}" fill="#2b4f9e"/>
+ <rect x="${px-ph*.24}" y="${py-ph*.86}" width="${ph*.48}" height="${ph*.46}" rx="4" fill="#e8463c"/><rect x="${px-ph*.36}" y="${py-ph*.84}" width="${ph*.12}" height="${ph*.4}" fill="#f2c25c"/><rect x="${px+ph*.24}" y="${py-ph*.84}" width="${ph*.12}" height="${ph*.4}" fill="#f2c25c"/>
+ <rect x="${px-ph*.16}" y="${py-ph*1.18}" width="${ph*.32}" height="${ph*.3}" rx="6" fill="#f2c25c"/><rect x="${px-ph*.17}" y="${py-ph*1.2}" width="${ph*.34}" height="${ph*.12}" rx="5" fill="#3a2a1a"/></g>`;
+ if(spec.world.carry)s+=packSvg(px,py-ph*1.42,H*.07);
+ if(spec.world.held)s+=packSvg(px+ph*.42,py-ph*.62,H*.075);
+ if(spec.world.seed)s+=`<text x="${px+ph*.42}" y="${py-ph*.5}" font-size="${H*.05}" text-anchor="middle">🌱</text>`;
+ return s+'</svg>';
+}
+function packSvg(x,y,h){return `<g transform="translate(${x},${y})"><path d="M${-h*.4},${-h*.5} Q0,${-h*.65} ${h*.4},${-h*.5} L${h*.45},${h*.45} Q0,${h*.6} ${-h*.45},${h*.45} Z" fill="#3fae4a" stroke="#1d5e24" stroke-width="3"/><text y="${h*.18}" font-size="${h*.5}" text-anchor="middle">🌿</text></g>`}
+// ---------- HUD (faded) ----------
+function hud(phone,W,H,ins){
+ let s='';const top=phone?4:8,bh=phone?32:40,bw=phone?84:118,cx=W/2;
+ s+=`<div class="hud" style="left:${ins+8}px;top:${top}px;width:${bh}px;height:${bh}px;border-radius:9px;background:#0009"></div>`;
+ s+=`<div class="tb" id="BASE" style="left:${cx-bw-4}px;top:${top}px;width:${bw}px;height:${bh}px;background:linear-gradient(#7fd88f,#4ea860)">BASE</div>`;
+ s+=`<div class="tb" id="TRACK" style="left:${cx+4}px;top:${top}px;width:${bw}px;height:${bh}px;background:linear-gradient(#ffb05a,#e2892f)">TRACK</div>`;
+ const n=phone?5:10,ss=phone?50:72,gap=6,total=(n+1)*ss+n*gap,x0=cx-total/2,y0=H-(phone?10:16)-ss;
+ for(let i=0;i<=n;i++){const icon=i===n?'🎒':'';s+=`<div class="slot hud" style="opacity:.8;left:${x0+i*(ss+gap)}px;top:${y0}px;width:${ss}px;height:${ss}px" data-slot="${i}">${i<n?`<span class="num">${(i+1)%10}</span>`:''}${icon}</div>`}
+ s+=`<div class="hud" style="left:${ins+10}px;top:${H/2-30}px;width:60px;height:60px;border-radius:50%;background:linear-gradient(#ffd64f,#e8a020);display:flex;align-items:center;justify-content:center;color:#3a2a00;font-size:13px">MENU</div>`;
+ s+=`<div class="hud" style="left:${ins+12}px;top:${phone?H-110:H-200}px;font-size:${phone?15:22}px;line-height:1.35;text-shadow:0 2px 0 #000">⚡ 16<br>💵 $120<br>💎 5</div>`;
+ if(phone){s+=`<div class="hud" style="left:${ins+20}px;top:${H-120}px;width:96px;height:96px;border-radius:50%;border:3px solid #fff8;background:#0003"></div><div class="hud" style="left:${W-100}px;top:${H-96}px;width:72px;height:72px;border-radius:50%;border:3px solid #fff8;background:#0003"></div>`}
+ return {html:s,slot0:{x:x0,y:y0,s:ss},top,bh,bw,cx};
+}
+// ---------- tutorial overlays ----------
+function card(spec,phone,W,H,ins){
+ const cw=phone?352:470,ch=phone?92:108,x=W/2-cw/2,y=(phone?46:60)+(spec.ui==='track'||spec.ui==='base'?(phone?40:44):0),icon=phone?62:74,x0=14+icon+14;
+ const chip=spec.chip&&spec.chip[phone?'phone':'pc'];const title=(!phone&&spec.titlePc)||spec.title;
+ const doneIcon=spec.done;let s=`<div class="card" style="left:${x}px;top:${y}px;width:${cw}px;height:${ch}px">`;
+ s+=`<div class="avatar" style="left:6px;top:-14px;width:28px;height:28px;font-size:15px">🙂</div>`;
+ s+=`<div class="icon" style="left:12px;top:${(ch-icon)/2-4}px;width:${icon}px;height:${icon}px;font-size:${icon*.58}px;${doneIcon?'background:linear-gradient(#a6ff8c,#38c048);color:#fff;font-family:DejaVu Sans;font-weight:700;':''}">${spec.icon}</div>`;
+ const tsz=phone?(title.length>13?24:28):(title.length>13?30:34);
+ s+=`<div class="title" style="left:${x0}px;top:${phone?10:12}px;font-size:${tsz}px">${title}</div>`;
+ if(chip){const h=phone?28:32;let inner='';
+  if(chip.key)inner+=`<span class="key ${chip.cls||''}" style="height:${h-8}px;font-size:${phone?15:17}px">${chip.key}</span>`;
+  if(chip.arrow)inner+=`<span style="color:#ff4848;font-size:${phone?20:22}px">➜</span>`;
+  inner+=`<span style="font-size:${phone?17:19}px">${chip.label}</span>`;
+  s+=`<div class="chip" style="left:${x0}px;top:${phone?44:52}px;height:${h}px;${chip.key?'':'padding-left:12px;'}">${inner}</div>`}
+ // step row
+ const dsz=phone?14:16;let d=`<div class="dots" style="left:${x0}px;top:${ch-(phone?18:20)}px;gap:0">`;
+ PROG.forEach((p,i)=>{const k=i+1;const done=k<spec.now||(spec.done&&k<=spec.now);const here=k===spec.now&&!spec.done;const sz=here?dsz+6:dsz;
+  if(i>0)d+=`<div class="link" style="width:${phone?22:30}px;${done||here?'background:#78e86e':''}"></div>`;
+  d+=`<div class="dot" style="width:${sz}px;height:${sz}px;font-size:${sz*.62}px;background:${done?'#78e86e':here?'#ffd64f':'rgba(14,20,48,.75)'};color:#fff">${done?'✓':p}</div>`});
+ s+=d+'</div>';
+ s+=`<div class="x" style="right:6px;top:6px;width:${phone?40:30}px;height:${phone?40:30}px;font-size:${phone?17:15}px">X</div>`;
+ if(spec.done)s+=`<div class="ripple" style="left:${12+icon/2-icon*.8}px;top:${(ch-icon)/2-4+icon/2-icon*.8}px;width:${icon*1.6}px;height:${icon*1.6}px;opacity:.6;border-color:#9cff8a"></div>`;
+ return s+'</div>';
+}
+function pressHand(x,y,size,ring){ // a pressing hand pointing up-left at (x,y)
+ let s='';if(ring)s+=`<div class="ring" style="left:${ring.x-6}px;top:${ring.y-6}px;width:${ring.w+12}px;height:${ring.h+12}px"></div>`;
+ s+=`<div class="ripple" style="left:${x-size*.45}px;top:${y-size*.45}px;width:${size*.9}px;height:${size*.9}px;opacity:.7"></div>`;
+ s+=`<div class="ripple" style="left:${x-size*.75}px;top:${y-size*.75}px;width:${size*1.5}px;height:${size*1.5}px;opacity:.3"></div>`;
+ s+=`<div class="hand" style="left:${x-size*.22}px;top:${y-size*.08}px;font-size:${size}px;transform:rotate(-24deg)">👆</div>`;
+ return s;
+}
+function overlays(spec,phone,W,H,h){
+ let s='';
+ if(spec.world.beam&&spec.world.marker){const gx=W*spec.world.beam[0],gy=H*spec.world.beam[1];const b=phone?44:54;
+  s+=`<div class="bubble" style="left:${gx-b/2}px;top:${gy-H*.13-b}px;width:${b}px;height:${b}px;font-size:${b*.55}px">${spec.world.marker}</div>`;
+  s+=`<div style="position:absolute;left:${gx-14}px;top:${gy-H*.13+2}px;width:0;height:0;border-left:14px solid transparent;border-right:14px solid transparent;border-top:20px solid #ff4848;filter:drop-shadow(0 2px 0 #4a1010)"></div>`;
+  if(spec.world.dist)s+=`<div class="dist" style="left:${gx-60}px;width:120px;text-align:center;top:${gy-H*.13-b-22}px;font-size:${phone?14:16}px">${spec.world.dist}</div>`;}
+ if(spec.ui==='track'||spec.ui==='base'){const id=spec.ui==='track'?'TRACK':'BASE';const bx=id==='BASE'?h.cx-h.bw-4:h.cx+4;
+  s+=pressHand(bx+h.bw*.72,h.top+h.bh*.75,phone?54:64,{x:bx,y:h.top,w:h.bw,h:h.bh})}
+ if(spec.ui==='slot'){const sx=h.slot0.x,sy=h.slot0.y,ss=h.slot0.s;
+  s+=`<div class="slot" style="left:${sx}px;top:${sy}px;width:${ss}px;height:${ss}px;opacity:1;font-size:${ss*.5}px"><span class="num">1</span>🎁</div>`;
+  s+=pressHand(sx+ss*.7,sy+ss*.62,phone?58:70,{x:sx,y:sy,w:ss,h:ss})}
+ if(spec.ui==='click'){const px=W/2+H*.2*.42+(phone?70:110),py=H*.83-H*.2*.62;const sz=phone?50:64;
+  s+=`<div class="ripple" style="left:${px-sz*.7}px;top:${py-sz*.7}px;width:${sz*1.4}px;height:${sz*1.4}px;opacity:.6"></div>`;
+  s+=`<div class="hand" style="left:${px-sz*.4}px;top:${py-sz*.55}px;font-size:${sz}px;transform:rotate(-12deg)">${phone?'👆':'🖱️'}</div>`;
+  s+=`<div class="popword" style="left:${px-60}px;width:120px;text-align:center;top:${py+sz*.55}px;font-size:${phone?26:32}px">${phone?'TAP!':'CLICK!'}</div>`;
+  let pips='';for(let i=0;i<5;i++)pips+=`<span style="display:inline-block;width:14px;height:14px;border-radius:50%;margin:0 3px;border:2px solid #080d18;background:${i<2?'#ffd64f':'#0e1430cc'}"></span>`;
+  s+=`<div style="position:absolute;left:${px-60}px;width:120px;text-align:center;top:${py+sz*.55+(phone?32:40)}px">${pips}</div>`}
+ if(spec.world.soilHand){const gx=W*spec.world.beam[0],gy=H*spec.world.beam[1];const sz=phone?48:60;
+  s+=`<div class="hand" style="left:${gx-sz*.35}px;top:${gy-sz*1.2}px;font-size:${sz}px">👇</div>`;
+  s+=`<div class="ripple" style="left:${gx-sz*.5}px;top:${gy-sz*.18}px;width:${sz}px;height:${sz*.36}px;opacity:.8"></div>`}
+ if(spec.confetti){const cols=['#ffd64f','#78e86e','#6ebeff','#ff6e96','#c88cff'];for(let i=0;i<46;i++){const x=W/2+Math.sin(i*2.3)*W*.3*((i%7)/7+.3),y=H*.12+((i*37)%100)/100*H*.5;
+  s+=`<div style="position:absolute;left:${x}px;top:${y}px;width:${8+(i%3)*3}px;height:${12+(i%2)*6}px;background:${cols[i%5]};transform:rotate(${i*47}deg)"></div>`}}
+ return s;
+}
+function frame(spec,phone){
+ const W=phone?844:1280,H=phone?390:720,ins=phone?47:0;
+ const h=hud(phone,W,H,ins);
+ let s=`<div class="frame ${phone?'phone':'pc'}">${world(spec,W,H)}${h.html}${card(spec,phone,W,H,ins)}${overlays(spec,phone,W,H,h)}`;
+ if(phone)s+=`<div class="safe" style="left:${ins}px;top:40px;width:${W-ins*2}px;height:${H-40-4}px"></div>`;
+ return s+'</div>';
+}
+const rows=document.getElementById('rows');
+for(const spec of STEPS){
+ const words=[spec.title,spec.chip&&spec.chip.phone.label].filter(Boolean).join(' ');
+ const div=document.createElement('div');div.className='row';
+ div.innerHTML=`<div class="meta"><div class="n">${spec.n} <span style="font-size:18px;color:#c9d2e4">${spec.sub}</span></div>
+ <div class="w">${spec.icon} ${spec.title}${spec.chip?`<br><span style="font-size:18px;color:#c9d2e4">${spec.chip.phone.key?'['+spec.chip.phone.key+'] ':''}${spec.chip.phone.arrow?'➜ ':''}${spec.chip.phone.label}</span>`:''}</div>
+ <div class="t">${spec.why}<br><br>next when: ${spec.next}</div></div>
+ <div><div class="cap">phone landscape 844×390</div><div class="box-phone">${frame(spec,true)}</div></div>
+ <div><div class="cap">PC 1280×720</div><div class="box-pc">${frame(spec,false)}</div></div>`;
+ rows.appendChild(div);
+}
+</script></body></html>

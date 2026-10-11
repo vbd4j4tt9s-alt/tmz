@@ -1,25 +1,30 @@
 -- R123: treadmill bonus rolls (owner request, final spec). Pure rules shared by TreadmillBonusService (server,
 -- authoritative) and TreadmillBonusClient (roll button, crate-style strip, progress bar over the player).
 --
--- Earning: only time on a treadmill counts (the server's own BaseService.TrainingSessions lock). Every 10 minutes of
+-- Earning: only time on a treadmill counts (the server's own BaseService.TrainingSessions lock). Every 6 minutes (R124;
+-- was 10) of
 -- treadmill time makes one roll READY. Progress is SAVED (profile Premium.TreadmillBonusProgress, seconds): 5 minutes,
 -- get off, rejoin tomorrow -> still 5 minutes. READY rolls stack to 2 and are NOT saved (leaving the game loses them);
 -- while 2 are ready the timer pauses (time beyond the cap is lost).
 --
--- What a roll gives: one ordinary world seed pack (PackSize 1, no coat, no weather, current odds version), granted
+-- What a roll gives: one ordinary world seed pack (R126: a rolled pack size like world packs; no coat, no weather, current odds version), granted
 -- with PlayerData:AddChest + ChestService:SyncTools (the ChestService:Bank path for a stolen pack), so opening it uses the normal seed odds and boot luck as usual.
---  * Pack rarity = the pack's tier (SeedPackRules.GetPackTier) at the game's existing world spawn weights
---    (SeedPackRules.Variants[*].SpawnWeight <- BalanceValues81/RouteBalance83.SpawnWeights), unchanged:
---      Common (Pack01) 38%   Uncommon (Pack02) 25%   Rare (Pack03) 15%   Epic (Pack04) 7%
---      Legendary (Pack05) 10%   Mythic (Pack06) 5%
+--  * Pack rarity (R124 owner odds, B.Odds; no longer the world spawn weights):
+--      Secret = the Void Pack ("the cosmic pack", EclipseReliquary, always a Storm pack) 0.1%
+--      Mythic (Pack06) 0.5%   Legendary (Pack05) 2%
+--      the other 97.4% keeps the old 38:25:15:7 shape: Common (Pack01) 43.5%   Uncommon (Pack02) 28.6%
+--      Rare (Pack03) 17.2%   Epic (Pack04) 8.1%
 --  * Biome = evenly among the biomes the player's best owned treadmill unlocks, cumulative in machine order:
 --      1 Trail Runner -> Forest | 2 Vine Runner +Jungle | 3 Dune Runner +Desert | 4 Glacier Runner +Snow
 --      5 Magma Runner +Lava | 6 Prism Runner +Crystal | 7 Thunder Runner +Storm (= every biome pack)
---    The Void pack (EclipseReliquary) and the paid Mech pack are never in the pool.
+--    The Void Pack is not a biome pick: when Secret comes up it is always the Storm Void Pack (any treadmill).
+--    The paid Mech pack is never in the pool.
 local PackRules=require(script.Parent.SeedPackRules)
-local B={Version=123,IntervalSeconds=600,MaxReady=2,SaveEvery=10,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
-B.VariantOrder={'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06'}
-B.Special={Legendary=true,Mythic=true} -- flash + glow + fanfare on the result
+local B={Version=124,IntervalSeconds=360,MaxReady=2,SaveEvery=10,RollCooldown=1,RemoteName='TreadmillBonusRoll'}
+B.VariantOrder={'Pack01','Pack02','Pack03','Pack04','Pack05','Pack06','EclipseReliquary'}
+B.Odds={Pack01=.435,Pack02=.286,Pack03=.172,Pack04=.081,Pack05=.02,Pack06=.005,EclipseReliquary=.001}
+B.Void={Variant='EclipseReliquary',Stage=7,Name='Secret',Color=Color3.fromRGB(190,144,255),Label='Void Pack'}
+B.Special={Legendary=true,Mythic=true,Secret=true} -- border light-up + fanfare on the result
 -- Player attributes the server publishes (client reads only).
 B.Attr={Ready='TreadmillBonusReady',DueAt='TreadmillBonusDueAt',Left='TreadmillBonusLeft',Interval='TreadmillBonusInterval',Pool='TreadmillBonusPool'}
 function B.ReadyCount(v)
@@ -42,11 +47,14 @@ function B.DecodePool(text)
  for n in text:gmatch('%d+')do local s=tonumber(n);if s and s>=1 and s<=7 and #out<7 then table.insert(out,s)end end
  return out
 end
-function B.Tier(variant)local tier=PackRules.GetPackTier(variant);return tier.Name,tier.Color end
--- {variant = probability} from the live world spawn weights.
+function B.Tier(variant)
+ if variant==B.Void.Variant then return B.Void.Name,B.Void.Color end
+ local tier=PackRules.GetPackTier(variant);return tier.Name,tier.Color
+end
+-- {variant = probability} (B.Odds, normalised).
 function B.VariantOdds()
- local total=0;for _,k in ipairs(B.VariantOrder)do total+=PackRules.Variants[k].SpawnWeight end
- local out={};for _,k in ipairs(B.VariantOrder)do out[k]=PackRules.Variants[k].SpawnWeight/total end;return out
+ local total=0;for _,k in ipairs(B.VariantOrder)do total+=B.Odds[k]end
+ local out={};for _,k in ipairs(B.VariantOrder)do out[k]=B.Odds[k]/total end;return out
 end
 -- draw(): uniform [0,1). Returns {Stage=, Variant=}.
 function B.RollPack(stages,draw)
@@ -56,6 +64,7 @@ function B.RollPack(stages,draw)
  local v=draw();v=type(v)=='number'and v==v and math.clamp(v,0,1-1e-12)or 0
  local odds=B.VariantOdds();local variant=B.VariantOrder[#B.VariantOrder]
  for _,k in ipairs(B.VariantOrder)do v-=odds[k];if v<0 then variant=k;break end end
+ if variant==B.Void.Variant then stage=B.Void.Stage end -- the Void Pack's odds only exist as a Storm pack
  return {Stage=stage,Variant=variant}
 end
 function B.Percent(p)

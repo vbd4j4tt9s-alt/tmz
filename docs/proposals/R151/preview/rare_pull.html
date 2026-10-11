@@ -1,0 +1,111 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Rare pull preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// R151 preview: draws one FRAME of preview_frames.luau with three.js - Roblox parts as boxes / balls / cylinders (a pack's mesh as a rounded
+// pouch), neon as unlit colour with a soft additive glow, particle emitters as clouds of sparkle dots (smoke as soft puffs), point lights,
+// the seed aura's soft glows (BillboardGui images) as sprites and its beams as thin lines. The camera is the frame's camera (vertical FOV, as
+// in Roblox). Approximate: no Roblox materials, textures, Future lighting, trails or real particle motion; the world frames use a plain
+// grass ground and sky; the post grade / blur is applied afterwards by compose.py.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true,alpha:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1),geoSphere=new THREE.SphereGeometry(.5,32,20),geoPouch=new RoundedBoxGeometry(1,1,1,5,.16);
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,40);geoCyl.rotateZ(Math.PI/2);
+const glowTex=(()=>{const cv=document.createElement('canvas');cv.width=cv.height=64;const c=cv.getContext('2d');const gr=c.createRadialGradient(32,32,0,32,32,32);
+  gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.3,'rgba(255,255,255,.55)');gr.addColorStop(1,'rgba(255,255,255,0)');c.fillStyle=gr;c.fillRect(0,0,64,64);return new THREE.CanvasTexture(cv)})();
+function rnd(seed){let s=seed;return()=>{s=(s*16807)%2147483647;return s/2147483647}}
+function glow(s,pos,color,size,opacity){
+  const m=new THREE.SpriteMaterial({map:glowTex,color:col(color),transparent:true,opacity,depthWrite:false,blending:THREE.AdditiveBlending});
+  const sp=new THREE.Sprite(m);sp.position.set(pos[0],pos[1],pos[2]);sp.scale.set(size,size,1);s.add(sp);
+}
+function grassTexture(){
+  const cv=document.createElement('canvas');cv.width=cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#5ea84a';g.fillRect(0,0,256,256);g.fillStyle='rgba(0,0,0,.05)';g.fillRect(0,0,128,128);g.fillRect(128,128,128,128);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(80,80);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function addParts(s,parts,opts){
+  for(const p of parts){
+    if(p.t>=.995)continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const geo=p.sh==='Ball'?geoSphere:p.sh==='Cylinder'?geoCyl:p.sh==='Pouch'?geoPouch:geoBox;
+    let mat;const neon=p.m==='Neon';
+    if(neon)mat=new THREE.MeshBasicMaterial({color:col(p.c).multiplyScalar(1.15),transparent:p.t>0,opacity:1-p.t,toneMapped:false,depthWrite:p.t<.5});
+    else if(p.m==='Glass'||p.m==='Ice')mat=new THREE.MeshPhysicalMaterial({color:col(p.c),roughness:.06,metalness:0,transparent:p.t>0,opacity:1-p.t,clearcoat:1,envMap:envTex,envMapIntensity:.4});
+    else{
+      const rough={Wood:.7,Marble:.25,Slate:.82,Fabric:.95,SmoothPlastic:.45,Plastic:.6,Metal:.3}[p.m]??.7;
+      mat=new THREE.MeshStandardMaterial({color:col(p.c),roughness:rough,metalness:p.m==='Metal'?.85:0,transparent:p.t>0,opacity:1-p.t});
+      if(p.m==='Metal'||p.m==='Marble'){mat.envMap=envTex;mat.envMapIntensity=p.m==='Metal'?1.1:.35}
+    }
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.s[0],p.s[1],p.s[2]));
+    mesh.castShadow=opts.shadows&&!neon&&p.t<.3;mesh.receiveShadow=opts.shadows&&!neon;s.add(mesh);
+    if(neon&&p.t<.95){const sz=Math.max(p.s[0],p.s[1],p.s[2]);if(sz<7)glow(s,p.p,p.c,Math.max(.9,sz*2.6),.32*(1-p.t));}
+  }
+}
+function addFx(s,f){
+  for(const l of f.lights||[]){
+    const pl=new THREE.PointLight(col(l.color),l.brightness*l.range*1.6,l.range*1.6,1.3);pl.position.set(...l.p);s.add(pl);
+  }
+  const R=rnd(11);
+  for(const e of f.emitters||[]){
+    const pts=[];const c=col(e.color);
+    if(e.count>0||e.rate>0){
+      const n=Math.min(e.smoke?24:160,Math.round(e.count>0?e.count:e.rate*e.life));
+      for(let i=0;i<n;i++){
+        if(e.count>0&&e.speed<.5){pts.push(e.p[0]+(R()-.5)*e.size[0],e.p[1]+(R()-.5)*e.size[1],e.p[2]+(R()-.5)*e.size[2]);continue}
+        if(e.count>0){const th=R()*Math.PI*2,ph=Math.acos(2*R()-1),r=(.3+R()*.7)*e.speed*e.life*.5;pts.push(e.p[0]+Math.sin(ph)*Math.cos(th)*r,e.p[1]+Math.cos(ph)*r,e.p[2]+Math.sin(ph)*Math.sin(th)*r);continue}
+        const u=R();pts.push(e.p[0]+(R()-.5)*Math.max(1,e.size[0]),e.p[1]+u*e.speed*e.life*.7+(R()-.5)*e.size[1],e.p[2]+(R()-.5)*Math.max(1,e.size[2]));
+      }
+    }
+    if(!pts.length)continue;
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+    s.add(new THREE.Points(g,new THREE.PointsMaterial({map:glowTex,color:c,size:e.smoke?Math.max(1.5,e.ps):Math.max(.18,e.ps*1.2),transparent:true,opacity:e.smoke?.18:.9,depthWrite:false,blending:e.smoke?THREE.NormalBlending:THREE.AdditiveBlending,sizeAttenuation:true})));
+  }
+  for(const g of f.glows||[])glow(s,g.p,g.color,g.size*1.1,Math.min(1,g.a*1.1));
+  for(const b of f.beams||[]){
+    const a=new THREE.Vector3(...b.a),bb=new THREE.Vector3(...b.b);const len=a.distanceTo(bb);if(len<1e-4)continue;
+    const geo=new THREE.CylinderGeometry(b.w*.5,b.w*.5,len,6);const mat=new THREE.MeshBasicMaterial({color:col(b.color),transparent:true,opacity:Math.max(0,1-b.t),toneMapped:false,depthWrite:false,blending:THREE.AdditiveBlending});
+    const m=new THREE.Mesh(geo,mat);m.position.copy(a.clone().add(bb).multiplyScalar(.5));m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),bb.clone().sub(a).normalize());s.add(m);
+  }
+}
+const KIND={
+  world:{bg:0x9fd3f2,hemi:[0xeaf6ff,0x5f8f55,1.2],sun:2.3,ground:true,shadows:true,fog:[0x9fd3f2,150,600]},
+  stage6:{bg:0x05030a,hemi:[0x8a70c0,0x100818,.45],sun:0,ground:false,shadows:false},
+  stage7:{bg:0x03040e,hemi:[0x8090d0,0x080818,.4],sun:0,ground:false,shadows:false},
+  stage8:{bg:0x2a2018,hemi:[0xfff0d8,0x806040,1.05],sun:1.1,ground:false,shadows:false},
+};
+window.shoot=function(f,Wd,Ht){
+  renderer.setSize(Wd,Ht);renderer.setClearColor(0x000000,1);
+  const k=KIND[f.kind]||KIND.world;
+  const s=new THREE.Scene();s.background=new THREE.Color(k.bg);if(k.fog)s.fog=new THREE.Fog(k.fog[0],k.fog[1],k.fog[2]);
+  s.add(new THREE.HemisphereLight(k.hemi[0],k.hemi[1],k.hemi[2]));
+  const T=new THREE.Vector3(...f.target),C=new THREE.Vector3(...f.eye);
+  if(k.sun){const sun=new THREE.DirectionalLight(0xfff2dd,k.sun);sun.position.set(T.x-40,T.y+80,T.z-30);sun.target.position.copy(T);
+    if(k.shadows){sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:300});sun.shadow.bias=-.0006}
+    s.add(sun,sun.target)}
+  if(k.ground){const ground=new THREE.Mesh(new THREE.PlaneGeometry(2000,2000),new THREE.MeshStandardMaterial({map:grassTexture(),roughness:.95}));ground.rotation.x=-Math.PI/2;ground.position.y=0;ground.receiveShadow=true;s.add(ground)}
+  addParts(s,f.parts,k);addFx(s,f);
+  const cam=new THREE.PerspectiveCamera(f.fov,Wd/Ht,.1,3000);cam.position.copy(C);cam.lookAt(T);
+  renderer.render(s,cam);const url=renderer.domElement.toDataURL('image/png');
+  s.traverse(o=>{if(o.material){if(o.material.map&&o.material.map!==glowTex)o.material.map.dispose();o.material.dispose()}});return url;
+};
+// the seed card's viewport: the seed alone on a transparent background, ViewportFrame-style light (ambient + one direction)
+window.shootViewport=function(v,size){
+  renderer.setSize(size,size);renderer.setClearColor(0x000000,0);
+  const s=new THREE.Scene();s.add(new THREE.HemisphereLight(0xffffff,0x8888a0,1.25));
+  const d=new THREE.DirectionalLight(0xfffaf0,2.2);d.position.set(6,10,8);s.add(d);
+  addParts(s,v.parts,{shadows:false});addFx(s,{glows:v.glows,beams:v.beams});
+  const cam=new THREE.PerspectiveCamera(v.fov,1,.05,500);cam.position.set(...v.eye);cam.lookAt(new THREE.Vector3(...v.target));
+  renderer.render(s,cam);const url=renderer.domElement.toDataURL('image/png');
+  s.traverse(o=>{if(o.material)o.material.dispose()});return url;
+};
+window.ready=true;
+</script></body></html>

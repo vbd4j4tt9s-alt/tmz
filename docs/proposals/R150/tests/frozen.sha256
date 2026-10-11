@@ -1,0 +1,3 @@
+0270f40e5b25b4bfb33aac66f3af313e8f5874bf9156bf49983aaeed00cf0ebd  src/ReplicatedStorage/TreadmillBonusRules.lua
+# R158i (on purpose): TreadmillBonusService.lua gained GrantGift (the tutorial's free roll: a ready roll, or a waiting one when the player already holds the 2 ready, ready the moment one is spent; saved as Premium.BonusGiftPending158i), _promote / _keepOwed, the TreadmillBonusRolled counter and Roll's returned Ready after the promotion; the roll's rules, odds, cooldown, cap and timing are as they were
+1ec17ebf6fb6e455a1ef660b7706c54adcea6d678952a5050466ab5cbc3cbc47  src/ServerScriptService/ChestChaseServer/TreadmillBonusService.lua

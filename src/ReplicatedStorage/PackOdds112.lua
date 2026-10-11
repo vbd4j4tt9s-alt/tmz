@@ -4,6 +4,7 @@
 -- no-boot share: Legendary, Mythic, then Secret give chance back first (each keeps half), Cosmic and King are never touched.
 -- Missing tiers: Common..Mythic pass their share up to the next tier that exists (never into Secret+); Secret+ are not rolled.
 local T=require(script.Parent.BalanceValues81)
+local Pity=require(script.Parent.PackPity155) -- R155: the pack pity's lucky roll (its clamps take x1.5 more, for that roll only)
 local O={Version=112,Gate=1e-5}
 O.Order={'Common','Uncommon','Rare','Legendary','Mythic','Secret','Cosmic','King'}
 O.Rank={};for i,t in ipairs(O.Order)do O.Rank[t]=i end
@@ -28,15 +29,22 @@ O.FloorKeep,O.GivebackKeep=.4,.5
 O.Void={MechChance=.005,OneIn={King=2e8,Cosmic=20}}
 -- Packs banked before R112 keep the old boots' luck (x1.15..x2), matched by the best boot the new luck reaches.
 O.LegacyBootLuck={1.15,1.3,1.5,1.75,2}
-function O.LegacyLuck(luck)
+local function legacyLuck(luck)
  local old=1
  if type(luck)=='number'and luck==luck then
   for i,value in ipairs(T.BootLuck)do if luck>=value then old=O.LegacyBootLuck[i]or old end end
  end
  return old
 end
+-- R155: a lucky roll (PackPity155) maps its luck before the x1.5 and gives the old multiplier the x1.5 once (x1 -> x1.5 ... x2 -> x3); any other roll as before.
+function O.LegacyLuck(luck)return Pity.Legacy(legacyLuck,luck)end
+-- R154 (owner: "the 2x luck is universal"): the clamp is LuckCeiling (the boots' cap x the luck passes: a 4 Leaf Clover owner's x2 also applies at
+-- Thunder Boots' x25M: R155 halved every boot, so that is x50M with the clover). The server caps each player at MaxLuck x their own passes, so luck without a pass is exactly as before.
+-- R155 (owner: "a 1.5x luck boost at the 10th pack"): while the pack pity's LUCKY roll is worked out (PackPity155.Scoped) the clamp is x1.5 higher (x75M:
+-- LuckyLuckCeiling), so its x1.5 always counts; every other roll clamps exactly as before.
 function O.Luck(luck)
- return type(luck)=='number'and luck==luck and math.clamp(luck,1,T.MaxLuck)or 1
+ if Pity.Lucky()then return type(luck)=='number'and luck==luck and math.clamp(luck,1,Pity.Ceiling(T.LuckCeiling or T.MaxLuck))or 1 end
+ return type(luck)=='number'and luck==luck and math.clamp(luck,1,T.LuckCeiling or T.MaxLuck)or 1
 end
 local function oneIn(pack,tier)
  return O.MidOneIn[pack][tier]or O.TopOneIn[tier]/O.PackTopLuck[pack]

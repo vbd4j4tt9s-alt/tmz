@@ -1,0 +1,229 @@
+--!nocheck
+-- R158e tutorial, the server half, on the REAL player data (the R123 world): PlayerDataService (AddChest / OpenSeedPack / PlantSeed / HarvestPlant / SellHarvest, save and load),
+-- TutorialProgress, TutorialTargets, PremiumService's Tutorial branch (from source), BeginnerGuide.
+--  1  the ten steps walked by a new player: the published step (1 / 4 / 6 / 7 / 9 / 10 / 0) and what the server points at (the nearest pack; carrying: the home line; your dirt; the
+--     plant; the market; your treadmill; your base pad as "home");
+--  2  only a pack STOLEN on the track (banked) ticks the steal step (the new-player gift pack, a roll, a grant never); after it, opening ANY pack counts (the owner's rule);
+--  3  the first fruit in 10 s: the plant planted in the plant step, once per player (saved); its later fruit / regrowth in the normal time; a finished tutorial (the owner's /test tutorial done): never;
+--  4  harvest -> sell -> the treadmill (TreadmillInfo only on step 10) -> done -> the free Forest pack (2x); R158g: there is NO skip: the 'Skip' request is refused (plain failure, nothing changes, no pack);
+--  5  old saves (R111 - R158d masks) land on the right step; a finished save stays finished; Fast / FastCrop are saved and loaded (optional fields, ProfileVersion 22);
+--  6  BeginnerGuide.Resolve over every published step walks the ten looks;
+--  7  R158h / R158i: the free bonus roll of the last step is given by the SERVER when step 10 is reached (no client ask): +1 READY roll, once per player ever (saved flag), kept across a rejoin;
+--     a player already holding the 2 ready rolls gets it as a waiting roll (saved) that is ready the moment one is spent (3 rolls in all, never a 4th); no flag is spent when the bonus service is
+--     not there or throws; a fresh state (the owner's reset writes one) is given the roll again; nothing before step 10 or after the tutorial.
+local W=require('./world');local R=W.R
+local fails,checks=0,0
+local function check(c,msg)checks+=1;if not c then fails+=1;print('FAIL: '..msg)end;return c end
+local RS=W.RS;local V3,CF=R.Vector3.new,R.CFrame.new
+local Run=W.service('RunService');Run.IsServer=function()return true end;Run.IsClient=function()return false end
+local Players=W.service('Players');Players.PlayerAdded=R.signal();Players.PlayerRemoving=R.signal()
+local present={}
+function Players.GetPlayers()local out={};for _,p in pairs(present)do out[#out+1]=p end;return out end
+function Players.GetPlayerByUserId(_,id)return present[id]end
+local guid=0;local Http=W.service('HttpService');function Http.GenerateGUID()guid+=1;return 'guid-'..guid end
+local DS=W.service('DataStoreService');local stores={}
+local function dsCopy(v)if type(v)~='table'then return v end;local o={};for k,x in pairs(v)do o[k]=dsCopy(x)end;return o end
+function DS.GetDataStore(_,name)
+ stores[name]=stores[name]or{Data={},UpdateAsync=function(self,key,fn)local v=fn(dsCopy(self.Data[key]),nil);if v~=nil then self.Data[key]=dsCopy(v)end;return dsCopy(self.Data[key])end,
+  GetAsync=function(self,key)return dsCopy(self.Data[key])end,SetAsync=function(self,key,v)self.Data[key]=dsCopy(v)end}
+ return stores[name]
+end
+local remotes=R.new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
+local folder=R.new('Folder');folder.Name='ChestChaseServer';folder.Parent=W.service('ServerScriptService')
+for _,n in ipairs(require('./srv_names'))do RS[n].Parent=folder end
+local function server(n)return W.require(folder[n])end
+W.env.bit32=bit32
+do local inew=R.Instance.new;R.Instance.new=function(class,parent)local o=inew(class,parent)
+ if class=='RemoteEvent'then o.OnServerEvent=R.signal();o.OnClientEvent=R.signal()end;return o end end
+R.clock=20727*86400+3600*5 -- (os.time on the mock = the clock: a real-looking Unix time)
+local Config=server('Config');local Guide=W.module('BeginnerGuide');local B=Guide.Bits;local Rules=W.module('PlantRules');local Packs=W.module('SeedPackRules')
+local Targets=server('TutorialTargets')
+local Map={GetStageAccent=function()return R.Color3.new(.5,.5,.5)end}
+local Data=server('PlayerDataService').new(Config,Map,{Show=function()end})
+-- R158h: the real treadmill bonus service (ChestChaseServerMain sets playerData.TreadmillBonus the same way)
+Data.TreadmillBonus=server('TreadmillBonusService').new(Config,Data,{TrainingSessions={}},nil,nil)
+local function makePlayer(id,name)
+ local p=R.new('Player');p.Name=name;p.DisplayName=name;p.UserId=id;p.Parent=Players;present[id]=p
+ function p.Kick(_,why)error('kicked '..name..': '..tostring(why),0)end
+ R.new('Backpack').Parent=p
+ Data:PreparePlayer(p);assert(Data:Load(p),'load '..name)
+ local m=R.new('Model');m.Name=name;local root=R.new('Part');root.Name='HumanoidRootPart';root.CFrame=CF(0,3,0);root.Parent=m;m.PrimaryPart=root;m.Parent=W.workspace;p.Character=m
+ return p
+end
+local function state(p)return Data:GetPremium(p).Tutorial end
+local function step(p)return p:GetAttribute('TutorialStep')end
+local function now()return math.floor(R.clock)end
+-- A stand-in ChestService for TutorialTargets: the track's packs, the home line, the market, your base (pad, spawn, treadmill, garden dirt).
+local function part(name,pos,size)local q=R.new('Part');q.Name=name;q.Size=size or V3(4,1,4);q.CFrame=CF(pos.X,pos.Y,pos.Z);return q end
+local baseModel=R.new('Model');baseModel.Name='Base1'
+local plots=R.new('Folder');plots.Name='GardenPlots';plots.Parent=baseModel
+for i=1,10 do part('DirtPlot_'..i,V3(-20+i,1,10),V3(46,1,22.6)).Parent=plots end
+local base={Model=baseModel,Pad=part('Pad',V3(0,0,-20),V3(118,1,180)),Spawn=part('Spawn',V3(0,1,-60)),Treadmill=part('Treadmill',V3(12,1,-6))}
+local function worldPack(pos)local body=part('Pack',pos);body.Parent=W.workspace;return {Stage=1,Available=true,Body=body,Prompt={Enabled=true}}end
+local packs={worldPack(V3(40,3,90)),worldPack(V3(-60,3,140))}
+local chests={Bases={GetPlayerBase=function()return base end},Map={Chests=packs,Refreshing=false,BaseBoundaryLine=part('Line',V3(0,1,50),V3(240,1,2)),SellStation=part('SellStation',V3(0,3,-150))},
+ GetPackPickupPosition=function(_,_,pos)return pos end}
+local function targets(p)return Targets.State(Data,chests,p)end
+local function record(p,id)for _,r in ipairs(Data:GetChestRecords(p))do if r.Id==id then return r end end end
+local function crop(p,id)for _,list in pairs(Data.Gardens[p].Plots)do for _,c in ipairs(list)do if c.Id==id then return c end end end end
+local function steal(p)return Data:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{Luck=true,Banked=true})end
+local function grantPack(p)return Data:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion})end
+local function open(p,id)return Data:OpenSeedPack(p,id,function()return .02 end)end -- (this roll gives a Forest seed with several fruit: "only the first fruit" is checked)
+local function finish(p) -- PremiumService's Tutorial request for an action (its branch is checked from source below)
+ return function(action)
+  if Data:TutorialAction(p,action)then Data:PublishTutorial(p)end
+  local gift;if action=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then gift=Data:GrantStarterPack(p)end
+  return gift
+ end
+end
+
+-- 1-4. A new player walks the ten steps ---------------------------------------------------------------------------------------------------------------------------------
+local P=makePlayer(501,'Nova')
+check(P:GetAttribute('TutorialDone')==false and step(P)==1,'a brand-new player: step 1 (spawn arrow / TRACK / steal on the client)')
+local t=targets(P)
+check(t.Success and t.Step==1 and t.Kind=='Pack'and t.Target==V3(40,3,90)and t.TargetPart==packs[1].Body and not t.WaitingForPack,'steps 1 - 3: the server points at the nearest pack')
+check(t.HomeCFrame==base.Pad.CFrame and t.HomeSize==base.Pad.Size,'and sends your base pad (home for steps 5 - 10)')
+P:SetAttribute('ChestChaseSeedCarrying',true);t=targets(P);check(t.Kind=='Safety'and math.abs(t.Target.Z-38)<.01,'carrying a stolen pack: the home line');P:SetAttribute('ChestChaseSeedCarrying',false)
+-- the new-player gift (or a roll / grant) is not a steal
+local gift=grantPack(P);check(step(P)==1,'2: a pack that was not stolen (the gift, a roll) does not tick the steal step')
+open(P,gift.Id);check(step(P)==1,'2: opening it before the steal changes nothing yet')
+steal(P);check(step(P)==4,'3 -> 4: a pack stolen on the track and banked')
+t=targets(P);check(t.Step==4 and t.Kind==nil,'4: no world target (the hotbar slot / clicking hand on the client)')
+local other=grantPack(P);open(P,other.Id);check(step(P)==6,'4 -> 6: opening ANY pack counts (owner)')
+t=targets(P);check(t.Step==6 and t.Kind=='Garden'and t.Target~=nil,'5 / 6: your dirt')
+-- the plant step: the first fruit in 10 s
+local seed=record(P,other.Id);local def=Config.GardenPlants[seed.SeedId]
+print(('INFO the planted seed: %s, %d fruit, %d s to grow, regrows in %s s'):format(seed.SeedId,def.FruitCount or 1,def.Seconds,tostring(def.RegrowSeconds)))
+check((def.FruitCount or 1)>1 and def.Mode~='whole'and def.Regrows~=false,'(the walk plants a seed with several fruit, so "only the first fruit" is checked)')
+local okPlant,planted=Data:PlantSeed(P,1,seed.Id,{OffsetX=-8,OffsetZ=0},now())
+local c=okPlant and crop(P,planted.Id)
+check(okPlant and step(P)==7,'6 -> 7: planted')
+check(c and c.MatureAt==now()+10 and Rules.FruitReadyAt(c,1)==now()+10,'3: its first fruit is ready in exactly 10 s ('..tostring(c and c.MatureAt-now())..')')
+check(state(P).Fast==true and state(P).FastCrop==planted.Id,'3: flagged on the server: once (Fast) and which plant (FastCrop)')
+local normal=now()+def.Seconds
+local others=true;for i=2,def.FruitCount do if Rules.FruitReadyAt(c,i)<normal-1 then others=false end end
+check(others,'3: its other fruit grow in the normal time ('..def.FruitCount..' fruit, '..def.Seconds..' s)')
+check(Rules.ValidTraits(c,def.FruitCount),'3: the quick plant is a valid saved crop (the loader keeps it)')
+do -- the look (PlantGrowth): fruit 1 ripens with the plant at 10 s; fruit 2+ grow smoothly over their normal time (no jump when the plant is grown up at 10 s)
+ local Growth=W.module('PlantGrowth');local t0=c.PlantedAt
+ local _,f1=Growth.Progress(c,def,t0+10,1);local _,a=Growth.Progress(c,def,t0+9.9,2);local _,b2=Growth.Progress(c,def,t0+10.1,2);local _,e=Growth.Progress(c,def,t0+def.Seconds-1,2)
+ check(f1==1 and math.abs(b2-a)<.01 and a<.2 and e>.95,('3: the look: fruit 1 ripe at 10 s, fruit 2 grows smoothly (%.3f -> %.3f at 10 s, %.2f near its time)'):format(a,b2,e))
+end
+t=targets(P);check(t.Step==7 and t.Kind=='Crop'and t.ReadyIn==10 and t.Ripe==false and t.Target~=nil,'7: the plant, ready in 10 s, not ripe yet')
+R.clock+=10;t=targets(P);check(t.ReadyIn==0 and t.Ripe==true,'7 -> 8: 10 s after planting the fruit is ripe')
+local okH,harvest=Data:HarvestPlant(P,1,planted.Id,now(),1)
+check(okH and step(P)==9,'8 -> 9: harvested')
+check(not Data:HarvestPlant(P,1,planted.Id,now(),2),'3: the second fruit is not quick (normal timing)')
+check(Rules.FruitReadyAt(c,1)>=now()+(def.RegrowSeconds or 1)-1,'3: fruit 1 regrows in the normal time ('..(Rules.FruitReadyAt(c,1)-now())..' s)')
+t=targets(P);check(t.Step==9 and t.Kind=='Sell'and t.Target==V3(0,3,-150),'9: the market')
+check(Data.TreadmillBonus:GetReady(P)==0,'7: (no free roll before step 10)')
+check(Data:SellHarvest(P,harvest.Id)and step(P)==10,'9 -> 10: sold')
+t=targets(P);check(t.Step==10 and t.Kind=='Treadmill'and t.Target==V3(12,1,-6),'10: your treadmill')
+-- R158i (owner: "players are still not granted that free roll at the start"): the free bonus roll is given by the SERVER the moment the tutorial reaches step 10 (the sale above made it 10): +1 READY
+-- roll with NO client ask at all, once per player, also when the player already holds the 2 ready rolls of the starter gift (a waiting roll, ready the moment one is spent)
+do local bonus=Data.TreadmillBonus
+ check(bonus:GetReady(P)==1 and P:GetAttribute('TreadmillBonusReady')==1,'7: reaching step 10 (the sale) gave +1 READY bonus roll with no client request')
+ check(state(P).Bonus==true and Data:GetPremium(P).StarterRolls158d==1,'7: ... flagged on the server (once) and kept as an unused gift roll for a rejoin')
+ -- "right after another Tutorial request" (the 0.2 s throttle of PremiumService refuses the second request of a pair): the grant never depended on a request
+ Data:TutorialAction(P,'Replay');Data:PublishTutorial(P);Data:PublishTutorial(P);targets(P)
+ check(bonus:GetReady(P)==1,'7: more tutorial requests / publishes at step 10 never add a second roll')
+ check(Data:TutorialAction(P,'BonusGift')==false and bonus:GetReady(P)==1,'7: the old client ask is refused and harmless (once per player)')
+ local Q0=makePlayer(504,'EarlyStep');check(bonus:GetReady(Q0)==0 and state(Q0).Bonus==nil and Data:TutorialAction(Q0,'BonusGift')==false,'7: before step 10 (and an early ask) no roll, no flag')
+end
+local starter=finish(P)('TreadmillInfo')
+check(P:GetAttribute('TutorialDone')==true and step(P)==0,'10 -> done')
+check(starter and starter.RateBoost==2 and starter.Stage==1,'the free Forest pack (2x) for finishing')
+check(Data:TutorialAction(P,'BonusGift')==false and Data.TreadmillBonus:GetReady(P)==1,'7: after the tutorial no more rolls (still the one)')
+do local bonus=Data.TreadmillBonus;local saved=Data:_buildSaveData(P);check(saved.Premium.Tutorial.Bonus==true,'7: the flag is saved')
+ Data.Store.Data['Player_901']=saved;local back=makePlayer(901,'BonusBack')
+ check(state(back).Bonus==true and back:GetAttribute('TutorialDone')==true,'7: ... and loaded back')
+ local mask10=bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash)
+ local R2=makePlayer(905,'Rejoiner');state(R2).Mask=mask10;Data:PublishTutorial(R2)
+ check(bonus:GetReady(R2)==1 and state(R2).Bonus==true,'7: (a second player reaching step 10 gets her own roll)')
+ local s2=Data:_buildSaveData(R2);Data.Store.Data['Player_906']=s2;local R3=makePlayer(906,'Rejoined')
+ check(step(R3)==10 and state(R3).Bonus==true,'7: (she rejoins at step 10 with the flag)')
+ bonus:Setup(R3);Data:PublishTutorial(R3);check(bonus:GetReady(R3)==1 and state(R3).Bonus==true and Data:TutorialAction(R3,'BonusGift')==false,'7: a rejoin before pressing it: the roll comes back, and no second one')
+ -- already holding the most ready rolls (the starter gift's 2): the free roll waits and is ready the moment one is spent; 3 rolls in all, never a 4th
+ local F=makePlayer(907,'Full');bonus:GrantReady(F,2);state(F).Mask=mask10;Data:PublishTutorial(F)
+ check(bonus:GetReady(F)==2 and state(F).Bonus==true and bonus.Pending[F]==true and Data:GetPremium(F).BonusGiftPending158i==true,'7: already 2 ready: the flag is spent and the roll WAITS (saved), the 2 ready stay')
+ check(F:GetAttribute('TreadmillBonusReady')==2,'7: ... the button shows the 2 ready')
+ local sF=Data:_buildSaveData(F);check(sF.Premium.BonusGiftPending158i==true,'7: the waiting roll is saved')
+ R.clock+=5;local r1=bonus:Roll(F)
+ check(r1.Ok==true and bonus:GetReady(F)==2 and bonus.Pending[F]==nil and Data:GetPremium(F).BonusGiftPending158i==nil and F:GetAttribute('TreadmillBonusRolled')==1,'7: the first roll spent: the waiting roll is ready at once (2 ready again), the counter the tutorial arrow watches grew')
+ R.clock+=5;check(bonus:Roll(F).Ok==true and bonus:GetReady(F)==1,'7: the second roll: 1 left')
+ R.clock+=5;check(bonus:Roll(F).Ok==true and bonus:GetReady(F)==0,'7: the third roll: the player got 3 rolls (2 + the free one)')
+ R.clock+=5;check(bonus:Roll(F).Ok~=true and bonus:GetReady(F)==0,'7: ... and never a fourth')
+ Data:PublishTutorial(F);Data:PublishTutorial(F);check(bonus:GetReady(F)==0 and bonus.Pending[F]==nil,'7: more publishes give nothing more (once per player)')
+ -- a waiting roll survives a rejoin: the saved flag brings it back as a ready roll
+ Data.Store.Data['Player_909']=sF;local W2=makePlayer(909,'WaitBack');bonus:Setup(W2)
+ check(bonus:GetReady(W2)==1 and bonus.Pending[W2]==nil and Data:GetPremium(W2).BonusGiftPending158i==nil and state(W2).Bonus==true,'7: a waiting roll comes back after a rejoin as a ready roll (ready rolls themselves are not saved), once')
+ -- a fresh state (the owner's tutorial reset / step writes one) is given its own roll
+ local fresh=makePlayer(908,'Reset');Data:GetPremium(fresh).Tutorial={Version=1,Mask=mask10,Done=false};Data:PublishTutorial(fresh)
+ check(bonus:GetReady(fresh)==1 and state(fresh).Bonus==true,'7: a fresh state (the owner\'s tutorial reset writes one) is given the roll again')
+ -- the service not wired yet / a throw: the flag is NOT spent, the next publish gives it
+ local X=makePlayer(910,'Unwired');state(X).Mask=mask10;Data.TreadmillBonus=nil;Data:PublishTutorial(X)
+ check(state(X).Bonus==nil and step(X)==10,'7: no bonus service yet: no flag spent')
+ Data.TreadmillBonus={GrantGift=function()error('boom')end};Data:PublishTutorial(X);check(state(X).Bonus==nil,'7: a throw: no flag spent')
+ Data.TreadmillBonus=bonus;Data:PublishTutorial(X);check(bonus:GetReady(X)==1 and state(X).Bonus==true,'7: ... and the next publish gives the roll')
+end
+-- once per player: the tutorial put back on the plant step by hand: the next plant grows normally
+do local s=state(P);s.Done=false;s.Mask=bit32.bor(1,B.Pack,B.Seed);Data:PublishTutorial(P)
+ local again=grantPack(P);open(P,again.Id)
+ local ok2,c2=Data:PlantSeed(P,2,again.Id,{OffsetX=0,OffsetZ=0},now())
+ check(ok2 and c2.MatureAt>now()+10 and step(P)==7,'3: only once per player: a second tutorial plant grows in its normal time')
+ s.Done=true;Data:PublishTutorial(P)
+end
+-- R158g (owner: "there will be no skip tutorial button"): the 'Skip' request is refused like 'Replay' (plain failure, nothing changes, no free pack, no quick-fruit change)
+do local Q=makePlayer(502,'Skipper');local before=state(Q).Mask
+ check(finish(Q)('Skip')==nil and Data:TutorialAction(Q,'Skip')==false,'4: the Skip request is refused (a plain failure)')
+ check(state(Q).Done==false and state(Q).Mask==before and Q:GetAttribute('TutorialDone')==false and step(Q)==1,'4: ... nothing changes: the tutorial is still on step 1, not done')
+ check(Data:GrantStarterPack(Q)==nil,'4: ... and no free pack')
+ check(Data:TutorialAction(Q,'Replay')==false,'4: (Replay is still refused too)')
+ local pk=steal(Q);open(Q,pk.Id);local ok,cq=Data:PlantSeed(Q,1,pk.Id,{OffsetX=0,OffsetZ=0},now())
+ check(ok and cq.MatureAt==now()+10,'3: (a refused skip took nothing from the player: the tutorial plant is still the quick one)')
+ -- a finished tutorial (the owner's /test tutorial done sets the saved state directly): no quick fruit, no second pack
+ local D=makePlayer(503,'Finished');Data:GetPremium(D).Tutorial={Version=1,Mask=255,Done=true};Data:PublishTutorial(D)
+ local pk2=steal(D);open(D,pk2.Id);local ok2,cd=Data:PlantSeed(D,1,pk2.Id,{OffsetX=0,OffsetZ=0},now())
+ check(ok2 and cd.MatureAt>now()+10 and not state(D).Fast,'3: a finished tutorial: no quick fruit')
+end
+-- the PremiumService Tutorial branch (from source: PremiumService.new starts product loaders the mock can't settle)
+local src=W.B.PremiumService
+check(src:find("if value=='TreadmillInfo'and p:GetAttribute('TutorialDone')==true then",1,true)and src:find('return require(script.Parent.TutorialTargets).State(data,chests,p)',1,true),'PremiumService: TreadmillInfo grants the free pack, every request answers with the targets')
+check(not src:find("'Skip'",1,true)and W.B.TutorialProgress:find("if action=='Skip'then return false end",1,true),'R158g: PremiumService has no Skip path; TutorialProgress refuses it')
+
+-- 5. Old saves -----------------------------------------------------------------------------------------------------------------------------------------------------------
+do
+ local cases={{1,1},{bit32.bor(1,B.Pack),4},{bit32.bor(1,B.Pack,B.Seed),6},{bit32.bor(1,B.Pack,B.Seed,B.Plant),7},{bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest),9},
+  {bit32.bor(1,B.Pack,B.Seed,B.Plant,B.Harvest,B.Sell,B.Cash),10}}
+ for i,case in ipairs(cases)do
+  local V=makePlayer(600+i,'Old'..i);local saved=Data:_buildSaveData(V);saved.Premium.Tutorial={Version=1,Mask=case[1],Done=false}
+  Data.Store.Data['Player_'..(700+i)]=saved
+  local V2=makePlayer(700+i,'Back'..i)
+  check(step(V2)==case[2]and V2:GetAttribute('TutorialDone')==false,('5: an old save with mask %d resumes at step %d (got %s)'):format(case[1],case[2],tostring(step(V2))))
+ end
+ for i,mask in ipairs({255,31,1})do
+  local V=makePlayer(810+i,'Finished'..i);local saved=Data:_buildSaveData(V);saved.Premium.Tutorial={Version=1,Mask=mask,Done=true}
+  Data.Store.Data['Player_'..(820+i)]=saved;local V2=makePlayer(820+i,'StillDone'..i)
+  check(V2:GetAttribute('TutorialDone')==true and step(V2)==0,'5: a finished save (mask '..mask..') stays finished')
+ end
+ local L=makePlayer(802,'Saver');local pk=steal(L);open(L,pk.Id);local ok,cl=Data:PlantSeed(L,1,pk.Id,{OffsetX=0,OffsetZ=0},now())
+ local saved=Data:_buildSaveData(L);local st=saved.Premium.Tutorial
+ check(ok and st.Fast==true and st.FastCrop==cl.Id and st.Version==1,'5: Fast / FastCrop are saved')
+ Data.Store.Data['Player_803']=saved;local L2=makePlayer(803,'Loader');local s2=state(L2)
+ check(s2.Fast==true and s2.FastCrop==cl.Id and step(L2)==7,'5: ... and loaded back (the grow step, the same plant)')
+ check(Config.ProfileVersion==22,'5: ProfileVersion is still 22')
+end
+
+-- 6. Resolve walks the ten looks over the published steps ------------------------------------------------------------------------------------------------------------------
+do
+ local seen={}
+ local function look(c)local s,k=Guide.Resolve(c);seen[s]=k;return s,k end
+ look({Stage=1,OnTrack=false});look({Stage=1,OnTrack=false,IntroDone=true});look({Stage=1,OnTrack=true})
+ look({Stage=4,PackInHand=true});look({Stage=6,Home=false});look({Stage=6,Home=true,SeedInHand=true})
+ look({Stage=7,Home=true});look({Stage=7,Home=true,Ripe=true});look({Stage=9});look({Stage=10,Home=true})
+ local order={'Spawn','Track','Grab','Open','Base','Plant','Grow','Harvest','Market','Treadmill'}
+ local _,bonus=Guide.Resolve({Stage=10,Home=true,Bonus=true});check(bonus=='Bonus','6: step 10 goes on to the BONUS ROLL arrow once the treadmill is done')
+ for i,k in ipairs(order)do check(seen[i]==k,('6: step %d is %s (%s)'):format(i,k,tostring(seen[i])))end
+end
+print(('%d checks, %d failures'):format(checks,fails))
+if fails>0 then error('FAILED')end

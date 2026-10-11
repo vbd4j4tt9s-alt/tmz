@@ -21,6 +21,19 @@ function P.Add(a,b)
  end
  return #out>0 and table.concat(out):reverse()or'0'
 end
+-- R158i: a-b for exact whole points, never below 0 (the shown speed is the points minus the 19,999 every player starts with: SpeedDisplay).
+function P.Sub(a,b)
+ a=P.Normalize(a);b=P.Normalize(b)
+ if P.Compare(a,b)<=0 then return '0'end
+ local out={};local i,j,borrow=#a,#b,0
+ while i>0 do
+  local n=a:byte(i)-48-borrow-(j>0 and b:byte(j)-48 or 0)
+  if n<0 then n+=10;borrow=1 else borrow=0 end
+  out[#out+1]=string.char(48+n);i-=1;j-=1
+ end
+ local text=table.concat(out):reverse():gsub('^0+','')
+ return text~=''and text or'0'
+end
 function P.Log10(v)
  v=P.Normalize(v);if v=='0'then return 0 end
  local n=math.min(14,#v)
@@ -29,6 +42,33 @@ end
 function P.Exact(v)
  local s=P.Normalize(v):reverse():gsub('(%d%d%d)','%1,'):reverse()
  return(s:gsub('^,',''))
+end
+-- R148 (owner: "the speed needed is in numbers, whole numbers and multiples of 5"): the keeper sign's number. `v` is
+-- the exact points needed (a decimal string, or a number). RoundUp2 rounds it UP to 2 significant figures (so it is never
+-- below the real need; values under 100 go up to the next multiple of 5), as exact decimal text of any size. NeedText
+-- writes that whole, with thousands separators and the largest suffix that keeps the number whole (K M B T Qa ... Dc):
+-- 3800 -> "3,800", 18000 -> "18K", 540000 -> "540K"; from a million up one decimal is allowed (R148): 1.2M, 16M, 2.6B, 22B;
+-- "0" for nothing; "∞" from 10^36 on.
+function P.RoundUp2(v)
+ v=P.Normalize(v);local len=#v
+ if len<=2 then return tostring(math.ceil(tonumber(v)/5)*5)end
+ local lead=tonumber(v:sub(1,2));if v:sub(3):find('[1-9]')then lead+=1 end
+ local zeros=len-2
+ if lead>=100 then lead=10;zeros+=1 end
+ return tostring(lead)..string.rep('0',zeros)
+end
+local NEED_SUFFIXES={'K','M','B','T','Qa','Qi','Sx','Sp','Oc','No','Dc'} -- 10^3 ... 10^33
+local function withCommas(digits)return(digits:reverse():gsub('(%d%d%d)','%1,'):reverse():gsub('^,',''))end
+function P.NeedText(v)
+ local r=P.RoundUp2(v);if #r>36 then return'∞'end
+ if #r<=4 then return withCommas(r)end -- below 10,000: in full
+ if #r>=7 then -- R148 (owner: "B or mil can have decimal points"): a million and up reads 1.2M, 16M, 2.6B, 22B
+  local group=math.min(math.floor((#r-1)/3),#NEED_SUFFIXES);local first=#r-3*group
+  local tenth=r:sub(first+1,first+1);return r:sub(1,first)..((tenth~=''and tenth~='0')and'.'..tenth or'')..NEED_SUFFIXES[group]
+ end
+ local zeros=#r-#(r:gsub('0+$',''))
+ local group=math.min(math.floor(zeros/3),#NEED_SUFFIXES)
+ return withCommas(r:sub(1,#r-3*group))..(NEED_SUFFIXES[group]or'')
 end
 function P.Compact(v)
  v=P.Normalize(v);if #v<7 then return v end

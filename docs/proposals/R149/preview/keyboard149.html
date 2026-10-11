@@ -1,0 +1,90 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Keyboard preview R149</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_keyboard149.luau scene (R148 "before" or R149 "after"): Roblox parts as boxes, keycap MeshParts as square
+// frustums with a lighter dished top (the R142Keycap mesh is not available outside Roblox: a stand-in with its proportions), floors unless the
+// keyboard hides them for this client, and every SurfaceGui painted onto its part's Top face the way Roblox lays it out (R151: canvas x -> world
+// -Z, canvas y -> world +X, so the canvas is depth x width; labels turned by GuiObject.Rotation about their centre. R149's version of this file drew
+// canvas x -> +X and canvas y -> +Z, which is why it never showed the missing letters). Grass banks outside the 180-wide track, a light haze like
+// the game's Atmosphere. Plain lighting, no Roblox materials: a design preview, not a screenshot.
+import * as THREE from 'three';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const geoBox=new THREE.BoxGeometry(1,1,1);
+// keycap stand-in: unit square frustum (bottom 1 x 1, top .80 x .80), flat-shaded sides
+function keycapGeometry(){
+  const g=new THREE.CylinderGeometry(.80/Math.SQRT2,1/Math.SQRT2,1,4,1,false);g.rotateY(Math.PI/4);return g.toNonIndexed();
+}
+const geoCap=keycapGeometry();geoCap.computeVertexNormals();
+function grassTexture(){
+  const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d');
+  g.fillStyle='#5fae4f';g.fillRect(0,0,128,128);g.fillStyle='rgba(0,0,0,.05)';g.fillRect(0,0,64,64);g.fillRect(64,64,64,64);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(200,200);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function guiTexture(gui){
+  const scale=Math.min(1,2048/Math.max(gui.cw,gui.ch),Math.max(.25,256/Math.min(gui.cw,gui.ch)));
+  const cv=document.createElement('canvas');cv.width=Math.max(4,Math.round(gui.cw*scale));cv.height=Math.max(4,Math.round(gui.ch*scale));
+  const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);g.textAlign='center';g.textBaseline='middle';
+  for(const l of gui.labels){
+    let px=l.size;
+    if(l.scaled){px=Math.min(l.h*.92,l.w/(Math.max(1,l.t.length)*.62));}
+    px=Math.min(px,100)*scale; // TextSize / TextScaled stop at 100 px on Roblox
+    g.save();g.translate(l.x*scale,l.y*scale);g.rotate(l.rot*Math.PI/180);
+    g.globalAlpha=1-l.a;g.fillStyle=`rgb(${l.ink[0]},${l.ink[1]},${l.ink[2]})`;
+    g.font=`700 ${Math.round(px)}px "DejaVu Sans","Arial Rounded MT Bold",sans-serif`;g.fillText(l.t,0,px*.04);g.restore();
+  }
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=16;return t;
+}
+function avatar(x,y,z,s){
+  const grp=new THREE.Group();const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.7});
+  const box=(sx,sy,sz,px,py,pz,c)=>{const m=new THREE.Mesh(geoBox,mat(c));m.scale.set(sx,sy,sz);m.position.set(px,py,pz);grp.add(m)};
+  box(.9,2,1,-.5,1,0,0x2f4a8f);box(.9,2,1,.5,1,0,0x2f4a8f);box(2,2,1,0,3,0,0xd23b3b);box(1,2,1,-1.5,3,0,0xe8bd9a);box(1,2,1,1.5,3,0,0xe8bd9a);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.9,24,16),mat(0xe8bd9a));head.position.set(0,4.6,0);grp.add(head);
+  grp.position.set(x,y,z);return grp;
+}
+window.shoot=function(scene,W,H,view){
+  renderer.setSize(W,H);
+  const s=new THREE.Scene();const bg=view.bg||0xb9dcf2;s.background=new THREE.Color(bg);
+  if(view.fog)s.fog=new THREE.Fog(bg,view.fog[0],view.fog[1]);
+  s.add(new THREE.HemisphereLight(0xf2f8ff,0x6a7d5a,1.25));
+  const sun=new THREE.DirectionalLight(0xfff0d8,2.2);sun.position.set(70,140,-60);s.add(sun);
+  const F=scene.runner[1];
+  // grass banks beside and beyond the track (the side walls / scenery are not drawn)
+  const grass=new THREE.MeshStandardMaterial({map:grassTexture(),roughness:1});
+  for(const side of [-1,1]){const m=new THREE.Mesh(new THREE.PlaneGeometry(3000,8000),grass);m.rotation.x=-Math.PI/2;m.position.set(side*(90+1500),F-.02,3000);s.add(m);}
+  {const m=new THREE.Mesh(new THREE.PlaneGeometry(3000,2000),grass);m.rotation.x=-Math.PI/2;m.position.set(0,F-.02,-1100);s.add(m);}
+  // parts: keycaps instanced, everything else boxes
+  const caps=scene.parts.filter(p=>p.cls==='MeshPart'&&p.k==='Key');
+  const capMat=new THREE.MeshStandardMaterial({roughness:.5,flatShading:true});
+  const capMesh=new THREE.InstancedMesh(geoCap,capMat,Math.max(1,caps.length));
+  const plateMesh=new THREE.InstancedMesh(geoBox,new THREE.MeshStandardMaterial({roughness:.35}),Math.max(1,caps.length));
+  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),v=new THREE.Vector3(),sc=new THREE.Vector3();
+  caps.forEach((p,i)=>{
+    m4.compose(v.set(p.p[0],p.p[1],p.p[2]),q,sc.set(p.s[0],p.s[1],p.s[2]));capMesh.setMatrixAt(i,m4);capMesh.setColorAt(i,col(p.c));
+    m4.compose(v.set(p.p[0],p.p[1]+p.s[1]/2-.03,p.p[2]),q,sc.set(p.s[0]*.72,.08,p.s[2]*.72));plateMesh.setMatrixAt(i,m4);plateMesh.setColorAt(i,col(p.c).multiplyScalar(1.1));
+  });
+  capMesh.count=caps.length;plateMesh.count=caps.length;s.add(capMesh);s.add(plateMesh);
+  const boxes=scene.parts.filter(p=>!(p.cls==='MeshPart'&&p.k==='Key'));
+  const boxMesh=new THREE.InstancedMesh(geoBox,new THREE.MeshStandardMaterial({roughness:.6}),Math.max(1,boxes.length));
+  boxes.forEach((p,i)=>{m4.compose(v.set(p.p[0],p.p[1],p.p[2]),q,sc.set(p.s[0],p.s[1],p.s[2]));boxMesh.setMatrixAt(i,m4);boxMesh.setColorAt(i,col(p.c));});
+  boxMesh.count=boxes.length;s.add(boxMesh);
+  // SurfaceGuis on Top faces
+  for(const gui of scene.guis){
+    const mat=new THREE.MeshBasicMaterial({map:guiTexture(gui),transparent:true,depthWrite:false,toneMapped:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+    // the canvas is (depth x width): its x axis (reading direction) toward world -Z, its y axis (down) toward world +X; the plane's local x / y are the
+    // texture's right / up, so local x -> -Z, local y (up) -> -X, normal -> +Y
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(gui.d,gui.w),mat);
+    plane.matrix.makeBasis(new THREE.Vector3(0,0,-1),new THREE.Vector3(-1,0,0),new THREE.Vector3(0,1,0));plane.matrixAutoUpdate=false;
+    plane.matrix.setPosition(gui.p[0],gui.p[1]+.01,gui.p[2]);s.add(plane);
+  }
+  if(view.avatar)s.add(avatar(scene.runner[0],scene.runner[1],scene.runner[2]));
+  const cam=new THREE.PerspectiveCamera(view.fov,W/H,.1,6000);
+  cam.position.set(...view.pos);cam.lookAt(new THREE.Vector3(...view.look));
+  renderer.render(s,cam);return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

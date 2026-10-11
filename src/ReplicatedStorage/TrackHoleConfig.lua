@@ -3,16 +3,22 @@
 -- A hole slot frees when: it traps a carrier, its owner covers it (use the shovel on your own hole), it expires
 -- (LifetimeSeconds), the track refreshes, or its owner leaves the server. A 5th dig is refused, never replaces one.
 return {
- -- Size: "one player big". The trap circle IS the visible dark circle (the root must be over it).
- Diameter=3.4,           -- studs, dark pit circle
- RimWidth=.3,            -- lighter-brown ring around the pit (visual only; never traps)
- CrumbCount=9,           -- loose dirt cubes scattered around the rim
+ -- Size (R153: 1.5x the radius, was 3.4 / .3 / 9). The trap circle IS the visible dark circle (the root must be over it); the server
+ -- tests the whole path of a step against it (TrackHoleService.Cross), so a carrier is caught at any speed. KeyboardTrack.Config.HoleReach
+ -- (4.6) must stay >= Diameter/2 + RimWidth + CrumbSpread + CrumbSizeMax: the keys under the rim AND under every crumb stay up (a crumb lifted onto a key that
+ -- goes down when someone steps on it would hang in the air).
+ Diameter=5.1,           -- studs, dark pit circle
+ RimWidth=.45,           -- lighter-brown ring around the pit (visual only; never traps)
+ CrumbCount=12,          -- loose dirt cubes scattered around the rim
+ CrumbSpread=1.1,        -- a crumb's centre lies at most this far outside the rim (at least .1)
+ CrumbSizeMin=.22,CrumbSizeMax=.5, -- crumb edge
 
  -- Limits (anti-grief)
- CooldownSeconds=8,      -- per player, between two digs (covering is not a dig)
+ CooldownSeconds=3,      -- per player, between two digs (covering is not a dig). R124: 8 -> 3
  MaxPerPlayer=4,         -- active holes per player; the 5th dig is refused
  MaxPerServer=30,        -- active holes in the whole server
  LifetimeSeconds=180,    -- a hole closes by itself after 3 minutes
+ SweepSeconds=5,         -- R153: a hole model that no live hole owns is removed at least this often (and at every refresh clear)
  ArmSeconds=1,           -- a fresh hole cannot trap anyone for this long
  RemoteRoute='TrackHole',-- SecurityGate budget (Rate 2/s, Burst 4)
 
@@ -20,35 +26,40 @@ return {
  RagdollSeconds=4,       -- a trapped carrier lies on the ground this long, then recovers normally
  FallHorizontal=8,       -- small stumble forward (studs/s) - a fall, not a launch
  FallVertical=4,
- TrapHeightMin=-1.5,     -- root height above the hole surface that counts as "standing on it"
+ TrapHeightMin=-1.5,     -- root height above the hole surface that counts as "standing on it" (R153: anywhere along the swept path)
  TrapHeightMax=7,        -- (a high jump clears it)
  TutorialSafeSteps={[1]=true,[2]=true}, -- tutorial players on these steps never fall in
 
  -- Where you may dig
  DigRange=12,            -- max flat distance from your root to the aimed spot (else you dig at your feet)
  CoverSnap=1,            -- aiming within (pit radius + this) of YOUR hole covers it instead of digging
- MinSpacing=6,           -- center to center between any two holes
+ MinSpacing=8,           -- center to center between any two holes (R153: 6 -> 8, the same 2-stud gap between two rims)
  PackClearance=10,       -- from pack spawn pads and dropped packs
  KeeperCampClearance=18, -- from each keeper's home camp
  EntranceClearance=12,   -- past the track entrance / refresh wall line
  SurfaceTolerance=.6,    -- walkable top surface must be this close to the biome ground (thin overlays ok)
 
  Messages={
-  Cooldown='SHOVEL READY IN %dS',
-  Carrying="CAN'T DIG WHILE CARRYING A PACK",
+  Cooldown='%ds',          -- R124: only the time left
+  Carrying="CAN'T DIG WITH A PACK!",
   Refreshing='TRACK IS REFRESHING',
-  Ground='DIG ON THE TRACK GROUND',
+  Ground='ONLY DIG ON THE TRACK!',
   Pack='TOO CLOSE TO A PACK',
   Camp='TOO CLOSE TO A KEEPER CAMP',
   Entrance='TOO CLOSE TO THE ENTRANCE',
   Spacing='TOO CLOSE TO ANOTHER HOLE',
-  PlayerCap='%d HOLES MAX - COVER ONE OR WAIT FOR A TRAP',
+  PlayerCap='%d HOLES MAX! COVER ONE OR WAIT',
   ServerCap='TOO MANY HOLES ON THE TRACK',
   Covered='HOLE COVERED',
   Trapped='YOU FELL IN A HOLE! PACK DROPPED',
   Tripped='%s FELL IN YOUR HOLE!',
  },
- Hint='Dig holes on the track: thieves carrying a pack fall in',
+ -- R124: a short tip when the shovel comes out, then it fades (replaces the permanent hint line). R153 (owner): the shovel also removes plants,
+ -- so the tip says both; it shows wherever the shovel is pulled out (garden or track), the first HintTimes pull-outs of a session.
+ Hint='🕳️ dig holes on the track to trap players • tap a plant in your garden to remove it', -- R125 (owner): 'players', not 'pack thieves'
+ HintSeconds=5,
+ HintTimes=3,          -- pull-outs per session that show it (then never again until the next join)
+ HintRepeatSeconds=8,  -- a pull-out while the last tip is still on screen shows nothing and is not counted
 
  -- Dig / cover sound: one long recording with several digs, played as short variants (see DigSoundVariants and
  -- docs/proposals/holes_R122/DIG_SOUND.md). Variant source, first match wins:

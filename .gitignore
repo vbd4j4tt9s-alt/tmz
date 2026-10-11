@@ -2,3 +2,4 @@ __pycache__/
 *.rbxl
 *.rbxl.lock
 sourcemap.json
+.claude/

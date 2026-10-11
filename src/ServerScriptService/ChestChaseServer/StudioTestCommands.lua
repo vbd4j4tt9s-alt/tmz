@@ -3,6 +3,7 @@ local Commands={}
 local PlayerCommands=require(script.Parent:WaitForChild('OwnerPlayerCommands'))
 local ServerClear=require(script.Parent:WaitForChild('ServerClearService'))
 local Access=require(script.Parent:WaitForChild('OwnerCommandAccess'))
+local function isOwner(p)local f=Access.IsOwner;return type(f)=='function'and f(p)==true end -- R158f: the game owner (a test's stand-in access module without IsOwner has no owner: the limits stay)
 local Targeting=require(script.Parent.OwnerCommandTargets82)
 local TestState=require(script.Parent.OwnerTestState82)
 local UpdateCommands=require(script.Parent.OwnerUpdateCommands82)
@@ -16,6 +17,7 @@ local Rules=require(RS:WaitForChild('PlantRules'))
 local Packs=require(RS:WaitForChild('SeedPackRules'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'))
 local Help=require(RS:WaitForChild('StudioTestHelp'))
+local PartyRules=require(RS:WaitForChild('PartyRules158l')) -- R158l: the words of /test givepack
 local biomeIDs={forest=1,jungle=6,desert=2,snow=3,lava=4,crystal=5,storm=7}
 local function key(v)return tostring(v or''):lower():gsub('[^%w]','')end
 local function number(s,default,minimum,maximum,integer)
@@ -98,14 +100,21 @@ function Commands.Normalize(text)
  return '/test '..phrase
 end
 
-local function executeFor(ctx,player,text,requester)
+local GrantsItems={seed=true,seeds=true,pack=true,plant=true,plants=true,rarepacks=true,packset=true,eclipse=true,void=true,verity=true,holo=true,droppack=true,givepack=true}
+local executeFor
+executeFor=function(ctx,player,text,requester)
  if not player or player.Parent~=Players or not ctx.Data:IsLoaded(player)then return false,'Wait for your player data to load.'end
  text=Commands.Normalize(text);if not text then return false,'Invalid command.'end
  local a={};for word in text:gmatch('%S+')do table.insert(a,word)end
  if a[1]~='/test'and a[1]~='/cctest'then return false,'Type help in the F4 command box.'end
  table.remove(a,1);local action=(table.remove(a,1)or'help'):lower()
- if action=='points'then action='speed'elseif action=='tp'then action='biome'end
- if UpdateCommands.Actions[action]then return UpdateCommands.Execute(ctx,player,action,a)end
+ -- R158f: the GAME OWNER's commands are absolute: no refusal for a chase, a carry or a pack opening, no cap (the 200 Bag cap, 100 per grant), no cooldown. Admins keep today's limits.
+ local owner=isOwner(requester)
+ local fastfruit=action=='fastfruit'
+ if action=='points'then action='speed'elseif action=='tp'then action='biome'elseif fastfruit then action='growall'elseif action=='reveal'then action='rarepull'end
+ -- R151: whatever an owner command just gave this player (packs, seeds, plants) is not counted for the hub's BEST PULL / BIGGEST FRUIT boards for the rest of this session.
+ if GrantsItems[action]then local hub=ctx.Chase and ctx.Chase.HubDisplays;if hub then pcall(hub.NoteOwnerGrant,hub,player)end end
+ if UpdateCommands.Actions[action]then return UpdateCommands.Execute(ctx,player,action,a,requester)end
  local function exact(min,max)return #a>=min and #a<=(max or min)end
  if action=='help'then
   local lines={'OWNER COMMANDS — Public servers: owner / configured admins. Add @username or @all at the end. Inventory, currency and progression changes are saved; movespeed, animrate and flight are temporary.'}
@@ -118,13 +127,22 @@ local function executeFor(ctx,player,text,requester)
   return true,table.concat(lines,'\n')
  elseif action=='perf'then
   player:SetAttribute('StudioTestPerf',not player:GetAttribute('StudioTestPerf'));return true,'Performance display toggled.'
+ elseif action=='hotbar'then -- R153: the hotbar log on this player's screen + what the server did with their packs
+  local on=not player:GetAttribute('HotbarLog');player:SetAttribute('HotbarLog',on)
+  local chests=ctx.Chests;local log=chests and chests.HoldLog and chests.HoldLog[player];local op=chests and chests.Openings and chests.Openings[player]
+  local c=player.Character;local held=c and c:FindFirstChildOfClass('Tool')
+  return true,table.concat({'Hotbar log '..(on and'ON: each press, what it did and anything the server moved shows top-left (select it to copy) and in the F9 console.'or'OFF.'),
+   'Server sees in the hand: '..(held and held.Name or'nothing')..' | pack held: '..(type(op)=='table'and op.Tool and((op.Committed and'revealing 'or'')..op.Tool.Name)or'none'),
+   'Packs the server held late or sent back (newest last): '..(log and #log>0 and table.concat(log,' | ')or'none'),
+   -- R155: what this player holds (the 200 cap) and what they threw away (each discard is also an Output line "[R155 Discard] ...")
+   'Items held: '..tostring(ctx.Data.HeldItemCount and ctx.Data:HeldItemCount(player)or'?')..'/'..tostring(ctx.Data.HeldItemCap and ctx.Data:HeldItemCap()or'?')..' | thrown away (newest last): '..(ctx.Data.DiscardLog and ctx.Data.DiscardLog[player]and #ctx.Data.DiscardLog[player]>0 and table.concat(ctx.Data.DiscardLog[player],' | ')or'none')},'\n')
  elseif action=='effects'then
   if not exact(1)or(a[1]~='normal'and a[1]~='low'and a[1]~='off')then return false,'Use /test effects normal, low or off.'end
   player:SetAttribute('StudioPlantEffects',a[1]);return true,'Plant effects: '..a[1]
  elseif action=='stats'then
   local records=ctx.Data:GetChestRecords(player);local packs=0
   for _,r in ipairs(records)do if r.Kind=='Pack'then packs+=1 end end
-  return true,string.format('Seeds %d | Packs %d | Plants %d | Harvests %d | Cash %.0f | Speed %s',#records-packs,packs,#crops(ctx.Data,player),#ctx.Data.Gardens[player].Harvests,ctx.Data:GetCash(player),ctx.Data:GetOrCreateSpeedValue(player).Value)
+  return true,string.format('Seeds %d | Packs %d | Plants %d | Harvests %d | Cash %.0f | Speed %s',#records-packs,packs,#crops(ctx.Data,player),#ctx.Data.Gardens[player].Harvests,ctx.Data:GetCash(player),require(RS.SpeedDisplay).Both(ctx.Data:GetOrCreateSpeedValue(player).Value))
  elseif action=='unfly'or action=='clip'then
   player:SetAttribute(action=='unfly'and'StudioTestFlying'or'StudioTestNoclip',false)
   if not player:GetAttribute('StudioTestFlying')and not player:GetAttribute('StudioTestNoclip')then TestState.ClearMovement(player)end
@@ -136,34 +154,75 @@ local function executeFor(ctx,player,text,requester)
   if not ctx.ServerClearer then ctx.ServerClearer=ServerClear.new(ctx)end
   return ctx.ServerClearer:Request(requester,action=='clearinventory'and 'inventory'or 'garden')
  end
+ if action=='holo'then
+  -- R158f: the two Holo plants' seeds in one go (HoloMelonSeed, HoloAppleTreeSeed): /test seed <SeedId> for each
+  if#a~=0 then return false,'Use holo [@username].'end
+  local ok1,m1=executeFor(ctx,player,'/test seed HoloMelonSeed',requester);local ok2,m2=executeFor(ctx,player,'/test seed HoloAppleTreeSeed',requester)
+  return ok1 and ok2,(ok1 and ok2)and'Added the Holo Melon seed and the Holo Apple Tree seed. Plant them in your base; each harvest cycles melon / cantaloupe / pumpkin and apple / pear / orange.'or('Holo: '..tostring(ok1 and m2 or m1))
+ end
+ if action=='givepack'then
+  -- R158l (owner: "I can give packs"): /test givepack <biome|rarity|pack name> [count] [@name|@all] = the normal grant commands (/test pack, void, verity, rarepacks), so the packs are TEST packs
+  -- as always (never announced, no BEST PULL) and the usual limits hold (the owner: any count to 500 and no 200 cap; an admin: 100 / 20 and the cap). @all runs it for everyone in the server.
+  local plan,why=PartyRules.GivePlan(a);if not plan then return false,why end
+  local given=0
+  for _,step in ipairs(plan.Commands)do
+   local ok,message=executeFor(ctx,player,'/test '..step.Text,requester)
+   if not ok then return false,(given>0 and('Gave '..given..' of '..plan.Total..' packs, then: ')or'')..tostring(message)end
+   given+=step.N
+  end
+  return true,'Gave '..plan.Total..' '..plan.Label..' pack'..(plan.Total==1 and''or's')..' (TEST packs: never announced, no BEST PULL).'
+ end
+ if action=='fruithour'then
+  -- R132: /test fruithour [fruit] [1.5-3] makes a fruit the Fruit of the Hour for 10 minutes; off returns to the clock.
+  local Hour=require(RS:WaitForChild('FruitOfHour'));local now=workspace:GetServerTimeNow()
+  if #a==1 and key(a[1])=='off'then Hour.SetTest(nil);return true,'Fruit of the Hour follows the clock again: '..(Hour.At(now).Name or'?')..'.'end
+  local m=3;if #a>0 and tonumber(a[#a])then m=number(table.remove(a),3,Hour.Min,Hour.Max);if not m then return false,'The bonus must be 1.5 to 3.'end end
+  local id
+  if #a==0 then local list=Hour.Candidates();id=list[math.random(1,#list)]
+  else
+   for _,spec in ipairs(choose(table.concat(a,' '),false))do if table.find(Hour.Candidates(),spec.id)then id=spec.id end end
+   if not id then return false,'Unknown fruit. Try /test fruithour apple 3 (catalog all lists them).'end
+  end
+  Hour.SetTest(id,m,now,600)
+  return true,('Fruit of the Hour for 10 minutes: %s sells ×%.1f. /test fruithour off ends it.'):format(Hour.Name(id),m)
+ end
  -- Mutations wait until normal game transactions are finished.
- if ctx.Chase:IsPlayerBusy(player)or player:GetAttribute('ChestChaseRunActive')or player:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish your chase before using this test command.'end
- if ctx.Chests:IsOpening(player)then return false,'Wait for the pack to finish opening.'end
+ if not owner then
+  if ctx.Chase:IsPlayerBusy(player)or player:GetAttribute('ChestChaseRunActive')or player:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish your chase before using this test command.'end
+  if ctx.Chests:IsOpening(player)then return false,'Wait for the pack to finish opening.'end
+ end
  local data,config=ctx.Data,ctx.Config
  if action=='fly'or action=='noclip'then
   local speed=number(a[1],60,10,300,false)
   if not exact(0,action=='fly'and 1 or 0)or not speed then return false,'Use /test fly [10–300] or /test noclip.'end
   local _,h,root=character(player);if not h or h.Health<=0 or not root then return false,'Wait for your character.'end
-  if player:GetAttribute('GuardianRagdollActive')then return false,'Wait until your ragdoll recovers.'end
+  -- R158f: /test fly with no number while flying turns it off (a toggle); the owner can also start it in a ragdoll
+  if action=='fly'and#a==0 and player:GetAttribute('StudioTestFlying')==true then
+   player:SetAttribute('StudioTestFlying',false);if not player:GetAttribute('StudioTestNoclip')then TestState.ClearMovement(player)end
+   return true,'Flying is off.'
+  end
+  if player:GetAttribute('GuardianRagdollActive')and not owner then return false,'Wait until your ragdoll recovers.'end
   ctx.Bases:StopTraining(player,false)
   TestState.GrantMovement(player)
   if action=='fly'then player:SetAttribute('StudioTestFlySpeed',speed);player:SetAttribute('StudioTestFlying',true)
   else player:SetAttribute('StudioTestNoclip',true)end
-  return true,action=='fly'and'Flying: WASD, Space/E up, Ctrl/Q down. /test unfly to stop.'or'Noclip enabled. /test clip to restore collisions.'
+  return true,action=='fly'and'Flying: WASD, Space/E up, Ctrl/Q down. /test fly again (or /test unfly) to stop.'or'Noclip enabled. /test clip to restore collisions.'
  elseif action=='base'then
   local base=ctx.Bases:GetPlayerBase(player);if not base then return false,'Base not ready.'end
   return teleport(ctx,player,base.Spawn.CFrame*CFrame.new(0,4,0))
  elseif action=='biome'then
   local stage=biomeIDs[key(a[1])];if not exact(1)or not stage then return false,'Unknown biome. Use forest, jungle, desert, snow, lava, crystal or storm.'end
-  if ctx.Map.Refreshing then return false,'Wait until the biome refresh ends.'end
+  if ctx.Map.Refreshing and not owner then return false,'Wait until the biome refresh ends.'end -- (R158f: the game owner may go at once)
   local z=config.BiomeTrackStartZ
   for _,id in ipairs(config.BiomeOrder)do if id==stage then break end;z+=config.BiomeRunLengths[id]end
   local at=ctx.Map:GetRefreshReturnCFrame(1);local x=ctx.Map.BaseBoundaryLine.Position.X
   local point=Vector3.new(x,at.Position.Y,z+15)
   return teleport(ctx,player,CFrame.lookAt(point,point+Vector3.new(0,0,1)))
  elseif action=='rarepacks'then
-  if not exact(0,1)then return false,'Use /test rarepacks [rarity].'end
-  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester)
+  if not exact(0,2)then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local coat=a[2]~=nil and mutation(a[2])or nil -- R155: an optional coat word, so a TEST Mech pack (rarepacks mech gold) can be seen Gold / Diamond without 20 purchases (a bought pack rolls its own)
+  if a[2]~=nil and not coat then return false,'Use /test rarepacks [rarity] [gold|diamond].'end
+  local okay,message=require(script.Parent.RarePackTests).Grant(data,player,a[1],requester,coat,owner)
   if okay then ctx.Chests:SyncTools(player)end
   return okay,message
  elseif action=='seed'or action=='seeds'or action=='pack'then
@@ -171,12 +230,14 @@ local function executeFor(ctx,player,text,requester)
   if not exact(1,isPack and 5 or many and 3 or 4)then return false,'See /test help for grant syntax.'end
   local tier=3;if isPack then tier=number(a[2],3,1,6,true)end
   local size=number(a[isPack and 3 or 2],1,isPack and .5 or .35,25,false)
-  local coat=mutation(a[isPack and 4 or 3]);local count=number(a[isPack and 5 or 4],1,1,100,true)
+  local coat=mutation(a[isPack and 4 or 3]);local count=number(a[isPack and 5 or 4],1,1,owner and 500 or 100,true) -- (R158f: any sane count for the owner)
   if not tier or not size or not coat or not count then return false,'Invalid tier, size, mutation or count. See /test help.'end
   local selected=choose(a[1],many or isPack)
   if #selected==0 or(isPack and not biomeIDs[key(a[1])])then return false,'Unknown seed/biome. Use /test catalog.'end
   if isPack then selected={selected[1]}end
-  local records=data:GetChestRecords(player);if #records+#selected*count>config.MaxSavedChests then return false,'Inventory full. Clear some seeds or packs first.'end
+  local records=data:GetChestRecords(player)
+  if #records+#selected*count>config.MaxSavedChests then return false,'The save holds at most '..config.MaxSavedChests..' packs and seeds. Clear some seeds or packs first.'end -- R158f: the storage ceiling stays for everyone
+  if not data:RoomFor(player,#selected*count,{Owner=owner})then return false,'Inventory full (200 items max). Clear some seeds or packs first.'end -- R155: the cap (R158f: not for the game owner)
   local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
   for _,spec in ipairs(selected)do
    local seed=config.GetSeedById(spec.id);if not seed then return false,'Seed catalog mismatch.'end
@@ -185,7 +246,8 @@ local function executeFor(ctx,player,text,requester)
     table.insert(pending,{Id=HttpService:GenerateGUID(false),Kind=isPack and'Pack'or'Seed',ChestNumber=serial,ChestName=seed.Name,
      Stage=spec.stage,SeedId=seed.Id,SeedName=seed.Name,SeedEmoji=seed.Emoji,AccentColor=seed.Color,Rarity=spec.rarity,
      SeedScale=isPack and Packs.NewSeedScale(spec.stage,variant,size)or Packs.SanitizeSeedScale(size),
-     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat})
+     BagVariant=variant,OddsVersion=isPack and Packs.OddsVersion or nil,PackSize=isPack and size or 1,PackMutation=coat,TestGrant=true,
+     PackShape=isPack and require(RS:WaitForChild('PackShapes151')).Roll(variant) or nil}) -- R151: a /test pack is a TEST pack (never announced); it rolls its chip-bag shape like any pack
    end
   end
   player:SetAttribute('ChestInventorySerial',serial)
@@ -201,7 +263,7 @@ local function executeFor(ctx,player,text,requester)
    local definition=Catalog[spec.id];local spot
    spot=Layout.Find(config,garden,spec.id,math.min(size,3),ctx.Chests.GardenPlots and ctx.Chests.GardenPlots[base.Index])
    if not spot then break end
-   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
+   local crop=Rules.NewCrop({Id=HttpService:GenerateGUID(false),SeedId=spec.id,SeedScale=1,PackMutation=coat,TestGrant=true},HttpService:GenerateGUID(false),definition,now-definition.Seconds,spot[2],spot[3])
    crop.PlantScale=size;local slot=tostring(spot[1]);garden.Plots[slot]=garden.Plots[slot]or{};table.insert(garden.Plots[slot],crop);count+=1
   end
   if count>0 then changed(ctx,player,false)end
@@ -220,7 +282,7 @@ local function executeFor(ctx,player,text,requester)
     crop.FruitStates=nil;crop.PickedMask=0;crop.HarvestCycle=(crop.HarvestCycle+1)%1000000000;count+=1
    end
   end
-  changed(ctx,player,false);return true,'Updated '..count..' plants.'
+  changed(ctx,player,false);return true,(fastfruit and'Your crops are ripe now: '..count..' plants. (Creative mode ripens new plants and every regrowth at once.)'or'Updated '..count..' plants.')
  elseif action=='harvestall'then
   local count=0;local now=os.time()
   for _,entry in ipairs(crops(data,player))do
@@ -233,10 +295,11 @@ local function executeFor(ctx,player,text,requester)
  elseif action=='sellall'then
   local items=table.clone(data.Gardens[player].Harvests);local count,total=0,0
   for _,item in ipairs(items)do local ok,value=data:SellHarvest(player,item.Id);if ok then count+=1;total+=value end end
-  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. Hover over the floating cash to collect.'
+  changed(ctx,player,false);return true,'Sold '..count..' crops for '..total..' coins. The cash flies to your balance.'
  elseif action=='cash'then
+  if#a==1 and number(a[1],nil,0,require(RS.EconomyBalance90).MaxCash,true)then a={'set',a[1]}end -- R158f: cash <n> = cash set <n>
   local value=number(a[2],nil,0,require(RS.EconomyBalance90).MaxCash,true)
-  if not exact(2)or not value or(a[1]~='set'and a[1]~='add')then return false,'Use /test cash set <amount> or /test cash add <amount>.'end
+  if not exact(2)or not value or(a[1]~='set'and a[1]~='add')then return false,'Use /test cash <amount>, /test cash set <amount> or /test cash add <amount>.'end
   if a[1]=='add'then value+=data:GetCash(player)end
   local pending=require(RS.SaleReceiptRules).Total((data.Gardens[player]or{}).PendingSales or{},'Cash')
   if value+pending>require(RS.EconomyBalance90).MaxCash then return false,'Cash cap is 900 trillion including pending rewards.'end
@@ -245,7 +308,7 @@ local function executeFor(ctx,player,text,requester)
   local value=a[1];if not exact(1)or not require(game:GetService('ReplicatedStorage').SpeedPoints).Valid(value)then return false,'Use /test speed <nonnegative whole points>.'end
   local speed=data:GetOrCreateSpeedValue(player);speed.Value=config.NormalizeSpeedStat(value)
   local _,h=character(player);if h then ctx.Bases:_applyPhysicalSpeed(player,h,speed.Value)end
-  data:MarkDirty(player);data:QueueGardenSave(player);return true,'Trained speed: '..speed.Value
+  data:MarkDirty(player);data:QueueGardenSave(player);return true,'Trained speed: '..require(RS.SpeedDisplay).Both(speed.Value)..(require(RS.SpeedPoints).Compare(speed.Value,config.DefaultSpeed or 0)<0 and' (below the 20,000 start: raised to it when the player next joins)'or'')
  elseif action=='treadmill'then
   local tier=number(a[1],nil,1,#config.TreadmillTiers,true);if not exact(1)or not tier then return false,'Use /test treadmill <1–7>.'end
   local t=data:GetTreadmillData(player);t.Tier=tier;t.Skin=tier
@@ -320,7 +383,8 @@ function Commands.Start(config,data,chests,chase,bases,notifications,map)
  local request=Instance.new('RemoteFunction');request.Name='Execute';request.Parent=folder
  local function execute(player,text)
   if not Access.Publish(player)then return false,'These commands are for the experience owner.'end
-  local now=os.clock();if busy[player]or now-(last[player]or-math.huge)<.35 then return false,'Wait a moment.'end
+  -- R158f: the game owner has no wait between commands (only one at a time: a command that is still working finishes first); admins wait .35 s
+  local now=os.clock();if busy[player]or(not isOwner(player)and now-(last[player]or-math.huge)<.35)then return false,'Wait a moment.'end
   last[player]=now;busy[player]=true
   local safe,ok,message=pcall(Commands.Execute,ctx,player,text);busy[player]=nil
   if not safe then warn('[Owner Command] '..tostring(ok));ok=false;message='Command failed. Check server Output.'end
@@ -332,7 +396,7 @@ function Commands.Start(config,data,chests,chase,bases,notifications,map)
   if ctx.ServerClearer then ctx.ServerClearer:Destroy()end
   for _,c in ipairs(connections)do c:Disconnect()end
   for _,item in ipairs(instances)do item:Destroy()end
-  for _,p in ipairs(Players:GetPlayers())do TestState.Clear(p);p:SetAttribute('ChestChaseCommandsAllowed',false)end
+  for _,p in ipairs(Players:GetPlayers())do TestState.Leave(p);p:SetAttribute('ChestChaseCommandsAllowed',false)end
   Commands.Running=nil
  end
  request.OnServerInvoke=execute
@@ -349,7 +413,7 @@ function Commands.Start(config,data,chests,chase,bases,notifications,map)
   end))
  end
  for _,p in ipairs(Players:GetPlayers())do hook(p)end
- table.insert(connections,Players.PlayerAdded:Connect(hook));table.insert(connections,Players.PlayerRemoving:Connect(function(p)last[p]=nil;busy[p]=nil;TestState.Clear(p)end))
+ table.insert(connections,Players.PlayerAdded:Connect(hook));table.insert(connections,Players.PlayerRemoving:Connect(function(p)last[p]=nil;busy[p]=nil;TestState.Leave(p)end))
  table.insert(connections,script.Destroying:Connect(function()controller:Destroy()end))
  folder.Parent=RS;Commands.Running=controller
  task.spawn(function()

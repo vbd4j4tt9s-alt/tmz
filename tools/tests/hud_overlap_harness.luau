@@ -16,7 +16,11 @@ local function boxes(m,w,h,touch)
  local bar={N='Hotbar',X=w/2+(m.HotbarShiftX or 0)-bw/2,Y=h-m.HotbarBottom-m.SlotSize,W=bw,H=m.SlotSize};b[#b+1]=bar
  if m.HotbarDetails~=false then b[#b+1]={N='Details',X=bar.X,Y=bar.Y-44,W=bw,H=42,Soft=true}end
  for i,k in ipairs({'Speed','Cash','Gem'})do b[#b+1]={N='Wallet'..k,X=m[k..'X']or m.WalletX,Y=m[k..'Y'],W=m.WalletWidth,H=m.WalletHeight}end
- if m.Phone then
+ if m.PhoneWide then
+  -- R129: landscape phones: corner status stack (above the jump button) and the jump button.
+  b[#b+1]={N='Status',X=m.StatusBox.X,Y=m.StatusBox.Y,W=m.StatusBox.W,H=m.StatusBox.H}
+  for _,z in ipairs(m.ThumbZones)do b[#b+1]={N='Jump',X=z.X,Y=z.Y,W=z.W,H=z.H,Zone=true}end
+ elseif m.Phone then
   local sw=(m.StatusHorizontal and 388 or 190)*m.StatusScale;local sh=(m.StatusHorizontal and 39 or 82)*m.StatusScale
   b[#b+1]={N='Status',X=w-12-sw,Y=8,W=sw,H=sh}
   for i,z in ipairs(m.ThumbZones)do b[#b+1]={N=i==1 and'ThumbL'or'ThumbR',X=z.X,Y=z.Y,W=z.W,H=z.H,Zone=true}end

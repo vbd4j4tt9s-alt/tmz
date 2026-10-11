@@ -1,0 +1,7 @@
+[
+ {"name": "west lawn by the avenue (-62, -205)", "pos": [-38, 11, -182], "look": [-64, 4.1, -210], "fov": 60, "clip": 40},
+ {"name": "east lawn by Verity (82, -368)", "pos": [104, 10, -346], "look": [79, 4.1, -371], "fov": 60, "clip": 40},
+ {"name": "desert garden lawn (232, -286)", "pos": [214, 8, -268], "look": [234, 4.1, -284], "fov": 60, "clip": 30},
+ {"name": "Base 1 fence corner (-148, -120)", "pos": [-141, 8.5, -112.5], "look": [-148.1, 5.1, -119.5], "fov": 50, "clip": 20},
+ {"name": "double lamp from below (53, -236)", "pos": [49.5, 8, -230], "look": [53, 16, -236], "fov": 50, "clip": 12}
+]

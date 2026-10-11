@@ -23,7 +23,7 @@ function Menu.new(parent,onSell)
  self.All=button(total,'SellAll','Sell all',UDim2.new(1,-138,0,6),UDim2.fromOffset(132,40))
  table.insert(self.Connections,self.All.Activated:Connect(function()if self.State and self.State.CanSell and #(self.State.Harvests or{})>0 then onSell('ALL',self.All.AbsolutePosition+self.All.AbsoluteSize*.5)end end))
  local list=Instance.new('ScrollingFrame');list.Name='HarvestRows';list.Position=UDim2.fromOffset(0,62);list.Size=UDim2.new(1,0,1,-62);list.BackgroundTransparency=1;list.BorderSizePixel=0;list.ScrollBarThickness=4;list.ScrollBarImageColor3=C.Mint;list.CanvasSize=UDim2.new();list.ClipsDescendants=true;list.Parent=root;self.List=list
- self.Empty=text(list,'Empty','No crops',UDim2.fromOffset(18,12),UDim2.new(1,-36,0,70),16,false,C.Muted);self.Empty.TextXAlignment=Enum.TextXAlignment.Center
+ self.Empty=text(list,'Empty','No crops yet!',UDim2.fromOffset(18,12),UDim2.new(1,-36,0,70),16,false,C.Muted);self.Empty.TextXAlignment=Enum.TextXAlignment.Center
  local search=Instance.new('TextBox');search.Name='CropSearch';search.PlaceholderText='Search crops…';search.Text='';search.ClearTextOnFocus=false;search.Size=UDim2.new(1,0,0,32);search.Position=UDim2.fromOffset(0,58);search.BackgroundColor3=C.Card;search.BorderSizePixel=0;Theme.Text(search,18,false,C.Text);Theme.Corner(search,7);search.Parent=root;self.Search=search
  local controls=Instance.new('ScrollingFrame');controls.Name='HarvestControls';controls.BackgroundTransparency=1;controls.BorderSizePixel=0;controls.ScrollBarThickness=4;controls.ScrollBarImageColor3=C.Mint;controls.ScrollingDirection=Enum.ScrollingDirection.Y;controls.CanvasSize=UDim2.new();controls.ClipsDescendants=true;controls.Visible=false;controls.Parent=root;self.Controls=controls
  self.FilterButtons={};self.FilterIndex={1,1,1};self.Mutated=false
@@ -64,7 +64,7 @@ function Menu:UpdateRow(row,item)
  local r=self.Data[row];r.Item=item
  local traitText=Traits.Lines(item,22);if traitText==''then traitText='Normal'end
  Traits.Style(r.Traits,item)
- local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Weight.Text('Fruit',item.SeedId,math.min(25,item.FruitScale or 1)),Details='Bonus ×'..string.format('%g',math.floor((item.CashMultiplier or 1)*100+.5)/100)..' (size × coat × weather)',Action='Sell\n$'..Cash.Compact(item.SellValue)}
+ local values={Name=Names.Fruit(item.SeedId,item.FruitName or item.Name)..((item.Count or 1)>1 and' ×'..item.Count or''),Traits=traitText..'\n'..Weight.Text('Fruit',item.SeedId,math.min(25,item.FruitScale or 1)),Details='Bonus ×'..string.format('%g',math.floor((item.CashMultiplier or 1)*100+.5)/100)..' (size × coat × weather)'..(item.HourMultiplier and('\n🌟 Fruit of the Hour ×'..string.format('%.1f',item.HourMultiplier))or''),Action='Sell\n$'..Cash.Compact(item.SellValue)}
  for field,value in pairs(values)do if r[field].Text~=value then r[field].Text=value end end
  r.Action:SetAttribute('ExactCash',Cash.Exact(item.SellValue));r.Action.Active=self.State.CanSell==true;r.Action.AutoButtonColor=r.Action.Active;r.Action.BackgroundTransparency=r.Action.Active and 0 or .5
 end

@@ -2,6 +2,11 @@
 import sys, os
 out = sys.argv[1]
 src = '/home/user/tmz/src'
+# R151: run in place, this bundler bundles the src of the checkout it lives in (it used to bundle the main checkout's from any worktree); a copy of it elsewhere
+# (the runners `sed` the literal above into their own checkout's path) keeps the literal
+_here = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../../src'))
+if os.path.isdir(os.path.join(_here, 'ReplicatedStorage')):
+    src = _here
 pairs = []
 for f in sorted(os.listdir(src + '/ReplicatedStorage')):
     if f.endswith('.lua'):

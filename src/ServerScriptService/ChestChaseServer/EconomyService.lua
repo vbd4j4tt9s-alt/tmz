@@ -220,7 +220,7 @@ function EconomyService:_equip(player, id, equipped)
  return self:_buildState(player,equipped==false and'Unequipped'or'Equipped')
 end
 
-function EconomyService:_purchase(player, productId)
+function EconomyService:_purchase(player, productId, shown)
 	if not self.PlayerData:IsLoaded(player) then
 		return {Success = false, Message = "PLAYER DATA IS STILL LOADING"}
 	end
@@ -232,13 +232,20 @@ function EconomyService:_purchase(player, productId)
 	if not product then
 		return {Success = false, Message = "UNKNOWN SHOP ITEM"}
 	end
+	-- R158k (owner: "make sure store prices are always the same"): the press pays the price its button showed (shown, optional: an older client sends none) or
+	-- nothing: a different price is refused with nothing charged, and the reply carries the shop's prices so the window shows the right ones
+	if shown ~= nil and shown ~= product.Price then
+		local state = self:_buildState(player, require(ReplicatedStorage:WaitForChild("StoreMoney158k")).PriceChanged)
+		state.Success = false
+		return state
+	end
 	local blocked = self:_purchaseBlockReason(product)
     if blocked then return {Success = false, Message = blocked} end
 	if self.PlayerData:OwnsBoost(player, product.Id) then
 		return {Success = false, Message = "YOU ALREADY OWN THIS"}
 	end
 	if not self.PlayerData:SpendCash(player, product.Price) then
-		return {Success = false, Message = "NOT ENOUGH CASH"}
+		return {Success = false, Message = require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Cash} -- R158k: the shared words ("Not enough cash!", the market shows it as the plain notice)
 	end
 
 	if not self.PlayerData:AddBoost(player, product.Id) then
@@ -277,7 +284,7 @@ end
 function EconomyService:_teleport(player, stationName)
 	if player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive") then return end
 	if self.Chase:IsPlayerBusy(player) then
-		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5)
+		self.Notifications:Show(player, "STATION TRAVEL IS DISABLED DURING A CHASE", Color3.fromRGB(255, 174, 87), 2.5, "Denied")
 		return
 	end
 	local now = os.clock()
@@ -476,9 +483,9 @@ function EconomyService:Start()
         if not Gate.Allow(player,'GetShopState')then return {Success=false,Message='Please wait.'}end
 		return self:_buildState(player)
 	end
-	self.PurchaseShopItem.OnServerInvoke = function(player, productId)
-        if not Gate.Allow(player,'PurchaseShopItem', productId)then return {Success=false,Message='Please wait.'}end
-		return self:_purchase(player, productId)
+	self.PurchaseShopItem.OnServerInvoke = function(player, productId, shown) -- R158k: shown = the price the button showed
+        if not Gate.Allow(player,'PurchaseShopItem', productId, shown)then return {Success=false,Message='Please wait.'}end
+		return self:_purchase(player, productId, shown)
 	end
 	self.EquipShopItem.OnServerInvoke = function(player, id, equipped)if not Gate.Allow(player,'EquipShopItem',id,equipped)then return {Success=false}end;return self:_equip(player,id,equipped)end
 	self.SellLootItem.OnServerInvoke = function(player, lootInstanceName)
@@ -533,7 +540,7 @@ function EconomyService:_sellHarvest(player, harvestId)
 	if not success then return {Success = false, Message = result} end
 	self.PlayerData:QueueGardenSave(player)
  self.Chests:SyncTools(player)
- local state=self:_buildState(player, string.format("SOLD FOR $%d — HOVER OVER CASH TO COLLECT", result))
+ local state=self:_buildState(player, string.format("SOLD FOR $%d CASH", result))
  state.SaleAmount=result -- Proceeds stay in PendingSales until each cash icon is claimed.
  return state
 end

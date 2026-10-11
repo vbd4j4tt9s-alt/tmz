@@ -222,5 +222,34 @@ check(E.NextArrival(fake,false,300,10,Schedule.Event)==1000+10+2*300,'cycle 3 id
 fake:SetAttribute('BiomeRefreshCycle',5);check(E.NextArrival(fake,false,300,10,Schedule.Event)==1010,'cycle 5 -> end of the next refresh')
 fake:SetAttribute('BiomeRefreshCycle',5);fake:SetAttribute('BiomeRefreshEndsAt',740);check(E.NextArrival(fake,true,300,10,Schedule.Event)==740,'refreshing into cycle 6 -> end of this refresh')
 fake:SetAttribute('BiomeRefreshCycle',6);check(E.NextArrival(fake,true,300,10,Schedule.Event)==1000+10+300,'refreshing into cycle 7 (next begin 1000 -> cycle 8) -> end of refresh 9')
+-- R128 (owner): keepers start their swing close, and a swing started close lands at the impact frame, so a keeper next to
+-- a thief no longer repeats the animation without hitting. Body contact is stubbed to "never touching" here (the case
+-- that used to whiff); running out of range during the windup still dodges.
+print('-- strike range')
+do
+ local Combat=W.module('KeeperCombat')
+ local p=newPlayer('Striker',777);local hrp=p.Character.HumanoidRootPart
+ local k=R.new('Model');k.Name='StrikeKeeper';local core=R.new('Part');core.CFrame=CF(0,5,900);core.Parent=k;k.PrimaryPart=core;k.Parent=W.workspace
+ local run={Player=p,Character=p.Character,HumanoidRootPart=hrp,Chaser=k,KeeperKey='strike-test',GuardianLeaseToken=1,Chest={},CatchEnabledAt=0}
+ self.KeeperTargets['strike-test']=run;Map.Refreshing=false
+ local finishes={};local saveFinish,saveMove=self.Finish,self._moveKeeperToward
+ self.Finish=function(_,escaped,caught)finishes[#finishes+1]=caught==true end;self._moveKeeperToward=function()end
+ for stage=1,7 do
+  run.Stage=stage;run.Attack=nil;table.clear(finishes);local reach,strike=Combat.Get(stage).Reach,Combat.StrikeReach(stage)
+  check(strike<reach and math.abs(strike-reach*Combat.TriggerShare)<1e-9,'stage '..stage..': strike range '..strike..' < old reach '..reach)
+  hrp.CFrame=CF(0,5,900+(strike+reach)/2);check(self:_beginKeeperAttack(run)==false and run.Attack==nil,'stage '..stage..': no swing between the strike range and the old reach')
+  hrp.CFrame=CF(0,5,900+strike-.3);check(self:_beginKeeperAttack(run)==true and run.Attack~=nil,'stage '..stage..': swing starts in strike range')
+  R.advance(Combat.Get(stage).Windup+.01);self:_stepKeeperAttack(run,.05)
+  check(#finishes==1 and finishes[1]==true,'stage '..stage..': the swing lands although the bodies never overlap (no whiff loop)')
+  run.Attack=nil;table.clear(finishes);run.CatchEnabledAt=0
+  hrp.CFrame=CF(0,5,900+strike-.3);self:_beginKeeperAttack(run)
+  hrp.CFrame=CF(0,5,900+strike+Combat.HitPadding+2);R.advance(Combat.Get(stage).Windup+.01);self:_stepKeeperAttack(run,.05)
+  check(#finishes==0 and run.Attack==nil and run.CatchEnabledAt>R.clock,'stage '..stage..': running out of range during the windup still dodges')
+  run.CatchEnabledAt=0
+ end
+ -- Height still matters: a thief far above the keeper is not hit.
+ run.Stage=1;run.Attack=nil;hrp.CFrame=CF(0,5+Combat.Get(1).Height+5,900+1);check(self:_beginKeeperAttack(run)==false,'no swing at a thief far above')
+ self.Finish,self._moveKeeperToward=saveFinish,saveMove;self.KeeperTargets['strike-test']=nil;k:Destroy()
+end
 print(('event checks %d, fails %d'):format(checks,fails))
 if fails>0 then error('failures')end

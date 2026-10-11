@@ -1,5 +1,7 @@
 -- Shared, event-driven feedback; no idle animation loop and no changes to layout.
 local Tween=game:GetService('TweenService');local Gui=game:GetService('GuiService');local H={}
+-- R150: buttons with these names close a panel, so they click MenuClose (not the generic Bubble04) unless ButtonSound says otherwise.
+H.CloseNames={Close=true,CloseButton=true,CloseGift=true}
 function H.Bind(button)
  if not button:IsA('GuiButton')or button:GetAttribute('ButtonHighlight')==false or button.Name=='Shade'or button.Name=='Backdrop'then return function()end end
  if button:FindFirstChild('InteractionHighlight')then return function()end end
@@ -17,7 +19,8 @@ function H.Bind(button)
  watch(button.MouseEnter,function()hovering=true;paint()end);watch(button.MouseLeave,function()hovering=false;pressed=false;paint()end)
  watch(button.SelectionGained,function()focused=true;paint()end);watch(button.SelectionLost,function()focused=false;pressed=false;paint()end)
  local function sound()
-  if button.Active and button.Interactable~=false and button:GetAttribute('ButtonSound')~=false then require(script.Parent.InteractionAudio).Play(button:GetAttribute('ButtonSound')or'Bubble04')end
+  local custom=button:GetAttribute('ButtonSound')
+  if button.Active and button.Interactable~=false and custom~=false then require(script.Parent.InteractionAudio).Play(custom or(H.CloseNames[button.Name]and'MenuClose')or'Bubble04')end
  end
  watch(button.Activated,sound)
  local function press(input,value)
@@ -30,6 +33,21 @@ function H.Bind(button)
   if dead then return end;dead=true;if current then current:Cancel()end;for _,c in ipairs(connections)do c:Disconnect()end;stroke:Destroy()
  end
  watch(button.Destroying,stop);return stop
+end
+-- R150: ONE rule for opening and closing panels. Every menu (Market, Settings, Index, Passes, Daily, Bag, Verity, Shovel) opens by
+-- setting PlayerGui.SeedMenu and closes by clearing it, whatever the input was (button, shade, Esc / B, prompt, walking away,
+-- auto-open). nil -> X and X -> Y click MenuClick; X -> nil clicks MenuClose. A button that opens or closes a menu may also name
+-- the same key (or ButtonSound=false): the same key inside the 0.09 s gap plays once.
+function H.WatchMenus(playerGui)
+ local last=playerGui:GetAttribute('SeedMenu');local dead=false
+ local connection=playerGui:GetAttributeChangedSignal('SeedMenu'):Connect(function()
+  if dead then return end
+  local now=playerGui:GetAttribute('SeedMenu');local was=last;last=now
+  if now==was then return end
+  if type(now)=='string'and now~=''then require(script.Parent.InteractionAudio).Play('MenuClick')
+  elseif type(was)=='string'and was~=''then require(script.Parent.InteractionAudio).Play('MenuClose')end
+ end)
+ return function()if dead then return end;dead=true;connection:Disconnect()end
 end
 function H.Start(playerGui)
  local stops={};local dead=false

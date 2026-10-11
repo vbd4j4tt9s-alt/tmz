@@ -28,7 +28,10 @@ function S.Place(panel,pg,maxWidth,wantedHeight)
  local camera=workspace.CurrentCamera;if not camera then return end
  local root=panel:FindFirstAncestorOfClass('ScreenGui');if root then root.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets end
  local view=root and root.AbsoluteSize or camera.ViewportSize
- local reserve=pg:GetAttribute('SeedMenu')=='Economy'and 16 or math.max(64,(pg:GetAttribute('ChestHotbarReserve')or 134)-54)
+ -- (R158 review: ChestHotbarReserve is in screen px, scaled with a computer's HUD; the 54 it gives back - the held item's name rows' share - are HUD px too, so they shrink by the same
+ -- scale Hotbar publishes as ChestHudScale (none = 1: a phone, a window of 1920 x 720 or more: exactly as before). Gap between a menu's bottom and the slots: 8 + 12 x scale px, 20 at 1.)
+ local hudScale=math.clamp(tonumber(pg:GetAttribute('ChestHudScale'))or 1,0,1)
+ local reserve=pg:GetAttribute('SeedMenu')=='Economy'and 16 or math.max(64,(pg:GetAttribute('ChestHotbarReserve')or 134)-54*hudScale)
  local w,h,x,y=S.Bounds(view.X,view.Y,0,pg:GetAttribute('HudNoticeBottom')or 48,reserve,maxWidth,wantedHeight)
  panel.Size=UDim2.fromOffset(w,h);panel.Position=UDim2.fromOffset(x,y)
 end

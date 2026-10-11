@@ -1,5 +1,6 @@
 local RS=game:GetService('ReplicatedStorage');local Visuals=require(RS:WaitForChild('PlantVisuals'));local Rules=require(RS:WaitForChild('PlantRules'));local Catalog=require(RS:WaitForChild('PlantCatalog'))
 local V={PartBudget=5000,ModelBudget=64,Range=3200}
+local PLAIN={Plain=true} -- (a distant garden: no leaf-attachment pass, the leaves only appear in turn)
 function V.Cost(crop)
  local def=Catalog[crop.SeedId];local layout=Visuals.LeafLayout(crop.SeedId,crop);local cost=1
  for _,raw in ipairs(Visuals.Specs(crop.SeedId,crop))do
@@ -23,7 +24,7 @@ function V.Build(crop,origin,now,work)
  local pivot=Instance.new('Part');pivot.Name='ViewOrigin';pivot.Size=Vector3.new(.05,.05,.05);pivot.CFrame=origin;pivot.Transparency=1;pivot.Anchored=true;pivot.CanCollide=false;pivot.CanTouch=false;pivot.CanQuery=false;pivot.Parent=model;model.PrimaryPart=pivot
  for _,part in ipairs(model:GetDescendants())do if part:IsA('BasePart')then part.CanQuery=false;part.CanTouch=false;part.CanCollide=false end end
  local growing=now<(crop.MatureAt or 0)or Rules.HasGrowingFruit(crop,def,now)
- if growing then Visuals.BeginGrowth(model,crop.SeedId,crop,origin);Visuals.UpdateGrowth(model,crop,now)end
+ if growing then Visuals.BeginGrowth(model,crop.SeedId,crop,origin,PLAIN);Visuals.UpdateGrowth(model,crop,now)end
  return model,growing
 end
 function V.Select(entries)

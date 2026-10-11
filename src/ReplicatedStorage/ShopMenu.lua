@@ -1,6 +1,7 @@
 -- R70: readable values with an explicit benefit; no extra item descriptions.
 local RS=game:GetService('ReplicatedStorage');local Theme=require(RS:WaitForChild('GardenTheme'));local Style=require(RS:WaitForChild('GardenMenuStyle'))
 local Cash=require(RS:WaitForChild('CashNumbers'));local Preview=require(RS:WaitForChild('ShopViewport'));local Art=require(RS:WaitForChild('ShopProductArt'));local Motion=require(RS:WaitForChild('GardenCardMotion'))
+local Money=require(RS:WaitForChild('StoreMoney158k')) -- R158k: the one money rule and words (shared with the server)
 local M={};M.__index=M;local C=Theme.Colors
 local function label(parent,name,content,pos,size,font,bold,color)
  local t=Instance.new('TextLabel');t.Name=name;t.Text=content;t.Position=pos;t.Size=size;t.BackgroundTransparency=1;t.BorderSizePixel=0;t.TextWrapped=true;t.TextXAlignment=Enum.TextXAlignment.Left
@@ -13,13 +14,18 @@ function M.Layout(width,trail)
  local narrow=width<540
  return {Narrow=narrow,Height=narrow and 178 or 154,Preview=narrow and 90 or 120,Left=narrow and 118 or 150,Right=narrow and 12 or 154}
 end
+-- R158k (owner: "if clicking on something and players don't have enough money, it just tells the player not enough cash"): a Buy button always reads its price
+-- (exactly: CashNumbers.Price) and can always be pressed; a press the money cannot pay says "Not enough cash!" (StoreMoney158k.Notice) and sends nothing.
+-- It used to read "Need $X", greyed out and dead, decided from an older server reply's Cash. `cash` is no longer used (kept for old callers).
 function M.Action(product,cash,busy)
- cash=cash or 0
- if busy then return 'Please wait',false end
+ if busy then return 'Wait a sec',false end
  if product.Owned then return product.Equipped and'Unequip'or'Equip',true end
  if product.Enabled==false then return product.UnavailableReason or'Coming soon',false end
- if (cash or 0)<(product.Price or 0)then return 'Need $'..Cash.Compact(product.Price-cash),false end
- return 'Buy  $'..Cash.Compact(product.Price),true
+ return 'Buy  $'..Cash.Price(product.Price),true
+end
+-- true when the screen knows the money is short (the live Cash stat the HUD shows, once the profile has loaded): the press is answered here
+function M.Short(product)
+ return not product.Owned and Money.Short(game:GetService('Players').LocalPlayer,'Cash',product.Price or 0)
 end
 function M.Description(product)
  return ''
@@ -56,12 +62,13 @@ function M:MakeRow(product,index,layout)
  local b=button(row,'Purchase','',layout.Narrow and UDim2.new(0,12,1,-50)or UDim2.new(1,-144,.5,-27),layout.Narrow and UDim2.new(1,-24,0,40)or UDim2.fromOffset(132,54))
  local record={Frame=row,Action=b,Product=product,View=view,Benefit=benefit,Description=desc}
  b.Activated:Connect(function()
-  local _,allowed=M.Action(record.Product,self.State and self.State.Cash or 0,self.Busy)
+  local _,allowed=M.Action(record.Product,nil,self.Busy)
   if not self.Root.Visible or not allowed then return end
+  if M.Short(record.Product)then if self.OnShort then pcall(self.OnShort)end;Money.Notice('Cash');return end -- R158k: short of cash: the plain notice, no request (OnShort: the window clears its own status line)
   self.Busy=true;self:Render()
   local ok,err
   if record.Product.Owned then ok,err=pcall(self.OnEquip,record.Product.Id,not record.Product.Equipped)
-  else ok,err=pcall(self.OnPurchase,record.Product.Id)end
+  else ok,err=pcall(self.OnPurchase,record.Product.Id,record.Product.Price)end -- R158k: the price the button shows goes with the purchase (the server refuses another)
   self.Busy=false;self:Render()
   if not ok then warn('[R49 Shop] '..tostring(err))end
  end)
@@ -73,11 +80,11 @@ function M:Render()
  local ids={self.Tab or'',tostring(layout.Narrow),state.BootBiome or'Forest'};for _,p in ipairs(products)do table.insert(ids,p.Id)end
  local key=table.concat(ids,'|')
  if key~=self.Key then self:Clear();self.Key=key;for i,p in ipairs(products)do self.Rows[i]=self:MakeRow(p,i,layout)end end
- self.Empty.Visible=#products==0;self.Empty.Text=self.State and'No items yet.'or'Loading shop…'
+ self.Empty.Visible=#products==0;self.Empty.Text=self.State and'Nothing here yet!'or'Loading shop…'
  local canvas=#products*layout.Height;self.List.CanvasSize=UDim2.fromOffset(0,canvas)
  local y=math.clamp(self.List.CanvasPosition.Y,0,math.max(0,canvas-self.List.AbsoluteSize.Y));if y~=self.List.CanvasPosition.Y then self.List.CanvasPosition=Vector2.new(0,y)end
  for i,r in ipairs(self.Rows)do
-  r.Product=products[i];local caption,enabled=M.Action(r.Product,state.Cash or 0,self.Busy)
+  r.Product=products[i];local caption,enabled=M.Action(r.Product,nil,self.Busy)
   r.Action.Text=caption;r.Action.Active=enabled;r.Action.AutoButtonColor=enabled;require(RS.BrightUI).Button(r.Action,enabled and Color3.fromRGB(43,177,106)or Color3.fromRGB(68,83,122));r.Action.TextColor3=C.Text;r.Action.Interactable=enabled
   r.Action:SetAttribute('ExactCash',Cash.Exact(r.Product.Price or 0))
  end

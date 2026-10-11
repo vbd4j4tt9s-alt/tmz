@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local Players=game:GetService('Players');local Run=game:GetService('RunService');local RS=game:GetService('ReplicatedStorage')
 local Playback=require(RS:WaitForChild('TreadmillPlayback'));local player=Players.LocalPlayer;local current;local elapsed=0
 local function clear()if current then current:Destroy();current=nil end end

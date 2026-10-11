@@ -9,6 +9,9 @@ local SupportArt=require(RS:WaitForChild('PlantSupportArt'))
 local Growth=require(RS:WaitForChild('PlantGrowth'))
 local Approved=require(RS:WaitForChild('ApprovedPlantArt'))
 local ApprovedMeshes=require(RS:WaitForChild('ApprovedPlantMeshes'))
+-- R149: the Watermelon / Snow Melon / Ember Pumpkin mesh bodies are generated and baked by FruitMeshes149 (same Get / Status contract)
+local FruitMeshes=require(RS:WaitForChild('FruitMeshes149'))
+local function meshes(key)return FruitMeshes.Owns(key)and FruitMeshes or ApprovedMeshes end
 local SurfaceStyle=require(RS:WaitForChild('PlantSurfaceStyle'))
 local styledApproved={}
 local boundedOrders=setmetatable({},{__mode='k'})
@@ -17,7 +20,7 @@ local function remember(cache,key,value)
  if not cache[key]then table.insert(order,key);if #order>64 then cache[table.remove(order,1)]=nil end end
  cache[key]=value;return value
 end
-local function styleKey(id,crop)return Approved.Key(id,crop)..SurfaceStyle.Key(id,crop)end
+local function styleKey(id,crop)return Approved.Key(id,crop)..SurfaceStyle.Key(id,crop)..FruitMeshes.Suffix(id)end
 local function fruitTrait(crop,index,def)
  local item=crop._VisualHarvest
  if item and item.Index==index then return {Scale=item.Scale,Mutation=item.Mutation,Value=0}end
@@ -72,10 +75,14 @@ function Visuals.Specs(id,crop)
  local key=styleKey(id,crop);if sizedSpecs[key]then return sizedSpecs[key]end
  local source=cache[def.ArtBiome or def.Biome][id];if not source then return nil end
  local scale=def.BaseScale or 1;local result={}
+ -- R151: a plant's list may carry `Skipped` (a set of positions): shine patches that were removed from it. The parts after a removed one keep the
+ -- _ArtIndex they had (growth timing, the position-based tints, crown variants), so removing a patch changes nothing else about the plant.
+ local skipped=source.Skipped;local at=0
  -- Scale each species once; saved PlantScale/FruitScale still apply independently.
  -- Keep raw authored descriptors immutable and preserve all grouping/materials.
  for index,original in ipairs(source)do
-  local spec=table.clone(original);spec._ArtIndex=index;spec.z=table.clone(original.z);spec.c=table.clone(original.c)
+  at+=1;while skipped and skipped[at]do at+=1 end
+  local spec=table.clone(original);spec._ArtIndex=at;spec.z=table.clone(original.z);spec.c=table.clone(original.c)
   for axis=1,3 do spec.z[axis]*=scale;spec.c[axis]*=scale end
   if spec.va then spec.va={spec.va[1]*scale,spec.va[2]*scale,spec.va[3]*scale}end
   if spec.bp then spec.bp={spec.bp[1]*scale,spec.bp[2]*scale,spec.bp[3]*scale}end
@@ -85,7 +92,8 @@ function Visuals.Specs(id,crop)
   result=require(RS:WaitForChild('ElderAppleArt')).Convert({Specs=result,Sockets=def.Sockets}).Specs
   for index,spec in ipairs(result)do spec._ArtIndex=index end
  end
- result=SurfaceStyle.Apply(id,def,result,crop);return remember(sizedSpecs,key,result)
+ -- R149: one baked mesh body per fruit for the FruitMeshes149 seeds (the part-built fruit if the bake failed)
+ result=FruitMeshes.Art(id,SurfaceStyle.Apply(id,def,result,crop,skipped));return remember(sizedSpecs,key,result)
 end
 
 local leafRanges={SunflowerSeed={6,9},SunflowerBloomSeed={2,4},BananaSeed={2,4},PineappleSeed={2,4},MonsteraSeed={2,4},LanternFernSeed={3,5},TigerOrchidSeed={2,4},AloeSeed={8,12},DatePalmSeed={5,7},SunKingPalmSeed={5,7},SnowdropSeed={6,9},FrostFernSeed={3,5},WinterPineSeed={2,4},CrystalLilySeed={5,7},SilentFrostbellSeed={2,4},PolarStarbloomSeed={2,4},FirePepperSeed={2,4},EmberBloomSeed={6,9},AshRoseSeed={6,9},LavaLotusSeed={5,7},SupernovaBloomSeed={2,4},AmethystSeed={2,4},PrismOrchidSeed={2,4},MoonflowerSeed={6,9},DiamondVineSeed={2,4},HollowGeodeSeed={7,10},OrbitLotusSeed={5,7},SparkReedSeed={2,4},ThunderTulipSeed={2,4},VoltOrchidSeed={2,4},TempestLotusSeed={5,7},BlackoutBloomSeed={2,4},StaticGrassSeed={2,4}}
@@ -190,6 +198,7 @@ end
 local function make(parent,name,size,cf,color,material,transparency,shape,solid)
  local part=Instance.new(shape=='Wedge'and 'WedgePart'or shape=='Corner'and 'CornerWedgePart'or 'Part');part.Name=name
  if shape=='Cylinder'then part.Shape=Enum.PartType.Cylinder end
+ if shape=='Sphere'then part.Shape=Enum.PartType.Ball end -- R147: a true ball (shape 'Ball' is a stretchable SpecialMesh sphere)
  part.Size=V(math.max(.01,size.X),math.max(.01,size.Y),math.max(.01,size.Z));part.CFrame=cf
  part.Color=color;part.Material=material;part.Transparency=transparency
  part.Anchored=true;part.CanCollide=solid==true;part.CanTouch=false;part.CanQuery=solid==true
@@ -202,7 +211,7 @@ local function make(parent,name,size,cf,color,material,transparency,shape,solid)
  end
  part.CastShadow=false;part.Parent=parent;return part
 end
-function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,growthVariant)
+function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,growthVariant,crop)
  local size=V(table.unpack(s.z))*scale;local cf=origin*frame(s.c,scale)
  local shift=positionOverride and(positionOverride-cf.Position)or V(0,0,0)
  if positionOverride then cf=CF(positionOverride)*cf.Rotation end
@@ -214,8 +223,11 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
  local function p(name,z,f,shape)
   local item
   if s.mesh then
-   item=ApprovedMeshes.Get(s.mesh,mutation~='None'):Clone();item.Name=s.f or name;item.Size=z;item.CFrame=f;item.Color=color;item.Material=mat;item.Transparency=alpha
-   item.Anchored=true;item.CanCollide=solid==true;item.CanQuery=solid==true;item.CanTouch=false;item.CastShadow=false;item.Parent=parent
+   local template=meshes(s.mesh).Get(s.mesh,mutation~='None')
+   if template then
+    item=template:Clone();item.Name=s.f or name;item.Size=z;item.CFrame=f;item.Color=color;item.Material=mat;item.Transparency=alpha
+    item.Anchored=true;item.CanCollide=solid==true;item.CanQuery=solid==true;item.CanTouch=false;item.CastShadow=false;item.Parent=parent
+   else item=make(parent,s.f or name,z,f,s.fk and mutation=='None'and Color3.fromRGB(table.unpack(s.fk))or color,mat,alpha,'Ball',solid)end -- R149: a fruit mesh whose bake just failed (server)
   else item=make(parent,s.f or name,z,f,color,mat,alpha,shape,solid)end
   if scale>10 then game:GetService('CollectionService'):AddTag(item,'GiantVisualPart')end
   if s.shaded then item:SetAttribute('PlantSurfaceShading',true)end
@@ -234,6 +246,8 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
   if s.f then item:SetAttribute('HarvestFeature',s.f)end
   if s._ArtIndex then item:SetAttribute('ArtSpecIndex',s._ArtIndex)end
   if mutation~='None'then item.Reflectance=mutation=='Gold'and .20 or .16 end
+  if s.rf and mutation=='None'then item.Reflectance=s.rf end -- R147: authored shine (Verity)
+  if s.face then local Verity=require(RS:WaitForChild('VerityPlantArt'));Verity.AddFace(item,s.face,Verity.FaceSide(crop))end -- R148: Verity's face; R151: one face (front for items, toward the path for the planted fruit)
   first=first or item;return item
  end
  local function sculptedLeaf(z,at,name,distant)
@@ -349,6 +363,7 @@ function Visuals.Part(parent,s,origin,scale,solid,mutation,positionOverride,grow
    p('Crystal facet',V(size.Z,size.Y*.5,size.X*.5),cf*CF(x*size.X*.25,y*size.Y*.25,0)*CFrame.Angles(0,0,y==1 and 0 or math.pi)*CFrame.Angles(0,turn,0),'Wedge')
   end end
  elseif s.s=='Wedge'then p(s.r,size,cf,'Wedge')
+ elseif s.s=='Sphere'then p(s.f,size,cf,'Sphere')
  else p(s.r,size,cf,(s.s=='Ball'or s.s=='Leaf')and 'Ball'or 'Block') end
  if first and s.tx and not solid then
   local z=first.Size;local at=first.CFrame;local surface=s.tx
@@ -433,7 +448,7 @@ function Visuals.DetailReady(id,crop,selected)
   local neutral=Rules.Mutation(mutation)~='None';local key=spec.mesh..(neutral and'_Neutral'or'')
   if not checked[key]then
    checked[key]=true
-   local state,message=ApprovedMeshes.Status(spec.mesh,neutral)
+   local state,message=meshes(spec.mesh).Status(spec.mesh,neutral)
    if state~='Ready'then return false,key,message end
   end
  end
@@ -467,7 +482,7 @@ function Visuals.Build(id,origin,crop,stage,now,onlyFruit,work)
   local grow=stage==4 and 1 or ({.32,.65,1})[stage]
   local variant=(s.s=='Blob'or s.s=='Shrub')and Visuals.CrownVariant(crop.Id,s._ArtIndex or 1)or nil
   if work then work.BeforePart(Visuals.PartCost(s))end
-  Visuals.Part(target,s,origin,visualScale*grow,false,mutation,override,variant);any=true
+  Visuals.Part(target,s,origin,visualScale*grow,false,mutation,override,variant,crop);any=true
  end
  if not any and stage<4 then
   make(model,'Growing stem',V(.22,stage*.65,.22)*scale,origin*CF(0,stage*.325*scale,0),Color3.fromRGB(81,135,75),Enum.Material.SmoothPlastic,0,'Cylinder',false)
@@ -503,7 +518,7 @@ function Visuals.Supports(id,origin,crop,stage,parent,work)
   if collision then collisionCost+=cost end
   local variant=(spec.s=='Blob'or spec.s=='Shrub')and Visuals.CrownVariant(crop.Id,spec._ArtIndex or 1)or nil
   if work then work.BeforePart(cost)end
-  local part=Visuals.Part(parent,spec,origin,scale,collision,crop.Mutation,nil,variant)
+  local part=Visuals.Part(parent,spec,origin,scale,collision,crop.Mutation,nil,variant,crop)
   if def.Mode=='whole'then part:SetAttribute('HarvestIndex',1);part.CanQuery=true end
  end
  if layout then parent:SetAttribute('LeafCount',layout.Count)end
@@ -538,17 +553,19 @@ function Visuals.FruitProxy(parent,id,crop,index,origin,work)
   used+=cost
   local pos=V(s.c[1],s.c[2],s.c[3])
   if work then work.BeforePart(cost)end
-  local part=Visuals.Part(parent,s,origin,trait.Scale,false,trait.Mutation,origin:PointToWorldSpace(socket*scale+(pos-authored)*trait.Scale))
+  local part=Visuals.Part(parent,s,origin,trait.Scale,false,trait.Mutation,origin:PointToWorldSpace(socket*scale+(pos-authored)*trait.Scale),nil,crop)
   part:SetAttribute('FruitProxy',true)
  end
  -- Tag every wedge half/canopy piece so close detail can hide the complete proxy.
  for _,p in ipairs(parent:GetDescendants())do if p:IsA('BasePart')and p.Transparency<.95 then p:SetAttribute('FruitProxy',true);p:SetAttribute('HarvestIndex',index);p.CanQuery=true end end
 end
 
-function Visuals.BeginGrowth(model,id,crop,origin)
+-- options (R149 review part 2, finding 2): {Plain=true} for a model nobody sees up close (the server's silhouettes, DistantPlantView): the leaves skip the
+-- contact pass and only appear in turn; {Work=work} for the near-detail build job: the pass yields through the job's budget.
+function Visuals.BeginGrowth(model,id,crop,origin,options)
  Visuals.EndGrowth(model)
  local sockets={};for i=1,Catalog[id].FruitCount do sockets[i]=Visuals.FruitSocket(crop,Catalog[id],i)end
- local state=Growth.Capture(model,id,Catalog[id],crop,origin,sockets);growthStates[model]=state
+ local state=Growth.Capture(model,id,Catalog[id],crop,origin,sockets,options);growthStates[model]=state
  state.Connection=model.Destroying:Connect(function()growthStates[model]=nil end)
  return state
 end
@@ -556,6 +573,7 @@ function Visuals.EndGrowth(model,crop,now)
  local state=growthStates[model];if not state then return end
  if crop then Growth.Apply(state,crop,math.max(now or 0,crop.ReadyAt or 0,crop.MatureAt or 0))end
  if state.Seed then state.Seed:Destroy()end;for _,p in ipairs(state.Sprout)do p:Destroy()end;for _,b in pairs(state.Buds)do b.Part:Destroy();b.Stem:Destroy()end
+ if state.Twins then for _,p in ipairs(state.Twins)do p:Destroy()end end
  if state.Connection then state.Connection:Disconnect()end;growthStates[model]=nil
 end
 function Visuals.UpdateGrowth(model,crop,now)
@@ -569,9 +587,10 @@ function Visuals.BuildGrowing(id,origin,crop,now,stage,work)
  end
  local ripe=table.clone(crop);ripe.ReadyAt=0
  local model=Visuals.Build(id,origin,ripe,4,math.huge,nil,work)
- Visuals.BeginGrowth(model,id,crop,origin);Visuals.UpdateGrowth(model,crop,now)
+ Visuals.BeginGrowth(model,id,crop,origin,work and{Work=work}or nil);Visuals.UpdateGrowth(model,crop,now)
  return model
 end
+local PLAIN={Plain=true} -- (the server's silhouettes: no leaf-attachment pass, see BeginGrowth)
 function Visuals.GrowingSupports(id,origin,crop,stage,parent,now)
  local def=Catalog[id];local ripe=table.clone(crop);ripe.ReadyAt=0
  Visuals.Supports(id,origin,ripe,4,parent)
@@ -581,7 +600,7 @@ function Visuals.GrowingSupports(id,origin,crop,stage,parent,now)
    Visuals.FruitProxy(group,id,ripe,index,origin)
   end
  end end
- Visuals.BeginGrowth(parent,id,crop,origin);Visuals.UpdateGrowth(parent,crop,now)
+ Visuals.BeginGrowth(parent,id,crop,origin,PLAIN);Visuals.UpdateGrowth(parent,crop,now)
 end
 function Visuals.GrowingFruitSupports(id,origin,crop,parent,now)
  local def=Catalog[id];local ripe=table.clone(crop);ripe.ReadyAt=0
@@ -589,7 +608,7 @@ function Visuals.GrowingFruitSupports(id,origin,crop,parent,now)
   local group=Instance.new('Folder');group.Name='GrowingHarvest_'..index;group.Parent=parent
   Visuals.FruitProxy(group,id,ripe,index,origin)
  end end
- Visuals.BeginGrowth(parent,id,crop,origin);Visuals.UpdateGrowth(parent,crop,now)
+ Visuals.BeginGrowth(parent,id,crop,origin,PLAIN);Visuals.UpdateGrowth(parent,crop,now)
 end
 
 -- Find an actual current sculpture surface from authored native bounds; never accept a client position.

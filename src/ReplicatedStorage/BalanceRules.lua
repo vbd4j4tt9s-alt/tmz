@@ -8,10 +8,16 @@ B.KeeperOrder={1,6,2,3,4,5,7}
 B.KeeperFloors={};B.KeeperCeilings={}
 for stage,row in pairs(tuning.KeeperSpeeds)do B.KeeperFloors[stage]=row[1];B.KeeperCeilings[stage]=row[3]end
 B.RarityWeights={Common=55,Uncommon=28,Rare=12,Legendary=3.8,Mythic=1,Secret=.16,Cosmic=.035,King=.005}
-B.PackSizes={{Scale=.5,Weight=3},{Scale=1,Weight=80.799},{Scale=1.5,Weight=13},{Scale=2.5,Weight=2.8},{Scale=3.5,Weight=.35},{Scale=5,Weight=.04},{Scale=7.5,Weight=.008},{Scale=10,Weight=.002},{Scale=15,Weight=.0007},{Scale=20,Weight=.0002},{Scale=25,Weight=.0001}}
+-- R127 (owner): giant packs are more common. Was .5:3 1:80.799 1.5:13 2.5:2.8 3.5:.35 5:.04 7.5:.008 10:.002 15:.0007 20:.0002 25:.0001
+-- (5x+ 0.051%, 10x+ 0.003%); now 5x+ 0.6% (~12x), 10x+ 0.05% (~17x), 25x 0.001% (10x). Used by world packs, Mech packs and bonus rolls.
+-- R137 (owner-approved, docs/proposals/pity_R136): bigger again. Was the R127 table .5:3 1:76.5 1.5:14 2.5:4.5 3.5:1.4 5:.45
+-- 7.5:.1 10:.035 15:.01 20:.004 25:.001 (5x+ 1/167, 10x+ 1/2000); now 5x+ 1/71, 10x+ 1/775, 25x 1/25,000. On top, a
+-- hidden soft pity (PackSizePity) for each player's packs and for the track.
+B.PackSizes={{Scale=.5,Weight=2},{Scale=1,Weight=69.991},{Scale=1.5,Weight=17},{Scale=2.5,Weight=7},{Scale=3.5,Weight=2.6},{Scale=5,Weight=1},{Scale=7.5,Weight=.28},{Scale=10,Weight=.09},{Scale=15,Weight=.025},{Scale=20,Weight=.01},{Scale=25,Weight=.004}}
 B.MutationWeights={None=95,Gold=4.5,Diamond=.5}
 B.MutationInheritance=.20;B.WeatherInheritance=.20
-B.WeatherPackChance=.02;B.WeatherFruitChance=.02;B.WeatherPlantChance=.02
+-- R131 (owner): 0.2% per minute of weather for every pack, plant and fruit (was one 2% roll per 3-minute event).
+B.WeatherPackChance=.002;B.WeatherFruitChance=.002;B.WeatherPlantChance=.002
 local function finite(n,fallback)return type(n)=='number'and n==n and math.abs(n)<math.huge and n or fallback end
 function B.Half(n)return math.floor(n*2+.5)/2 end
 function B.Training(machine,trail,premium)

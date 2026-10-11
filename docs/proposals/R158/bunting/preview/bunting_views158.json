@@ -1,0 +1,54 @@
+{
+ "note": "Cameras for the R158 bunting sheet (render_cloudy.mjs + cloudy.html: world studs, the track runs to +Z, hub floor top y = 4). string = the east market string from the side (the lamp at the right, the market's eave at the left); close = the lamp end and the first pennants; along = from the lamp's side, about 37 degrees off the string's line; avenue = the string across the avenue's mouth, from the front street.",
+ "views": [
+  {
+   "name": "string",
+   "title": "One candy string from the side: lamp (right) to the market's eave (left)",
+   "fov": 46,
+   "pos": [49, 10.5, -214],
+   "look": [37.5, 18.6, -243],
+   "shadowAt": [38, 4, -240],
+   "shadowExtent": 70,
+   "fogNear": 900,
+   "fogFar": 2600
+  },
+  {
+   "name": "close",
+   "title": "Close up at the lamp: the string leaves the lamp head, the first pennants hang from it",
+   "fov": 52,
+   "pos": [48, 11.5, -222],
+   "look": [44, 17.2, -238.5],
+   "shadowAt": [44, 4, -238],
+   "shadowExtent": 40,
+   "fogNear": 900,
+   "fogFar": 2600
+  },
+  {
+   "name": "along",
+   "title": "From an angle along the string (about 37 degrees off its line): the pennants still hang from it",
+   "fov": 50,
+   "pos": [52, 9.5, -222],
+   "look": [38, 18.4, -244],
+   "shadowAt": [40, 4, -240],
+   "shadowExtent": 70,
+   "fogNear": 900,
+   "fogFar": 2600
+  },
+  {
+   "name": "avenue",
+   "title": "The string across the avenue's mouth, from the front street",
+   "fov": 52,
+   "pos": [-2, 9.5, -172],
+   "look": [0, 15.8, -200],
+   "shadowAt": [0, 4, -200],
+   "shadowExtent": 60,
+   "fogNear": 900,
+   "fogFar": 2600
+  }
+ ],
+ "plan": {
+  "ortho": [0, -361, 350, 275],
+  "w": 1400,
+  "h": 1100
+ }
+}

@@ -1,0 +1,67 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Keyboard preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_keyboard.luau scene: Roblox parts as plain boxes (keycaps get a lighter top plate), the dark bed, the
+// lit legends as text planes and the spacebar label. Roblox coordinates map straight to three.js (both right handed, Y up).
+// Text on a Top-face SurfaceGui: its up points toward -Z and it reads toward +X; GuiObject.Rotation then turns it clockwise by the
+// dumped angle (180 = upright for a runner facing +Z, reading toward -X). No Roblox textures or lighting: a design preview.
+import * as THREE from 'three';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const geoBox=new THREE.BoxGeometry(1,1,1);
+function grass(){
+  const cv=document.createElement('canvas');cv.width=cv.height=128;const g=cv.getContext('2d');
+  g.fillStyle='#5fae4f';g.fillRect(0,0,128,128);g.fillStyle='rgba(0,0,0,.06)';g.fillRect(0,0,64,64);g.fillRect(64,64,64,64);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(160,160);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+function textTexture(text,ink,w,h){
+  const cv=document.createElement('canvas');const aspect=w/h;cv.height=256;cv.width=Math.max(256,Math.min(4096,Math.round(256*aspect)));
+  const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);
+  g.fillStyle=`rgb(${ink[0]},${ink[1]},${ink[2]})`;g.textAlign='center';g.textBaseline='middle';
+  g.font=`900 ${Math.round(cv.height*(aspect>2?.74:.78))}px "DejaVu Sans","Arial Black",sans-serif`;g.fillText(text,cv.width/2,cv.height/2+cv.height*.04);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+function avatar(x,y,z){
+  const grp=new THREE.Group();const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.7});
+  const box=(sx,sy,sz,px,py,pz,c)=>{const m=new THREE.Mesh(geoBox,mat(c));m.scale.set(sx,sy,sz);m.position.set(px,py,pz);grp.add(m)};
+  box(.9,2,1,-.5,1,0,0x2f4a8f);box(.9,2,1,.5,1,0,0x2f4a8f);box(2,2,1,0,3,0,0xd23b3b);box(1,2,1,-1.5,3,0,0xe8bd9a);box(1,2,1,1.5,3,0,0xe8bd9a);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.9,24,16),mat(0xe8bd9a));head.position.set(0,4.6,0);grp.add(head);
+  grp.position.set(x,y,z);return grp;
+}
+window.shoot=function(scene,W,H,view){
+  renderer.setSize(W,H);
+  const s=new THREE.Scene();s.background=new THREE.Color(view.bg||0xa9d8f5);
+  if(view.fog)s.fog=new THREE.Fog(view.bg||0xa9d8f5,view.fog[0],view.fog[1]);
+  s.add(new THREE.HemisphereLight(0xf2f8ff,0x6a7d5a,1.35));
+  const sun=new THREE.DirectionalLight(0xfff0d8,2.1);sun.position.set(60,120,-80);s.add(sun);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshStandardMaterial({map:grass(),roughness:1}));
+  ground.rotation.x=-Math.PI/2;ground.position.y=3.98;s.add(ground);
+  for(const p of scene.parts){
+    const m=new THREE.Mesh(geoBox,new THREE.MeshStandardMaterial({color:col(p.c),roughness:p.k==='Bed'?.95:.55,metalness:0}));
+    m.scale.set(p.s[0],p.s[1],p.s[2]);m.position.set(p.p[0],p.p[1],p.p[2]);s.add(m);
+    if(p.k==='Key'){ // the keycap's dished top: a slightly lighter, smaller plate
+      const plate=new THREE.Mesh(geoBox,new THREE.MeshStandardMaterial({color:col(p.c).clone().multiplyScalar(1.12),roughness:.4}));
+      plate.scale.set(p.s[0]*.78,.06,p.s[2]*.78);plate.position.set(p.p[0],p.p[1]+p.s[1]/2+.01,p.p[2]);s.add(plate);
+    }
+  }
+  for(const l of scene.legends){
+    const w=l.bar?l.w:Math.min(l.w,l.d)*.78,h=l.bar?l.d*.9:w;
+    const mat=new THREE.MeshBasicMaterial({map:textTexture(l.t,l.ink,w,h),transparent:true,depthWrite:false,toneMapped:false});
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(w,h),mat);
+    plane.rotation.x=-Math.PI/2;                                   // Top face: text up = -Z, reads toward +X
+    plane.rotateOnWorldAxis(new THREE.Vector3(0,1,0),-l.rot*Math.PI/180); // GuiObject.Rotation (clockwise seen from above = -Y rotation)
+    plane.position.set(l.p[0],l.p[1]+(l.bar?.03:.09),l.p[2]);s.add(plane);
+  }
+  if(view.avatar)s.add(avatar(scene.runner[0],scene.runner[1],scene.runner[2]));
+  let cam;
+  if(view.ortho){const hw=view.ortho.w/2,hh=view.ortho.h/2;cam=new THREE.OrthographicCamera(-hw,hw,hh,-hh,1,3000);cam.up.set(0,0,1);}
+  else cam=new THREE.PerspectiveCamera(view.fov,W/H,.1,4000);
+  cam.position.set(...view.pos);cam.lookAt(new THREE.Vector3(...view.look));
+  renderer.render(s,cam);return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

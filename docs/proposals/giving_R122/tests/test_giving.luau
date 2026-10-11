@@ -90,7 +90,7 @@ end
 local Gifts=server('FruitGiftService').new(Data,Chests,Chase,nil)
 local Remote=remotes.FruitGift
 local fired={}
-function Remote.FireClient(_,p,action,msg)fired[#fired+1]={P=p,Action=action,Text=msg}end
+function Remote.FireClient(_,p,action,msg,info)fired[#fired+1]={P=p,Action=action,Text=msg,Info=info}end
 local function lastFor(p)for i=#fired,1,-1 do if fired[i].P==p then return fired[i]end end end
 -- Players ---------------------------------------------------------------------------------------------
 local unequipped=0
@@ -111,11 +111,11 @@ end
 local A=makePlayer(101,'Alice',0);local B=makePlayer(202,'Bob',6);local C=makePlayer(303,'Carol',60)
 local function rootOf(p)return p.Character.HumanoidRootPart end
 local function hold(p,record)
- local t=R.new('Tool');t.Name='item'
+ local t=R.new('Tool');t.Name=record.Kind=='Pack'and'Test Pack'or'Test Seed'
  if record.Kind=='Pack'then t:SetAttribute('SeedPackTool',true)else t:SetAttribute('GardenSeed',true)end
  t:SetAttribute('SeedInventoryId',record.Id);t.Parent=p.Character;return t
 end
-local function holdFruit(p,crop)local t=R.new('Tool');t:SetAttribute('HarvestItemTool',true);t:SetAttribute('HarvestInventoryId',crop.Id);t.Parent=p.Character;return t end
+local function holdFruit(p,crop)local t=R.new('Tool');t.Name='Golden Apple';t:SetAttribute('HarvestItemTool',true);t:SetAttribute('HarvestInventoryId',crop.Id);t.Parent=p.Character;return t end
 local function find(p,id)for _,r in ipairs(Data:GetChestRecords(p))do if r.Id==id then return r end end end
 local function seedRecords(p)return #Data:GetChestRecords(p)end
 -- Each send is a fresh remote call through SecurityGate after the 2 s gift cooldown.
@@ -162,7 +162,7 @@ sameTraits(savedRow(B,pack.Id),packTraits,'recipient save')
 check(Data.Revision[A]>aRevision and Data.Revision[B]>bRevision,'both profiles marked dirty')
 check(A:GetAttribute('SeedInventoryCount')==seedRecords(A)and B:GetAttribute('SeedInventoryCount')==seedRecords(B),'both inventory counters refreshed')
 check((Chests.Synced[A]or 0)>0 and(Chests.Synced[B]or 0)>0,'both hotbars resynced')
-local recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text:find('seed pack'),'recipient notified: '..tostring(recv and recv.Text))
+local recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='🎁 Alice gave you Test Pack!','recipient notified with giver and item (R130): '..tostring(recv and recv.Text))
 local sent=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob')then sent=true end end
 check(sent,'giver notified')
 advance(121) -- acknowledgements finish on the background recovery loop (R123: every 60 s, two passes)
@@ -178,7 +178,7 @@ local gs=find(B,seed.Id)
 check(gs and gs.Kind=='Seed','recipient owns the seed')
 sameTraits(gs and Data:SerializeSeedRecord(gs),seedTraits,'gifted seed')
 check(B.DiscoveredSeeds:FindFirstChild(seed.SeedId)~=nil,'recipient index marks the seed discovered')
-recv=lastFor(B);check(recv and recv.Text:find('a seed!'),'seed receipt notice')
+recv=lastFor(B);check(recv and recv.Text=='🎁 Alice gave you Test Seed!','seed receipt notice names the seed: '..tostring(recv and recv.Text))
 
 -- 3. Recipient full: refused up front, nothing lost ------------------------------------------------------
 local p2=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p2)
@@ -186,7 +186,7 @@ local cap=Config.MaxSavedChests;Config.MaxSavedChests=seedRecords(B)
 send(A,'GiveSeed',B,p2.Id)
 check(find(A,p2.Id)~=nil,'full recipient: giver keeps the pack')
 check(find(B,p2.Id)==nil,'full recipient: nothing added')
-check(lastFor(A).Text=='Their seed inventory is full.','full recipient message')
+check(lastFor(A).Text=='Their bag is full.','full recipient message')
 -- Full only at delivery time: the gift waits in the inbox, is not lost, and lands once there is room.
 Config.MaxSavedChests=cap
 local realRecover=Gifts.Recover;local heldRecover=true
@@ -267,13 +267,45 @@ B:SetAttribute('PaidRandomAllowed',true);local mechTraits=Data:SerializeSeedReco
 local gm=find(B,mech.Id);check(gm~=nil,'paid pack gifted when both accounts allow it')
 sameTraits(gm and Data:SerializeSeedRecord(gm),mechTraits,'mech pack')
 
+-- 8b. R152: a free giveaway pack (record.GiftLocked) can't be gifted: not by the give click (OfferSeed), not by an offer that reaches AcceptSeed; an ordinary pack still can
+do
+ local free=Data:AddChest(A,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None',GiftLocked=true});local freeTool=hold(A,free)
+ check(free.GiftLocked==true,'R152: the fixture giveaway pack is GiftLocked')
+ local outbox0=0;for _ in pairs(Data.Gardens[A].OutgoingSeedGifts or{})do outbox0+=1 end
+ local beforeA,beforeB=seedRecords(A),seedRecords(B)
+ local accepts,rawAccept=0,Gifts.Accept;Gifts.Accept=function(...)accepts+=1;return rawAccept(...)end -- (a refusal in OfferSeed itself never makes an offer to accept)
+ send(A,'GiveSeed',B,free.Id)
+ Gifts.Accept=rawAccept
+ local told=lastFor(A)
+ check(accepts==0,'R152: OfferSeed refuses it before any offer is made ('..accepts..' offers reached Accept)')
+ check(find(A,free.Id)~=nil and find(B,free.Id)==nil and freeTool.Parent==A.Character,'R152: OfferSeed refuses a GiftLocked pack: the giver keeps it (and still holds it)')
+ check(told and told.Action=='Status'and told.Text=="Free Void Packs can't be gifted",'R152: ... with a short clear notice ('..tostring(told and told.Text)..')')
+ local outbox1=0;for _ in pairs(Data.Gardens[A].OutgoingSeedGifts or{})do outbox1+=1 end
+ check(outbox1==outbox0 and seedRecords(A)==beforeA and seedRecords(B)==beforeB,'R152: ... nothing staged, nothing moved')
+ -- an offer that already exists (made before the pack was locked, or forged): AcceptSeed refuses too
+ local before=#fired;local offerId='locked-offer-1'
+ Gifts.Offers[offerId]={From=A,To=B,ItemId=free.Id,Kind='Seed',Expires=math.huge}
+ task2.spawn(function()Gifts:Accept(B,offerId)end);advance(5)
+ local refusal;for i=before+1,#fired do if fired[i].P==A and fired[i].Text=="Free Void Packs can't be gifted"then refusal=fired[i]end end
+ check(find(A,free.Id)~=nil and find(B,free.Id)==nil and refusal~=nil,'R152: AcceptSeed refuses a GiftLocked pack too (same notice to the giver)')
+ check(seedRecords(A)==beforeA and seedRecords(B)==beforeB and Gifts.Offers[offerId]==nil,'R152: ... nothing moved, the offer is gone')
+ -- an ordinary Void pack (the track\'s) is still a gift, and arrives unlocked
+ local own=Data:AddChest(A,{Stage=7,BagVariant='EclipseReliquary',PackSize=1,PackMutation='None'});hold(A,own)
+ send(A,'GiveSeed',B,own.Id)
+ local got2=find(B,own.Id);check(got2 and find(A,own.Id)==nil and got2.GiftLocked==nil,'R152: an ordinary Void pack can still be gifted')
+ -- tidy up so later sections see the same inventory
+ for i,r in ipairs(Data:GetChestRecords(A))do if r.Id==free.Id then table.remove(Data:GetChestRecords(A),i);break end end;freeTool:Destroy()
+ for i,r in ipairs(Data:GetChestRecords(B))do if r.Id==own.Id then table.remove(Data:GetChestRecords(B),i);break end end
+ Data:_notifySeedInventory(A);Data:_notifySeedInventory(B)
+end
+
 -- 9. Save failure: debit stays in the outbox, nothing is lost or duplicated ------------------------------
 local p7=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p7)
 local profileStore;for name,s in pairs(stores)do if s.Data['Player_'..A.UserId]then profileStore=name end end
 dsFail[profileStore]=true;send(A,'GiveSeed',B,p7.Id);dsFail[profileStore]=nil
 check(find(A,p7.Id)==nil and find(B,p7.Id)==nil,'failed save: item held in the outbox only')
 check(Data.Gardens[A].OutgoingSeedGifts and next(Data.Gardens[A].OutgoingSeedGifts)~=nil,'failed save: outbox entry kept')
-check(lastFor(A).Text:find('pending a safe save'),'failed save: giver told it will retry')
+check(lastFor(A).Text:find('waiting for a safe save'),'failed save: giver told it will retry')
 Data.Revision[A]=(Data.Revision[A]or 0)+1;advance(16) -- background retry loop
 recover(B);recover(A);recover(B);recover(A)
 local copies=0;for _,p in ipairs({A,B})do if find(p,p7.Id)then copies+=1 end end
@@ -301,12 +333,18 @@ check(ok,'fixture harvested: '..tostring(harvest))
 local fruit=Data.Gardens[A].Harvests[#Data.Gardens[A].Harvests]
 local fruitId=fruit.Id;local fruitValue=fruit.Value
 local hb=#Data.Gardens[B].Harvests
+-- R131: the receiver's client shows the notice and plays the chime from the 'Received' event (no second server notice).
+local shown={};Gifts.Notes={Show=function(_,p,text)shown[#shown+1]={P=p,Text=text}end}
 holdFruit(A,fruit);send(A,'Give',B,fruitId)
+Gifts.Notes=nil
 local fa=false;for _,c in ipairs(Data.Gardens[A].Harvests)do if c.Id==fruitId then fa=true end end
 local fb;for _,c in ipairs(Data.Gardens[B].Harvests)do if c.Id==fruitId then fb=c end end
 check(not fa and fb~=nil and #Data.Gardens[B].Harvests==hb+1,'fruit moved to recipient')
 check(fb and fb.Value==fruitValue,'fruit value preserved')
-recv=lastFor(B);check(recv and recv.Text=='A gifted crop was added to your bag.','fruit receipt notice unchanged')
+recv=lastFor(B);check(recv and recv.Action=='Received'and recv.Text=='🎁 Alice gave you Golden Apple!'and recv.Info and recv.Info.From=='Alice'and recv.Info.Item=='Golden Apple','fruit receipt names giver and item: '..tostring(recv and recv.Text))
+check(#shown==0,'no duplicate server notice')
+local fs=false;for _,f in ipairs(fired)do if f.P==A and f.Text and f.Text:find('Gift sent to Bob! (Golden Apple)',1,true)then fs=true end end
+check(fs,'fruit giver told the gift was sent (R130)')
 advance(31)
 check(next(Data.Gardens[A].OutgoingGifts)==nil,'fruit outbox cleaned')
 local fruitBox;for name,s in pairs(stores)do if name:find('FruitInbox')then fruitBox=s end end
@@ -315,11 +353,131 @@ local fb2=fruitBox and fruitBox.Data[tostring(B.UserId)];check(fb2==nil or next(
 local p8=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,p8)
 send(A,'Give',B,p8.Id);check(find(A,p8.Id)~=nil,'pack id via the fruit action is ignored')
 
+-- R131 gifting fixes ------------------------------------------------------------------------------------
+do
+ local Service=server('FruitGiftService')
+ -- Every inbox read skips the DataStore read cache.
+ local optsSeen={}
+ for name,st in pairs(stores)do if name:find('Inbox')then local get=st.GetAsync
+  st.GetAsync=function(self,key,opts)optsSeen[#optsSeen+1]=opts;return get(self,key)end end end
+ -- Studio test players have negative UserIds (Player1 = -1, Player2 = -2).
+ local S1=makePlayer(-1,'Player1',200);local S2=makePlayer(-2,'Player2',206)
+ Service.SetStudio(true)
+ local sp=Data:AddChest(S1,{Stage=2,BagVariant='Pack02',PackSize=1});hold(S1,sp)
+ send(S1,'GiveSeed',S2,sp.Id)
+ check(find(S1,sp.Id)==nil and find(S2,sp.Id)~=nil,'Studio: Player1 gives a pack to Player2 (negative UserIds)')
+ local r=lastFor(S2);check(r and r.Action=='Received'and r.Info and r.Info.From=='Player1','Studio: Player2 is notified')
+ Service.SetStudio(false)
+ local sp2=Data:AddChest(S1,{Stage=2,BagVariant='Pack02',PackSize=1});hold(S1,sp2)
+ send(S1,'GiveSeed',S2,sp2.Id);check(find(S1,sp2.Id)~=nil,'live servers still refuse ids <= 0')
+ check(Service.ValidUserId(5)and not Service.ValidUserId(0)and not Service.ValidUserId(-3)and not Service.ValidUserId(1.5),'id rules (live)')
+ -- Refusals say why instead of doing nothing.
+ local function statusFor(p)for i=#fired,1,-1 do if fired[i].P==p and fired[i].Action=='Status'then return fired[i].Text end end end
+ local q=Data:AddChest(A,{Stage=1,BagVariant='Pack01',PackSize=1});hold(A,q)
+ Data.CanSave[B]=false;send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find("Bob's save is not ready",1,true),'receiver without a save: giver is told ('..tostring(statusFor(A))..')')
+ Data.CanSave[B]=true;Data.CanSave[A]=false;Service.SetStudio(true);send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Studio API access',1,true),'Studio without saving: told to turn on API access')
+ Data.CanSave[A]=true;Service.SetStudio(false)
+ Chase.Busy[B]=true;send(A,'GiveSeed',B,q.Id);Chase.Busy[B]=nil
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('in a run',1,true),'receiver in a run: giver is told')
+ blockLine=true;send(A,'GiveSeed',B,q.Id);blockLine=false
+ check(find(A,q.Id)~=nil and(statusFor(A)or''):find('Something is blocking',1,true),'blocked line of sight: giver is told')
+ -- A gift save or inbox check in progress is waited out instead of refusing the click.
+ Gifts.Working[B]=true;task2.spawn(function()task2.wait(1.5);Gifts.Working[B]=nil end)
+ send(A,'GiveSeed',B,q.Id)
+ check(find(A,q.Id)==nil and find(B,q.Id)~=nil,'gift goes through after the receiver\'s inbox check finishes')
+ -- A gift that lands during the receiver's inbox check is picked up right after it.
+ Gifts.Working[B]=true;Gifts:Recover(B);check(Gifts.Again and Gifts.Again[B]==true,'skipped inbox check is queued again')
+ Gifts.Working[B]=nil;recover(B);advance(1)
+ check(Gifts.Again[B]==nil,'and runs once more right after')
+ local uncached=false;for _,o in ipairs(optsSeen)do if type(o)=='table'and o.UseCache==false then uncached=true end end
+ check(uncached,'inbox reads skip the 4 s read cache')
+end
+
 -- 12. Reload round trip: the recipient's saved items decode to the same traits ---------------------------
 Data:Save(B,'final',true)
 local live={};for _,r in ipairs(Data:GetChestRecords(B))do live[r.Id]=Data:SerializeSeedRecord(r)end
 Data:PreparePlayer(B);check(Data:Load(B),'recipient reloads')
 for _,id in ipairs({pack.Id,seed.Id,mech.Id})do local r=find(B,id);sameTraits(r and Data:SerializeSeedRecord(r),live[id],'reloaded '..id)end
 
+-- R126 (owner): bought Mech packs roll a pack size like world packs; the seed inside follows it (1x stays scale 1).
+do
+ local PackRules=W.module('SeedPackRules');local want={};for _,row in ipairs(PackRules.PackSizes)do want[row.Scale]=row.Weight/100 end
+ local n,count,bad=6000,{},0
+ for _=1,n do
+  local rec=Data:GrantMechPack(C,true)
+  if not(rec and rec.BagVariant=='MechLimited'and want[rec.PackSize]and rec.SeedScale==PackRules.NewSeedScale(8,'MechLimited',rec.PackSize))then bad+=1 end
+  if rec then count[rec.PackSize]=(count[rec.PackSize]or 0)+1;Data:RemoveChest(C,rec.Id)end
+ end
+ check(bad==0,'R126: every Mech pack gets a world-table size and matching seed scale ('..bad..' bad)')
+ local big=0;for s,c in pairs(count)do if s>1 then big+=c end end
+ local share=(count[1]or 0)/n
+ check(math.abs(share-want[1])<5*math.sqrt(want[1]*(1-want[1])/n),string.format('R126: ~%.1f%% of Mech packs are 1x (got %.1f%%)',want[1]*100,share*100))
+ check(big>0 and(count[.5]or 0)>0,'R126: Mech sizes vary both ways ('..big..' bigger, '..tostring(count[.5])..' half-size)')
+ check(PackRules.NewSeedScale(8,'MechLimited',1)==1 and PackRules.NewSeedScale(8,'MechLimited',2.5)==2.5 and PackRules.NewSeedScale(8,'MechLimited',.5)==.5,'R126: Mech seed scale 1x=1, 2.5x=2.5, 0.5x=0.5')
+ local five=Data:GrantMechPacks(C,true,5)
+ check(five and #five==5,'R126: a 5-pack purchase still grants 5 packs')
+ if five then for _,r in ipairs(five)do Data:RemoveChest(C,r.Id)end end
+ local big25=Data:AddChest(C,{Stage=8,BagVariant='MechLimited',PackSize=2.5,PackMutation='None'});big25.PaidRandom=true
+ local opened=Data:OpenSeedPack(C,big25.Id,function()return .5 end)
+ check(opened and opened.Kind=='Seed'and opened.SeedScale==2.5,'R126: opening a 2.5x Mech pack gives a 2.5x seed ('..tostring(opened and opened.SeedScale)..')')
+ if opened then Data:RemoveChest(C,opened.Id)end
+end
+-- R132 (owner): the Fruit of the Hour sells for x1.5 to x3 (single sale, sell all, and the price the sell menu shows).
+do
+ local Hour=W.module('FruitOfHour')
+ local slot=1
+ local function grow(p)
+  local fp=Data:AddChest(p,{Stage=1,BagVariant='Pack01',PackSize=1});Data:OpenSeedPack(p,fp.Id,function()return .1 end)
+  slot+=1;local s=find(p,fp.Id);local ok,c=Data:PlantSeed(p,slot,s.Id,{OffsetX=0,OffsetZ=0},os.time())
+  assert(ok,'R132 fixture plant: '..tostring(c));assert(Data:HarvestPlant(p,slot,c.Id,c.ReadyAt+1),'R132 fixture harvest')
+  return Data.Gardens[p].Harvests[#Data.Gardens[p].Harvests]
+ end
+ Data.Gardens[A].Harvests={};Data.Gardens[A].PendingSales={}
+ local crop=grow(A)
+ local hot,cold
+ for h=480000,480000+24*60 do local c=Hour.At(h*3600);if c.SeedId==crop.SeedId and not hot then hot=c end;if c.SeedId~=crop.SeedId and not cold then cold=c end end
+ check(hot and cold,'R132 fixture: an hour with and one without this fruit')
+ local realNow=W.workspace.GetServerTimeNow;local clock=hot.StartsAt+60
+ W.workspace.GetServerTimeNow=function()return clock end
+ local want=math.floor(crop.Value*hot.Multiplier+.5)
+ local listed;for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==crop.Id then listed=g end end
+ check(listed and listed.SellValue==want and listed.HourMultiplier==hot.Multiplier,('R132: sell menu lists the bonus price (%s -> %s, x%.1f)'):format(crop.Value,tostring(listed and listed.SellValue),hot.Multiplier))
+ local ok,paid=Data:SellHarvest(A,crop.Id)
+ local receipt=Data.Gardens[A].PendingSales[#Data.Gardens[A].PendingSales]
+ check(ok and paid==want and receipt and receipt.Amount==want,('R132: selling the Fruit of the Hour pays the bonus (%s, receipt %s)'):format(tostring(paid),tostring(receipt and receipt.Amount)))
+ Data.Gardens[A].PendingSales={}
+ local c2=grow(A);clock=cold.StartsAt+60
+ local ok2,paid2=Data:SellHarvest(A,c2.Id)
+ check(ok2 and paid2==c2.Value,'R132: in another hour the same fruit sells for its normal price')
+ local listed2;Data.Gardens[A].PendingSales={};local c3=grow(A);local c4=grow(A)
+ for _,g in ipairs(Data:GetHarvestInventory(A))do if g.InventoryId==c3.Id then listed2=g end end -- (c3 only: two fruits roll their own sizes, so c4's price is not c3's)
+ check(listed2 and listed2.SellValue==c3.Value and listed2.HourMultiplier==nil,'R132: no bonus shown outside its hour')
+ clock=hot.StartsAt+3000
+ local ok3,total,count=Data:SellAllHarvests(A)
+ local wantAll=math.floor(c3.Value*hot.Multiplier+.5)+math.floor(c4.Value*hot.Multiplier+.5)
+ check(ok3 and total==wantAll and count==2,('R132: sell all adds the bonus to each fruit (%s, want %s)'):format(tostring(total),wantAll))
+ Data.Gardens[A].PendingSales={}
+ -- /test fruithour (owner test): a chosen fruit and bonus for 10 minutes, then back to the clock.
+ local Cmd=server('StudioTestCommands');local studio=Run.IsStudio;Run.IsStudio=function()return true end
+ local ctx={Data=Data,Chase=Chase,Chests=Chests};clock=cold.StartsAt+10
+ local name=Hour.Name(crop.SeedId)
+ local okc,msgc=Cmd.Execute(ctx,A,'/test fruithour '..name..' 2.5')
+ local forced=Hour.At(clock)
+ check(okc and forced.SeedId==crop.SeedId and forced.Multiplier==2.5 and forced.Test,'R132: /test fruithour '..name..' 2.5 -> '..tostring(msgc))
+ local c5=grow(A);local ok5,paid5=Data:SellHarvest(A,c5.Id)
+ check(ok5 and paid5==math.floor(c5.Value*2.5+.5),'R132: the test fruit sells for the test bonus ('..tostring(paid5)..')')
+ Data.Gardens[A].PendingSales={}
+ clock+=601;check(Hour.At(clock).SeedId==cold.SeedId and not Hour.At(clock).Test,'R132: the test ends after 10 minutes')
+ clock-=601;okc=Cmd.Execute(ctx,A,'/test fruithour off')
+ check(okc and RS:GetAttribute('FruitOfHourTest')==nil and Hour.At(clock).SeedId==cold.SeedId,'R132: fruithour off goes back to the clock')
+ check(not Cmd.Execute(ctx,A,'/test fruithour '..name..' 9'),'R132: a bonus over x3 is refused')
+ check(not Cmd.Execute(ctx,A,'/test fruithour no such fruit'),'R132: an unknown fruit is refused')
+ check(not Cmd.Execute(ctx,A,'/test fruithour '..name..' @Bob'),'R132: fruithour is server-wide (no @target)')
+ local okr,msgr=Cmd.Execute(ctx,A,'/test fruithour');check(okr and Hour.At(clock).Test and Hour.At(clock).Multiplier==3,'R132: plain fruithour picks a fruit at x3: '..tostring(msgr))
+ Cmd.Execute(ctx,A,'/test fruithour off');Run.IsStudio=studio
+ W.workspace.GetServerTimeNow=realNow
+end
 print(string.format('%d/%d checks passed%s',checks-fails,checks,fails>0 and(' ('..fails..' FAILED)')or''))
 if fails>0 then error('failures',0)end

@@ -14,12 +14,23 @@ X.Budget={
  Lights=1,                      -- one pulsing light in the whole scene (nearest pack, tier 3)
  EffectDistance=160,MotionDistance=850,SpinDistance=160,
 }
+-- R147: every colour / texture of the effect set. X.Void is the Void pack's (what this module always built). R147 / R148 gave the Verity
+-- pack its own gold set here; R149 (owner: the Verity pack's "only design needed" is pure yellow and her face) removed it: the Verity pack
+-- has no effects at all, so nothing here tracks or captures it any more (VeiledEventClient81 only tracks the Void pack).
+X.Void={
+ Haze={Texture=SMOKE,Colors={Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},Size={.6,1.5},Emission=0,Alpha=.30},
+ Nebula={Texture=SMOKE,Colors={Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},Size={.9,1.9},Emission=.7,Alpha=.62},
+ Stars={Texture=SPARK,Colors={Color3.fromRGB(255,255,255),Color3.fromRGB(150,232,255)},Size={.10,.03},Emission=1,Alpha=.15},
+ Debris=Color3.fromRGB(24,16,38),Comet=Color3.fromRGB(255,190,250),Trail={Color3.fromRGB(255,160,240),Color3.fromRGB(120,90,255)},
+ Fill=Color3.fromRGB(20,6,40),Outline=Color3.fromRGB(150,80,230),Light=Color3.fromRGB(170,90,255),
+}
+function X.PaletteFor(_bag)return X.Void end
 local function isFinite(n)return type(n)=='number'and n==n and math.abs(n)<math.huge end
 function X.Capture(bag)
  local root=bag.PrimaryPart
  if not root or not bag:GetAttribute('CompactPackReady')then return nil end
  local r={Bag=bag,Root=root,Scale=bag:GetAttribute('VisualScale')or 1,Origin=bag:GetAttribute('HoverOrigin')or root.CFrame,
-  Parts={},Spinners=0,Pulsers={},Anchored=root.Anchored}
+  Parts={},Spinners=0,Pulsers={},Anchored=root.Anchored,Palette=X.PaletteFor(bag)}
  for _,p in ipairs(bag:GetDescendants())do if p:IsA('BasePart')then
   local frame=p:GetAttribute('PackLocalFrame');if typeof(frame)~='CFrame'then frame=root.CFrame:ToObjectSpace(p.CFrame)end
   local e={Part=p,Frame=frame}
@@ -37,24 +48,32 @@ function X.LocalFrame(e,t,spin)
  return e.Frame
 end
 -- World hover pose (same motion as before R122) plus galaxy / halo spin near the camera.
+-- R152 perf: the hover frame alone (what Pose returns), for a caller that does not move the pack's own parts this frame (it is off screen).
+function X.HoverFrame(r,now)return r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)end
+-- (R153 perf: r.Moving, when a caller sets it, lists the only pieces that still need moving - the root its other pieces are welded to, and the
+-- spinners; VoidGiveawayClient152 does this for the giveaway pack. Without it every piece is posed, as before.)
 function X.Pose(r,now,parts,frames,spin)
- local frame=r.Origin*CF(0,math.sin(now*1.2)*.16,0)*CFrame.Angles(0,math.sin(now*.35)*.13,math.sin(now*.55)*.018)
- for _,e in ipairs(r.Parts)do if e.Part.Parent then
+ local frame=X.HoverFrame(r,now)
+ for _,e in ipairs(r.Moving or r.Parts)do if e.Part.Parent then
   parts[#parts+1]=e.Part;frames[#frames+1]=frame*X.LocalFrame(e,now,spin)
  end end
  return frame
 end
 -- Heartbeat glow on the eye, photon ring, stars and runes (colour only; restored on release).
+-- R153 perf: a part's colour is kept by the engine in 8 bits a channel (BasePart.Color3uint8), so a pulse step that stays inside the same half
+-- level of every channel as the colour written last cannot show: it is not written (exact under rounding and truncation alike).
+local function level(c)return math.floor(c.R*510)+math.floor(c.G*510)*512+math.floor(c.B*510)*262144 end
 function X.Pulse(r,now,reduced)
  for _,e in ipairs(r.Pulsers)do if e.Part.Parent then
   local wave=reduced and .5 or .5+.5*math.sin(now*(e.Amount>.5 and 3.1 or 1.7)+e.Phase)
   -- A double "heartbeat" on the pupil: two quick swells every ~2 s.
   if e.Amount>=.55 and not reduced then local beat=(now+e.Phase)%2.1;wave=math.max(wave*.5,math.exp(-((beat-.15)/.09)^2),math.exp(-((beat-.45)/.09)^2))end
-  e.Part.Color=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6)
+  local c=e.Color:Lerp(Color3.new(1,1,1),wave*e.Amount*.6);local k=level(c)
+  if e.Level~=k then e.Level=k;e.Part.Color=c end
  end end
 end
 function X.Restore(r)
- for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color end end
+ for _,e in ipairs(r.Pulsers)do if e.Part.Parent then e.Part.Color=e.Color;e.Level=nil end end
 end
 local function fxPart(folder,name,size,color,material,shape)
  local p=Instance.new('Part');p.Name=name;p.Size=size;p.Color=color;p.Material=material or Enum.Material.Neon
@@ -69,32 +88,37 @@ local function emitter(parent,name,texture,colors,size,rate,life,speed,emission,
  e.LightEmission=emission;e.LightInfluence=emission>0 and 0 or .25;e.Rotation=NumberRange.new(0,360);e.RotSpeed=NumberRange.new(-35,35)
  e.Parent=parent;return e
 end
--- Create (once) the effect set for one pack at the given tier.
-function X.Create(r,tier)
- local s=r.Scale;local folder=Instance.new('Folder');folder.Name='_VoidPackFx122'
+-- Create (once) the effect set for one pack at the given tier. noHighlight (optional): leave out the violet outline on the pack (a Highlight written every frame by Step): the giveaway
+-- pedestal's pack asks for that on tier 2 and below; the track's Void packs always have it, as before.
+function X.Create(r,tier,noHighlight)
+ local s=r.Scale;local pal=r.Palette or X.Void;local folder=Instance.new('Folder');folder.Name='_VoidPackFx122'
  local core=fxPart(folder,'VoidFxCore',V(.1,.1,.1),Color3.new(),Enum.Material.SmoothPlastic);core.Transparency=1
  local fx={Folder=folder,Core=core,Tier=tier,Debris={},Comets={}}
  local attach=Instance.new('Attachment');attach.Name='VoidFxEmit';attach.Parent=core
- -- Dark gravitational haze, a slow violet nebula swirl and falling star sparks.
- fx.Haze=emitter(attach,'VoidHaze',SMOKE,{Color3.fromRGB(6,3,14),Color3.fromRGB(40,18,66)},{.6*s,1.5*s},5,{.9,1.5},{.1,.35},0,.30)
- fx.Nebula=emitter(attach,'VoidNebulaSwirl',SMOKE,{Color3.fromRGB(255,90,210),Color3.fromRGB(80,170,255)},{.9*s,1.9*s},2.5,{1.6,2.4},{.05,.25},.7,.62)
- fx.Stars=emitter(attach,'VoidStarfall',SPARK,{Color3.fromRGB(255,255,255),Color3.fromRGB(150,232,255)},{.10*s,.03*s},4,{.6,1.1},{.2,.6},1,.15)
- for i=1,X.Budget.Debris[tier]or 0 do
+ -- Dark gravitational haze, a slow violet nebula swirl and falling star sparks (Verity: gold dust, a gold swirl, cream sparkles).
+ local hz,nb,st=pal.Haze,pal.Nebula,pal.Stars
+ fx.Haze=emitter(attach,'VoidHaze',hz.Texture,hz.Colors,{hz.Size[1]*s,hz.Size[2]*s},5,{.9,1.5},{.1,.35},hz.Emission,hz.Alpha)
+ fx.Nebula=emitter(attach,'VoidNebulaSwirl',nb.Texture,nb.Colors,{nb.Size[1]*s,nb.Size[2]*s},2.5,{1.6,2.4},{.05,.25},nb.Emission,nb.Alpha)
+ fx.Stars=emitter(attach,'VoidStarfall',st.Texture,st.Colors,{st.Size[1]*s,st.Size[2]*s},4,{.6,1.1},{.2,.6},st.Emission,st.Alpha)
+ for i=1,pal.Debris and X.Budget.Debris[tier]or 0 do
   local size=(.10+.05*((i*37)%3))*s
-  fx.Debris[i]=fxPart(folder,'VoidDebris',V(size,size*.8,size*.9),Color3.fromRGB(24,16,38),Enum.Material.Slate)
+  fx.Debris[i]=fxPart(folder,'VoidDebris',V(size,size*.8,size*.9),pal.Debris,Enum.Material.Slate)
  end
- for i=1,X.Budget.Comets[tier]or 0 do
-  local comet=fxPart(folder,'VoidComet',V(.12,.12,.12)*s,Color3.fromRGB(255,190,250),Enum.Material.Neon,Enum.PartType.Ball)
+ for i=1,pal.Comet and X.Budget.Comets[tier]or 0 do
+  local comet=fxPart(folder,'VoidComet',V(.12,.12,.12)*s,pal.Comet,Enum.Material.Neon,Enum.PartType.Ball)
   local a0=Instance.new('Attachment');a0.Position=V(0,.05*s,0);a0.Parent=comet
   local a1=Instance.new('Attachment');a1.Position=V(0,-.05*s,0);a1.Parent=comet
   local trail=Instance.new('Trail');trail.Attachment0=a0;trail.Attachment1=a1;trail.Lifetime=.35;trail.LightEmission=1;trail.FaceCamera=true
-  trail.Color=ColorSequence.new(Color3.fromRGB(255,160,240),Color3.fromRGB(120,90,255))
+  trail.Color=ColorSequence.new(pal.Trail[1],pal.Trail[2])
   trail.Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.1),NumberSequenceKeypoint.new(1,1)});trail.Parent=comet
   fx.Comets[i]={Part=comet,Trail=trail}
  end
- local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=Color3.fromRGB(20,6,40);h.FillTransparency=.88
- h.OutlineColor=Color3.fromRGB(150,80,230);h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
- local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=Color3.fromRGB(170,90,255);light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
+ if pal.Fill and not noHighlight then
+  local h=Instance.new('Highlight');h.Name='VoidDistortion';h.Adornee=r.Bag;h.FillColor=pal.Fill;h.FillTransparency=.88
+  h.OutlineColor=pal.Outline;h.OutlineTransparency=.35;h.DepthMode=Enum.HighlightDepthMode.Occluded;h.Parent=folder;fx.Highlight=h
+  pcall(function()local m=script.Parent:FindFirstChild('ClientFxBudget');if m then require(m).TrackHighlight(h)end end) -- (R153 perf: counted in the shared 31-Highlight budget)
+ end
+ local light=Instance.new('PointLight');light.Name='VoidPulseLight';light.Color=pal.Light;light.Range=math.min(16,8*s);light.Brightness=0;light.Shadows=false;light.Enabled=false;light.Parent=core;fx.Light=light
  folder.Parent=workspace
  r.Fx=fx;return fx
 end
@@ -102,17 +126,24 @@ function X.Clear(r)
  if r.Fx then r.Fx.Folder:Destroy();r.Fx=nil end
  X.Restore(r)
 end
+-- R152 perf: an effect object's property is written only when its value changes (the set is this module's own: nothing else writes it)
+local function put(fx,o,k,v)
+ local w=fx.Written;if not w then w={};fx.Written=w end
+ local key=w[o];if not key then key={};w[o]=key end
+ if key[k]~=v then key[k]=v;o[k]=v end
+end
 -- Moves effect parts in the same BulkMoveTo batch as the pack.
 function X.Step(r,now,frame,tier,reduced,lit,parts,frames)
  local fx=r.Fx;if not fx then return end
  local s=r.Scale
  parts[#parts+1]=fx.Core;frames[#frames+1]=frame
- fx.Haze.Enabled=tier>1;fx.Haze.Rate=tier==3 and 5 or 2
- fx.Nebula.Enabled=tier>1 and not reduced
- fx.Stars.Enabled=tier==3
- fx.Light.Enabled=lit and tier==3
- if fx.Light.Enabled then fx.Light.Brightness=reduced and 1.4 or 1.4+.8*math.sin(now*2.2)end
- fx.Highlight.OutlineTransparency=reduced and .4 or .3+.12*math.sin(now*1.6)
+ put(fx,fx.Haze,'Enabled',tier>1);put(fx,fx.Haze,'Rate',tier==3 and 5 or 2)
+ put(fx,fx.Nebula,'Enabled',tier>1 and not reduced)
+ put(fx,fx.Stars,'Enabled',tier==3)
+ local light=lit and tier==3
+ put(fx,fx.Light,'Enabled',light)
+ if light then put(fx,fx.Light,'Brightness',reduced and 1.4 or 1.4+.8*math.sin(now*2.2))end
+ if fx.Highlight then put(fx,fx.Highlight,'OutlineTransparency',reduced and .4 or .3+.12*math.sin(now*1.6))end
  -- Orbiting debris on a tilted ring; frozen in place under Reduced Motion.
  local t=reduced and 0 or now
  local orbit=frame*CFrame.Angles(.35,0,.2)
@@ -121,7 +152,7 @@ function X.Step(r,now,frame,tier,reduced,lit,parts,frames)
   parts[#parts+1]=p;frames[#frames+1]=orbit*CF(math.cos(a)*radius,math.sin(a*2)*.12*s,math.sin(a)*radius)*CFrame.Angles(t*1.3+i,t*.7,i)
  end
  for i,c in ipairs(fx.Comets)do
-  c.Trail.Enabled=not reduced
+  put(fx,c.Trail,'Enabled',not reduced)
   local a=-t*2.2+(i-1)*math.pi;local radius=1.55*s
   parts[#parts+1]=c.Part;frames[#frames+1]=frame*CFrame.Angles(-.5+i*.4,0,.3)*CF(math.cos(a)*radius,0,math.sin(a)*radius)
  end

@@ -1,0 +1,299 @@
+{
+ "note": "Close-ups of the built props (run_base_area_built_preview.sh -> base_area_built_variety.png). pos / look in world studs.",
+ "views": [
+  {
+   "name": "v_oaks",
+   "title": "Round oaks S / M / L, a blossom, bushes",
+   "fov": 55,
+   "pos": [
+    -52,
+    9,
+    -168
+   ],
+   "look": [
+    -82,
+    11,
+    -212
+   ],
+   "shadowAt": [
+    -80,
+    4,
+    -205
+   ],
+   "shadowExtent": 70
+  },
+  {
+   "name": "v_blossoms",
+   "title": "Blossom trees (pink, white), potted topiary, the signpost",
+   "fov": 60,
+   "pos": [
+    0,
+    8,
+    -158
+   ],
+   "look": [
+    0,
+    12,
+    -196
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -190
+   ],
+   "shadowExtent": 60
+  },
+  {
+   "name": "v_fruit",
+   "title": "Leafy trees (fresh, lime, sage greens), poplars",
+   "fov": 58,
+   "pos": [
+    60,
+    10,
+    -212
+   ],
+   "look": [
+    80,
+    10,
+    -262
+   ],
+   "shadowAt": [
+    80,
+    4,
+    -255
+   ],
+   "shadowExtent": 70
+  },
+  {
+   "name": "v_poplar",
+   "title": "Poplars, a round oak, lamps on the side street",
+   "fov": 58,
+   "pos": [
+    72,
+    9,
+    -186
+   ],
+   "look": [
+    108,
+    15,
+    -226
+   ],
+   "shadowAt": [
+    100,
+    4,
+    -215
+   ],
+   "shadowExtent": 70
+  },
+  {
+   "name": "v_desert",
+   "title": "Desert garden: palms, saguaros, barrel cacti, bollards",
+   "fov": 60,
+   "pos": [
+    150,
+    10,
+    -270
+   ],
+   "look": [
+    250,
+    9,
+    -268
+   ],
+   "shadowAt": [
+    230,
+    4,
+    -269
+   ],
+   "shadowExtent": 100
+  },
+  {
+   "name": "v_lava",
+   "title": "Lava garden: amber ember trees, glowing basalt rocks",
+   "fov": 60,
+   "pos": [
+    -150,
+    10,
+    -268
+   ],
+   "look": [
+    -250,
+    8,
+    -270
+   ],
+   "shadowAt": [
+    -230,
+    4,
+    -269
+   ],
+   "shadowExtent": 100
+  },
+  {
+   "name": "v_snow",
+   "title": "Snow lane: pines with snow rims, to the SNOW mural",
+   "fov": 58,
+   "pos": [
+    0,
+    9,
+    -428
+   ],
+   "look": [
+    0,
+    12,
+    -540
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -500
+   ],
+   "shadowExtent": 100
+  },
+  {
+   "name": "v_fountain",
+   "title": "The Seed Fountain: bowls, jet, water arcs, ripples",
+   "fov": 58,
+   "pos": [
+    22,
+    12,
+    -366
+   ],
+   "look": [
+    0,
+    11,
+    -392
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -392
+   ],
+   "shadowExtent": 40
+  },
+  {
+   "name": "v_beds",
+   "title": "A flower bed (mixed colours and heights), bench, butterflies",
+   "fov": 55,
+   "pos": [
+    46,
+    8,
+    -184
+   ],
+   "look": [
+    62,
+    4,
+    -200
+   ],
+   "shadowAt": [
+    60,
+    4,
+    -198
+   ],
+   "shadowExtent": 30
+  },
+  {
+   "name": "v_square",
+   "title": "Market square: double lamps, potted topiary, bunting, beds",
+   "fov": 60,
+   "pos": [
+    36,
+    13,
+    -221
+   ],
+   "look": [
+    18,
+    8,
+    -262
+   ],
+   "shadowAt": [
+    45,
+    4,
+    -240
+   ],
+   "shadowExtent": 60
+  },
+  {
+   "name": "v_mural_forest",
+   "title": "Mural 1 FOREST (richer relief) between pilasters",
+   "fov": 50,
+   "pos": [
+    160,
+    24,
+    -150
+   ],
+   "look": [
+    160,
+    28,
+    -104
+   ],
+   "shadowAt": [
+    160,
+    4,
+    -110
+   ],
+   "shadowExtent": 60
+  },
+  {
+   "name": "v_mural_crystal",
+   "title": "Mural 6 CRYSTAL and mural 7 STORM PEAKS",
+   "fov": 58,
+   "pos": [
+    -200,
+    24,
+    -160
+   ],
+   "look": [
+    -212,
+    28,
+    -104
+   ],
+   "shadowAt": [
+    -210,
+    4,
+    -110
+   ],
+   "shadowExtent": 90
+  },
+  {
+   "name": "v_gate_keys",
+   "title": "Gate keys up close (Jungle-fast player: Forest, Jungle ticked)",
+   "fov": 55,
+   "pos": [
+    24,
+    34,
+    -152
+   ],
+   "look": [
+    40,
+    50,
+    -106
+   ],
+   "shadowAt": [
+    40,
+    30,
+    -105
+   ],
+   "shadowExtent": 110
+  },
+  {
+   "name": "v_arch",
+   "title": "A free base's arch (Base 6), spur, curbs, potted cones",
+   "fov": 58,
+   "pos": [
+    74,
+    9,
+    -399
+   ],
+   "look": [
+    74,
+    16,
+    -430
+   ],
+   "shadowAt": [
+    74,
+    4,
+    -424
+   ],
+   "shadowExtent": 60
+  }
+ ]
+}

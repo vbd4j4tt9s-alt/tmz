@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Verity dialog, R152 texts</title>
+<!-- R152 preview: Verity's quest window with her new texts, in its main states, on a computer and on phones. Not the game: an HTML drawing of the
+     same layout. The positions and sizes are ported from VerityClient.client.lua layout(); every label is fitted with a port of GardenTextFit.Layout
+     (the largest size that fits, wrapping at spaces), measured with the real FredokaOne (docs/proposals/shop_R120/tests/FredokaOne.ttf) and the
+     system emoji font, so a line that is too long for its box shows up here as a small size. The texts come from copy.json (the strings of
+     VerityConfig / NoticeCopy83). The pack pictures, the 3D portrait and the sign are simple drawings. Render with render_verity_text.mjs. -->
+<style>
+@font-face{font-family:F;src:url('../../shop_R120/tests/FredokaOne.ttf')}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0e1120;color:#dfe6ff;font-family:F,"Noto Color Emoji",sans-serif;width:1522px;padding:26px 30px 30px}
+h1{font-weight:400;font-size:34px;color:#fff;letter-spacing:.5px}
+.sub{font-size:16px;color:#9fb0e8;margin:4px 0 20px;max-width:1300px;line-height:1.35}
+.row{display:flex;gap:30px;margin-bottom:26px;align-items:flex-start}
+.scene .cap{font-size:17px;color:#cfd8ff;margin-bottom:8px;display:flex;gap:8px;align-items:baseline}
+.scene .cap b{font-weight:400;color:#ffd75a}
+.scene .cap i{font-style:normal;color:#8d9bd4;font-size:14px}
+.screen{position:relative}
+.panel{position:absolute;left:0;top:0;border-radius:9px;overflow:hidden;background:linear-gradient(180deg,#414c8f,#191e40);box-shadow:0 0 0 3px #0c1126,0 10px 30px rgba(0,0,0,.45)}
+.abs{position:absolute}
+.lbl{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;white-space:pre;line-height:1.15;color:#fff;
+  -webkit-text-stroke:3px #080d18;paint-order:stroke fill;font-family:F,"Noto Color Emoji",sans-serif}
+.lbl.left{justify-content:flex-start;text-align:left}
+.chip{position:absolute;background:#30366a;border-radius:10px}
+.holder{position:absolute;background:#192041;border-radius:10px}
+.btn{position:absolute;border-radius:6px;box-shadow:0 0 0 2px #0c1126}
+.hdr{position:absolute;left:0;top:0;right:0;background:linear-gradient(160deg,#b8ff6f,#40c94b);box-shadow:inset 0 -2px 0 #12321f}
+.xbtn{position:absolute;border-radius:6px;background:linear-gradient(180deg,#ff8a9c,#e1344d);box-shadow:0 0 0 2px #0c1126}
+.port{position:absolute;background:#192041;border-radius:12px;box-shadow:inset 0 0 0 2px #ffce40}
+.dais{position:absolute;border-radius:50%;background:#ffce40;opacity:.65}
+.ball{position:absolute;border-radius:50%;background:radial-gradient(circle at 36% 30%,#ffff9a 0,#ffff00 38%,#e6d300 100%)}
+.world{position:relative;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#27346b 0,#1a2147 55%,#3b3a5a 55%,#2b2a45 100%)}
+.note{position:absolute;white-space:normal;font-size:22px;color:#fff;-webkit-text-stroke:5px #000;paint-order:stroke fill}
+</style>
+</head>
+<body>
+<h1>Verity's quest window, new texts</h1>
+<div class="sub" id="sub"></div>
+<div id="sheet"></div>
+<script>
+const FONT = 'F, "Noto Color Emoji", sans-serif';
+const cv = document.createElement('canvas').getContext('2d');
+const measure = (s, size) => { cv.font = size + 'px ' + FONT; return cv.measureText(s).width; };
+// GardenTextFit.Layout: the largest size (max..min) at which the text, wrapped at spaces, fits the box; else the minimum with an ellipsis.
+function fitLayout(text, width, height, max, min) {
+  width = Math.max(1, width - 4); height = Math.max(1, height - 2);
+  for (let size = max; size >= min; size--) {
+    const lines = []; let valid = true;
+    for (const paragraph of text.split('\n')) {
+      let line = '';
+      for (const word of paragraph.split(/[ \t\r\f\v]+/).filter(Boolean)) {
+        if (measure(word, size) > width) { valid = false; break; }
+        const cand = line === '' ? word : line + ' ' + word;
+        if (line !== '' && measure(cand, size) > width) { lines.push(line); line = word; } else line = cand;
+      }
+      if (!valid) break; lines.push(line);
+    }
+    if (valid && lines.length * size * 1.15 <= height) return { text: lines.join('\n'), size, cut: false };
+  }
+  return { text: text.replace(/\n/g, ' ') + '...', size: min, cut: true };
+}
+const RGB = (r, g, b) => `rgb(${r},${g},${b})`;
+const GOLD = [255, 206, 64], MINT = [110, 226, 96], SKY = [86, 182, 255], RED = [255, 96, 96], VIOLET = [190, 140, 255], MUTED = [204, 224, 255];
+const lerp = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
+const css = (c) => RGB(...c);
+function countdown(seconds) {
+  seconds = Math.max(0, Math.floor(seconds)); const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60);
+  if (h > 0) return h + 'h ' + m + 'm'; if (m > 0) return m + 'm ' + (seconds % 60) + 's'; return seconds + 's';
+}
+function el(parent, cls, style, html) {
+  const d = document.createElement('div'); if (cls) d.className = cls;
+  Object.assign(d.style, style || {}); if (html !== undefined) d.textContent = html; parent.appendChild(d); return d;
+}
+// A fitted label: box (x, y, w, h) inside parent, text fitted between max and min.
+function label(parent, x, y, w, h, text, max, min, color, opts = {}) {
+  const f = fitLayout(text, w, h, max, min);
+  const d = el(parent, 'lbl' + (opts.left ? ' left' : ''), { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px', fontSize: f.size + 'px', color: css(color || [255, 255, 255]) }, f.text);
+  if (opts.stroke === false) d.style.webkitTextStroke = '0';
+  d.dataset.size = f.size; d.dataset.cut = f.cut ? '1' : '';
+  return { el: d, size: f.size, cut: f.cut };
+}
+const NBSP = ' ';
+// The two pack pictures (simple drawings: the game draws its real 3D packs here).
+function packSvg(kind) {
+  if (kind === 'void') return `<svg viewBox="0 0 60 78" width="100%" height="100%"><defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4b1f8c"/><stop offset="1" stop-color="#0d0620"/></linearGradient></defs>
+    <path d="M6 8 L12 4 L18 8 L24 4 L30 8 L36 4 L42 8 L48 4 L54 8 L52 70 L46 74 L40 70 L34 74 L28 70 L22 74 L16 70 L10 74 L8 70 Z" fill="url(#vg)" stroke="#b88dff" stroke-width="2.5" stroke-linejoin="round"/>
+    <path d="M30 22 L33 33 L44 36 L33 39 L30 50 L27 39 L16 36 L27 33 Z" fill="#fff" opacity=".92"/><circle cx="14" cy="18" r="1.8" fill="#d9c2ff"/><circle cx="46" cy="56" r="1.6" fill="#d9c2ff"/><circle cx="40" cy="16" r="1.2" fill="#d9c2ff"/></svg>`;
+  return `<svg viewBox="0 0 60 78" width="100%" height="100%"><path d="M6 8 L12 4 L18 8 L24 4 L30 8 L36 4 L42 8 L48 4 L54 8 L52 70 L46 74 L40 70 L34 74 L28 70 L22 74 L16 70 L10 74 L8 70 Z" fill="#ffee00" stroke="#c9a400" stroke-width="2.5" stroke-linejoin="round"/>
+    <circle cx="23" cy="34" r="2.6" fill="#111"/><circle cx="37" cy="34" r="2.6" fill="#111"/><path d="M19 43 Q30 55 41 43" fill="none" stroke="#111" stroke-width="2.6" stroke-linecap="round"/></svg>`;
+}
+function smileyBall(parent, cx, cy, size) {
+  const b = el(parent, 'ball', { left: (cx - size / 2) + 'px', top: (cy - size / 2) + 'px', width: size + 'px', height: size + 'px' });
+  b.innerHTML = `<svg viewBox="0 0 100 100" width="100%" height="100%"><circle cx="35" cy="40" r="4.4" fill="#111"/><circle cx="65" cy="40" r="4.4" fill="#111"/><path d="M30 58 Q50 78 70 58" fill="none" stroke="#111" stroke-width="4.4" stroke-linecap="round"/></svg>`;
+  return b;
+}
+// The window. screen = [w, h]; s = {known, voidPacks, delivered, eventActive, nextAt (seconds left), message {text, good}, busy, live}
+function drawDialog(host, copy, screen, s) {
+  const W = Math.round(Math.min(screen[0] * .94, 660)), H = Math.round(Math.min(screen[1] * .88, 450));
+  const wrap = el(host, 'screen', { width: W + 'px', height: H + 'px', margin: '4px 4px 8px' });
+  const panel = el(wrap, 'panel', { width: W + 'px', height: H + 'px' });
+  const short = H < 380, headH = short ? 46 : 56;
+  const hdr = el(panel, 'hdr', { height: headH + 'px' });
+  label(hdr, 18, 2, W - 84, headH - 4, '🌟 ' + copy.Name, short ? 22 : 28, 8, [255, 255, 255], { left: true });
+  el(panel, 'xbtn', { left: (W - (headH - 6) - 6) + 'px', top: '3px', width: (headH - 6) + 'px', height: (headH - 6) + 'px' });
+  label(panel, W - (headH - 6) - 6, 3, headH - 6, headH - 6, 'X', 20, 8, [255, 255, 255]);
+  const pad = 12, top = headH + pad, bodyH = H - top - pad;
+  const showPortrait = W >= 560 && H >= 330;
+  const pw = showPortrait ? Math.min(bodyH, Math.floor(W * .34)) : 0;
+  if (showPortrait) {
+    const p = el(panel, 'port', { left: pad + 'px', top: top + 'px', width: pw + 'px', height: bodyH + 'px' });
+    const side = Math.max(0, pw - 16), ball = Math.floor(side * .75);
+    el(p, 'dais', { left: (pw / 2 - Math.floor(ball * .8) / 2) + 'px', top: (bodyH / 2 + Math.floor(ball * .5) - Math.max(8, Math.floor(ball * .12)) / 2) + 'px', width: Math.floor(ball * .8) + 'px', height: Math.max(8, Math.floor(ball * .12)) + 'px' });
+    smileyBall(p, pw / 2, bodyH / 2 - Math.floor(ball * .04), ball);
+  }
+  const cx = pad + (showPortrait ? pw + pad : 0), cw = W - cx - pad, gap = short ? 6 : 10;
+  const eventH = short ? 17 : 24, chipH = short ? 32 : 54, exH = short ? 44 : 66, statusH = short ? 17 : 24, buttonH = short ? 36 : 52;
+  const live = s.live !== false;
+  // The Darkened's line (eventText)
+  let evText = '', evColor = VIOLET;
+  if (s.eventActive) { evText = copy.Dialog.Here; evColor = VIOLET; }
+  else if (s.nextAt != null) { evText = s.nextAt > 0 ? copy.Dialog.Next + countdown(s.nextAt) : copy.Dialog.Arriving; evColor = SKY; }
+  const evRow = evText ? eventH + gap : 0;
+  const questH = Math.max(short ? 30 : 40, bodyH - (evRow + chipH + exH + statusH + buttonH) - gap * 4);
+  let y = top;
+  label(panel, cx, y, cw, questH, copy.Quest, short ? 15 : cw < 380 ? 18 : 20, 11, [255, 255, 255], { left: true }); y += questH + gap;
+  if (evText) { label(panel, cx, y, cw, eventH, evText, short ? 12 : 16, 8, evColor); y += eventH + gap; }
+  const chipW = Math.floor((cw - gap) / 2);
+  [[copy.Dialog.VoidChip, s.known ? String(s.voidPacks) : '-', VIOLET], [copy.Dialog.DoneChip, s.known ? String(s.delivered) : '-', GOLD]].forEach((c, i) => {
+    const chip = el(panel, 'chip', { left: (cx + i * (chipW + gap)) + 'px', top: y + 'px', width: chipW + 'px', height: chipH + 'px', boxShadow: 'inset 0 0 0 2px ' + css(c[2]) });
+    label(chip, 4, 2, chipW - 8, Math.floor(chipH * .38), c[0], short ? 10 : 12, 8, MUTED);
+    label(chip, 4, Math.floor(chipH * .4), chipW - 8, Math.floor(chipH * .58), c[1], short ? 16 : 24, 8, c[2]);
+  });
+  y += chipH + gap;
+  // The exchange row
+  const ex = el(panel, '', { position: 'absolute', left: cx + 'px', top: y + 'px', width: cw + 'px', height: exH + 'px' });
+  const arrowW = Math.max(28, Math.floor(exH * .5)), pic = Math.min(exH, Math.floor((cw - arrowW - 12 - 90) / 2));
+  const mk = (x, kind, color) => { const h = el(ex, 'holder', { left: x + 'px', top: Math.floor((exH - pic) / 2) + 'px', width: pic + 'px', height: pic + 'px', boxShadow: 'inset 0 0 0 2px ' + css(color) });
+    const inner = el(h, '', { position: 'absolute', left: '12%', top: '8%', width: '76%', height: '84%' }); inner.innerHTML = packSvg(kind); };
+  mk(0, 'void', VIOLET);
+  label(ex, pic + 4, 0, arrowW, exH, '➜', short ? 22 : 30, 8, GOLD);
+  mk(pic + arrowW + 8, 'verity', GOLD);
+  const rx = pic * 2 + arrowW + 8 + 10;
+  label(ex, rx, 0, Math.max(10, cw - rx), exH, copy.RewardText, short ? 13 : 16, 8, GOLD);
+  y += exH + gap;
+  // The status line: the server's last answer, else a hint by what you carry (VerityClient.hint)
+  let st = '', stColor = MINT;
+  if (s.message) { st = s.message.text; stColor = s.message.good ? MINT : RED; }
+  else if (s.known && !s.busy) {
+    if (!live) { st = copy.Hint.Over; stColor = MUTED; }
+    else if (s.voidPacks > 0) { st = copy.Hint.Have; stColor = MINT; }
+    else if (s.eventActive) { st = copy.Hint.Here; stColor = GOLD; }
+    else { st = copy.Hint.Wait; stColor = MUTED; }
+  }
+  label(panel, cx, y, cw, statusH, st, short ? 13 : 16, 8, stColor); y += statusH + gap;
+  const can = s.known && s.voidPacks > 0 && !s.busy && live;
+  const giveW = Math.floor((cw - gap) * .62);
+  const tint = (c) => `linear-gradient(180deg,${css(lerp(c, [255, 255, 255], .24))},${css(lerp(c, [0, 0, 0], .12))})`;
+  el(panel, 'btn', { left: cx + 'px', top: y + 'px', width: giveW + 'px', height: buttonH + 'px', background: tint(can ? GOLD : [96, 104, 140]) });
+  const giveText = !live ? copy.Event.Ended : s.busy ? copy.Dialog.Busy : copy.Dialog.Give;
+  const g = label(panel, cx + 8, y, giveW - 16, buttonH, giveText, short ? 16 : 22, 8, [255, 255, 255]);
+  el(panel, 'btn', { left: (cx + giveW + gap) + 'px', top: y + 'px', width: (cw - giveW - gap) + 'px', height: buttonH + 'px', background: tint([92, 128, 255]) });
+  label(panel, cx + giveW + gap + 4, y, cw - giveW - gap - 8, buttonH, copy.Dialog.Close, short ? 15 : 20, 8, [255, 255, 255]);
+  return { wrap, W, H, sizes: { quest: 0 } };
+}
+function scene(parent, copy, title, tag, screen, s) {
+  const sc = el(parent, 'scene');
+  const cap = el(sc, 'cap'); cap.innerHTML = `<b>${title}</b><i>${tag}</i>`;
+  const holder = el(sc, '', { position: 'relative' });
+  const d = drawDialog(holder, copy, screen, s);
+  holder.style.width = (d.W + 8) + 'px'; holder.style.height = (d.H + 16) + 'px';
+  sc.style.width = (d.W + 8) + 'px';
+  return sc;
+}
+function richNotice(html) { // NoticeCopy83 markup: <font color="#RRGGBB">text</font>
+  return html.replace(/<font color="(#[0-9A-Fa-f]{6})">/g, '<span style="color:$1">').replace(/<\/font>/g, '</span>');
+}
+function around(parent, copy) {
+  const sc = el(parent, 'scene', { width: '660px' });
+  const cap = el(sc, 'cap'); cap.innerHTML = '<b>Around the window</b><i>her sign, her prompt, the end of the event, the two notices</i>';
+  const w = el(sc, 'world', { width: '660px', height: '343px' });
+  // the sign (marker, name, timer) over her ball
+  const cx = 170;
+  el(w, 'lbl', { left: (cx - 120) + 'px', top: '4px', width: '240px', height: '44px', fontSize: '40px', color: 'white' }, '!');
+  el(w, 'lbl', { left: (cx - 120) + 'px', top: '46px', width: '240px', height: '34px', fontSize: '30px', color: css(GOLD), webkitTextStroke: '4px #1e143c' }, copy.Name);
+  const t = fitLayout(copy.Event.Prefix + '27d 04h 12m 09s', 310, 22, 18, 8);
+  el(w, 'lbl', { left: (cx - 155) + 'px', top: '82px', width: '310px', height: '22px', fontSize: t.size + 'px', color: 'rgb(255,236,150)', webkitTextStroke: '3px #1e143c' }, t.text);
+  smileyBall(w, cx, 225, 160);
+  el(w, 'dais', { left: (cx - 95) + 'px', top: '300px', width: '190px', height: '20px' });
+  // the proximity prompt
+  const pr = el(w, '', { position: 'absolute', left: '350px', top: '14px', width: '280px', height: '64px', background: 'rgba(20,24,40,.82)', borderRadius: '12px', boxShadow: '0 0 0 2px rgba(255,255,255,.2)' });
+  el(pr, 'lbl', { left: '12px', top: '12px', width: '40px', height: '40px', background: '#fff', borderRadius: '50%', color: '#10162a', fontSize: '24px', webkitTextStroke: '0' }, 'E');
+  el(pr, 'lbl', { left: '62px', top: '6px', width: '210px', height: '30px', fontSize: '24px', webkitTextStroke: '0', justifyContent: 'flex-start' }, copy.PromptActionText);
+  el(pr, 'lbl', { left: '62px', top: '34px', width: '210px', height: '22px', fontSize: '15px', color: '#b9c3e8', webkitTextStroke: '0', justifyContent: 'flex-start' }, copy.PromptObjectText);
+  // her sign after the end of the event (red) ...
+  el(w, 'lbl', { left: '350px', top: '90px', width: '280px', height: '24px', fontSize: '18px', color: css(RED), webkitTextStroke: '3px #1e143c' }, copy.Event.Ended);
+  // ... the notice when The Darkened arrives (NoticeCopy83.Arrival, with its colours) and the hand-in notice
+  const arrival = el(w, 'note', { left: '338px', top: '132px', width: '306px', whiteSpace: 'normal', textAlign: 'center', fontSize: '19px', lineHeight: '1.25', webkitTextStroke: '4px #000' });
+  arrival.innerHTML = richNotice(copy.Arrival);
+  const done = el(w, 'note', { left: '338px', top: '262px', width: '306px', whiteSpace: 'normal', textAlign: 'center', fontSize: '19px', lineHeight: '1.25', color: 'rgb(255,214,90)', webkitTextStroke: '4px #000' }, copy.Notice);
+  return sc;
+}
+window.draw = function (copy) {
+  document.getElementById('sub').textContent = 'Verity\'s quest window as it reads after R152, in its main states: computer (660 x 450 window), phone upright (360 x 640 screen) and phone sideways (844 x 390). All texts come from VerityConfig and NoticeCopy83; each label is fitted to its box with the real font, so what is shown is what fits.';
+  const sheet = document.getElementById('sheet'); sheet.innerHTML = '';
+  const desk = [1280, 720], phone = [360, 640], side = [844, 390];
+  const row1 = el(sheet, 'row'), row2 = el(sheet, 'row'), row3 = el(sheet, 'row'), row4 = el(sheet, 'row');
+  scene(row1, copy, 'The Darkened is here, no Void Pack', 'computer', desk, { known: true, voidPacks: 0, delivered: 1, eventActive: true });
+  scene(row1, copy, 'Not here yet, no Void Pack', 'computer', desk, { known: true, voidPacks: 0, delivered: 1, eventActive: false, nextAt: 12 * 60 + 3 });
+  scene(row2, copy, 'You carry a Void Pack', 'computer', desk, { known: true, voidPacks: 1, delivered: 1, eventActive: true });
+  scene(row2, copy, 'After handing one in', 'computer', desk, { known: true, voidPacks: 0, delivered: 2, eventActive: true, message: { text: copy.Thanks, good: true } });
+  scene(row3, copy, 'Here now', 'phone upright', phone, { known: true, voidPacks: 0, delivered: 1, eventActive: true });
+  scene(row3, copy, 'Carrying a pack', 'phone upright', phone, { known: true, voidPacks: 1, delivered: 1, eventActive: false, nextAt: 754 });
+  scene(row3, copy, 'Too far away', 'phone upright', phone, { known: true, voidPacks: 1, delivered: 1, eventActive: true, message: { text: copy.Reasons.TooFar, good: false } });
+  scene(row3, copy, 'Event over', 'phone upright', phone, { known: true, voidPacks: 0, delivered: 7, live: false });
+  scene(row4, copy, 'Carrying a pack, phone sideways', 'phone sideways', side, { known: true, voidPacks: 2, delivered: 4, eventActive: false, nextAt: 95 });
+  around(row4, copy);
+  window.__ready = true;
+};
+</script>
+</body>
+</html>

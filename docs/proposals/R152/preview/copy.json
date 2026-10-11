@@ -1,0 +1,46 @@
+{
+ "Arrival": "🌑 <font color=\"#DDC3FF\">The Darkened is here!!</font>  <font color=\"#B88DFF\">Two Void Packs</font> are up in <font color=\"#A2BBFF\">Storm Peaks</font>. <font color=\"#FFCE40\">Verity</font> wants one!",
+ "Dialog": {
+  "Arriving": "🌑 THE DARKENED IS WAKING UP...",
+  "Busy": "SWAPPING... ✨",
+  "Close": "BYE! 👋",
+  "DoneChip": "YOU GAVE ME",
+  "Give": "GIVE VOID PACK 🌑",
+  "Here": "🌑 THE DARKENED IS HERE!!",
+  "Next": "🌑 THE DARKENED WAKES IN ",
+  "VoidChip": "UR VOID PACKS"
+ },
+ "Event": {
+  "Ended": "EVENT OVER! THANKS!",
+  "Prefix": "HURRY! ENDS IN "
+ },
+ "Hint": {
+  "Have": "Ooh, a Void Pack! Hand it over!",
+  "Here": "Quick! Steal one in Storm Peaks!",
+  "Over": "Thanks for playing, u were great!",
+  "Wait": "Get ready to steal one!"
+ },
+ "Name": "VERITY",
+ "Notice": "🌟 Yippee! Verity gave u a Verity Pack!",
+ "PackName": "Verity Pack",
+ "PromptActionText": "Say hi!",
+ "PromptObjectText": "Verity",
+ "Quest": "I dare u to steal a Void Pack from the scary Darkened One at the end of Storm Peaks! Bring it to me and I'll give u a Verity Pack!",
+ "Reasons": {
+  "Busy": "WHOA, FINISH UR RUN FIRST!",
+  "CannotSave": "OOPS! UR DATA CAN'T SAVE NOW",
+  "EventEnded": "EVENT'S OVER! THANKS FOR PLAYING!",
+  "Failed": "OOPS! THAT DIDN'T WORK. TRY AGAIN",
+  "Gone": "THAT PACK LEFT UR BAG! TRY AGAIN",
+  "Invalid": "HMM, I CAN'T USE THAT PACK",
+  "Loading": "HOLD ON, UR DATA IS LOADING!",
+  "Moment": "WAIT A SEC, THEN TRY AGAIN!",
+  "NoVoid": "NO VOID PACK YET! GO STEAL ONE!",
+  "NotReady": "I'M NOT READY YET! ONE SEC!",
+  "NotVoid": "ONLY A VOID PACK WORKS FOR ME!",
+  "Opening": "FINISH OPENING THAT PACK FIRST!",
+  "TooFar": "OVER HERE! COME CLOSER TO ME!"
+ },
+ "RewardText": "SWAP! 1 VOID PACK = 1 VERITY PACK",
+ "Thanks": "Yay, thanks! Here's ur Verity Pack!"
+}

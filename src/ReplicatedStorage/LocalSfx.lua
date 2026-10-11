@@ -6,6 +6,10 @@ local Timing=require(script.Parent.SoundTiming)
 local Sfx={};local active={};local unavailable={};local warned={}
 -- R123: the same id fired twice within DedupeSeconds at (almost) the same spot plays once (no doubled / phased hits).
 Sfx.DedupeSeconds=.035;Sfx.DedupeStuds=6
+-- R150: a one-shot whose file is still cold this long after the call is dropped (SoundTiming's default is .5 s; a late impact is worse than none).
+Sfx.MaxAge=.25
+-- R150: the whoosh used for movement cues (teleport arrival, bat swing). Its .44 s lead-in is skipped through SoundTiming.Starts.
+Sfx.WhooshId='rbxassetid://9120768742'
 local recent={}
 local function valid(id)return type(id)=='string'and id:match('^rbxassetid://[1-9]%d*$')end
 function Sfx.Preload(ids)
@@ -22,7 +26,8 @@ function Sfx.Preload(ids)
         for _,sound in ipairs(sounds)do sound:Destroy()end
     end)
 end
-function Sfx.Play(id,position,volume,pitch,lifetime)
+-- skip (R150, optional): seconds of the cue already elapsed when it is started late (a late packet): the file joins that far in (x pitch).
+function Sfx.Play(id,position,volume,pitch,lifetime,skip)
     if not valid(id)then return end
     if unavailable[id]then
         if not warned[id]then warned[id]=true;warn('[V103] Sound unavailable for this session: '..id)end
@@ -49,7 +54,9 @@ function Sfx.Play(id,position,volume,pitch,lifetime)
     local ttl=math.clamp(lifetime or 8,1,20)
     table.insert(active,{Item=owner,Until=now+ttl})
     sound.Ended:Connect(function()owner:Destroy()end)
-    Debris:AddItem(owner,ttl);Timing.Play(sound)
+    Debris:AddItem(owner,ttl)
+    local late=math.max(0,tonumber(skip)or 0)
+    Timing.Play(sound,late>0 and Timing.Offset(sound)+late*sound.PlaybackSpeed or nil,Sfx.MaxAge)
     return sound
 end
 return Sfx

@@ -1,0 +1,5 @@
+# R156: the item info panel is removed (owner: "these descriptions can be removed from the game")
+No item description shows any more (hover, a picked item, a just-held pack, the gamepad selection): `ItemTooltip155.lua` and its manifest row are deleted, `InventoryPanel155` / `Hotbar` no longer call it (Hotbar main chunk still 174 of 180 registers, lines 1 and 2 untouched).
+The module is REMOVED, not a no-op: nothing requires it, so the installer takes `--retire docs/releases/R156_retire.json` to park the ModuleScript in the backup (without the list it only stays in the place, unused and harmless).
+The Bag hint lost "hover for info" / "hold for info" (the rest stays); `ChestService` still writes `Tool.ToolTip` (comment at `_packTooltip`), so the panel can come back later; a pack's odds and the Mech coat line now show only on the shop card.
+Tests: `test_tooltip155.luau` became `test_no_tooltip156.luau` (no panel is ever created on a PC, a landscape and a portrait phone; the Hotbar forwards nothing); `run_inventory.sh` static checks follow; R155's `inventory.png` still shows the old panel.

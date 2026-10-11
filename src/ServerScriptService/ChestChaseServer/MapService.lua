@@ -78,6 +78,8 @@ function MapService.new(config)
 	)
 	mapRoot:SetAttribute("GameplayControllerActive", true)
 	self.MapRoot = mapRoot
+    -- R149: a few saved place parts that z-fight are nudged apart first, while they are still where the place saved them.
+    do local ok,err=pcall(function()require(script.Parent.ZFightFix149).Apply(mapRoot)end);if not ok then warn('[R149] Z-fighting fix skipped: '..tostring(err))end end
     -- Build scenery before ChestService caches pack-placement obstacles.
     local art=require(script.Parent.BiomeVisuals)
     art.ApplyVolcanoV129(mapRoot)
@@ -89,7 +91,12 @@ function MapService.new(config)
     require(script.Parent.ForestLayout87).Apply(mapRoot)
     require(script.Parent.RouteDress84).Apply(mapRoot)
     require(script.Parent.FloorSafety86).Apply(mapRoot)
+    require(script.Parent.HideBushes124).Apply(mapRoot) -- R124: Forest/Jungle bushes big enough to hide in
     raiseMapBoundaries(mapRoot)
+    -- R153: nobody can stand on a track wall: tall invisible blockers on every wall top, flush with its inner face (the saved barriers leave a 1-stud strip of it open)
+    do local ok,err=pcall(function()require(script.Parent.TrackWalls153).Apply(mapRoot)end);if not ok then warn('[R153] Track wall blockers skipped: '..tostring(err))end end
+    -- R156: the owner's Classic Pyramid (hollow, a secret Mythic pack inside) replaces the Sunscar Pyramid on its footprint; before the keyboard scan and the pack-placement cache. A failure keeps the old pyramid.
+    do local ok,err=pcall(function()require(script.Parent.SecretPyramid156).Apply(mapRoot)end);if not ok then warn('[R156] Desert pyramid skipped: '..tostring(err))end end
 
 
 	local oldRuntime = mapRoot:FindFirstChild(config.RuntimeFolderName)
@@ -127,6 +134,12 @@ function MapService.new(config)
 	self.ChestsFolder = self.SeedsFolder -- legacy server alias; never player-facing
 	require(script.Parent.MarketLayout).Apply(mapRoot)
  require(game:GetService('ReplicatedStorage').WalkthroughProps90).Bind(mapRoot)
+ -- R151 Seed Festival Square: the dressed hub walls, murals, track gate, streets and base arches (the client adds trees and props).
+ do local ok,err=pcall(function()require(script.Parent.HubDecor151).Apply(mapRoot)end);if not ok then warn('[R151] Hub dressing skipped: '..tostring(err))end end
+ -- R158 (owner approved docs/proposals/R158/design): a wall dressing per biome (+ the border towers), the ground outside the track's walls, the owner's backdrop models and stone caps on the hub wall. Parts only (no collision, no scripts); a failure leaves the map as it was.
+ do local ok,err=pcall(function()require(script.Parent.TrackWalls158).Apply(mapRoot)end);if not ok then warn('[R158] Track walls skipped: '..tostring(err))end end
+ -- R158 (owner: "use this volcano to replace our current volcano", "yes remove the streams entirely", "and the lava pool"): no lava streams or pools in the Lava biome, the owner's volcano model in place of the old cone. Before the keyboard's skip scan below, so the keys fill the floor where lava was.
+ do local ok,err=pcall(function()require(script.Parent.LavaVolcano158).Apply(mapRoot)end);if not ok then warn('[R158] Lava volcano skipped: '..tostring(err))end end
 	self.EconomyHub = requireChild(config, mapRoot, "EconomyHub", "Folder")
 	self.BuyStation = requireChild(config, self.EconomyHub, "BuyStation", "BasePart")
 	self.SellStation = requireChild(config, self.EconomyHub, "SellStation", "BasePart")
@@ -134,7 +147,7 @@ function MapService.new(config)
 	self.SellPrompt = requireChild(config, self.SellStation, "OpenSellPrompt", "ProximityPrompt")
 	self.BuyTeleportCFrame = consumeTeleportMarker(self.EconomyHub, "BuyTeleport", self.BuyStation)
 	self.SellTeleportCFrame = consumeTeleportMarker(self.EconomyHub, "SellTeleport", self.SellStation)
-	updateStationPresentation(self.BuyStation, self.BuyPrompt, "SHOP", "PICK A BOOST!")
+	updateStationPresentation(self.BuyStation, self.BuyPrompt, "SHOP", "GET A BOOST!")
 	updateStationPresentation(self.SellStation, self.SellPrompt, "SELL", "SELL CROPS!")
  self.BuyPrompt.ActionText="MARKET";self.BuyPrompt.ObjectText="";self.BuyPrompt.HoldDuration=0
  self.BuyPrompt.RequiresLineOfSight=false;self.BuyPrompt.MaxActivationDistance=config.EconomyInteractionDistance
@@ -146,6 +159,8 @@ function MapService.new(config)
     movement:SetAttribute('TrackBoundaryZ',self.BaseBoundaryLine.Position.Z)
     movement:SetAttribute('TrackCenterX',self.BaseBoundaryLine.Position.X)
     movement:SetAttribute('TrackHalfWidth',math.max(90,self.BaseBoundaryLine.Size.X/2)+24)
+    -- R152: the keyboard leaves out the cells over water / lava / pools / props on the track floor: found once here, in the finished map (every scenery pass above has run).
+    do local ok,err=pcall(function()require(game:GetService('ReplicatedStorage').KeyboardSkip152).Apply(mapRoot,self.BaseBoundaryLine.Position.X)end);if not ok then warn('[R152] Keyboard skip scan skipped: '..tostring(err))end end
 	self.FallbackSpawn = requireChild(config, self.LobbyFolder, "FallbackSpawn", "SpawnLocation")
 	local obbyStartPad = self.LobbyFolder:FindFirstChild("ObbyStartPad")
 	if obbyStartPad and obbyStartPad:IsA("BasePart") then
@@ -330,6 +345,7 @@ function MapService:_bindChests()
 			local prompt = requireChild(self.Config, latch, "ClaimPrompt", "ProximityPrompt")
 			prompt.ActionText = "STEAL"
 			prompt.ObjectText = ""
+			prompt.HoldDuration = self.Config.StealHoldSeconds or 1 -- R125: hold E to steal
 			local label, billboard = getBillboardText(self.Config, hinge)
 			local glow = requireChild(self.Config, body, "ChestGlow", "PointLight")
 			local accentColor = model:GetAttribute("AccentColor") or glow.Color

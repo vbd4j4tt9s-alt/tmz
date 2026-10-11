@@ -2,6 +2,9 @@
 local B={};local Weather=require(script.Parent.WeatherTraits)
 function B.KeeperDue(distance,asleep,awake,onScreen,now,last,low)
  if distance<=160 then return true end
+ -- R153 (owner: "fix all jittery type effects"): an awake keeper on screen within 350 studs is posed every frame (it ran in 30 Hz / 20 Hz low steps,
+ -- and a giant keeper is plainly visible there); asleep ones (a slow breath) and off-screen ones keep the reduced rates below.
+ if onScreen and not asleep and distance<=350 then return true end
  local interval
  if onScreen then interval=distance<=350 and(asleep and(low and .15 or .1)or(low and 1/20 or 1/30))or(low and .2 or .1)
  else interval=asleep and awake<=.02 and .5 or .15 end

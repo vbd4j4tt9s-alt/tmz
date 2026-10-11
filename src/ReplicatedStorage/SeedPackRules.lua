@@ -1,5 +1,6 @@
 -- V119. Server rolls rewards; clients only render the published result.
 local Rules = {}
+local Verity = require(script.Parent.VerityCatalog) -- R147
 Rules.Version = 139
 Rules.MaxPackSize = 25
 Rules.MaxSeedScale = 25
@@ -13,7 +14,7 @@ Rules.OpenClicks = 5
 Rules.ClickInterval = .065
 Rules.TearSoundId = "rbxassetid://9125725227"
 Rules.TearVolume = 0.45
-Rules.TearSoundStart = 0.10
+-- (R150: the tear sound's lead-in lives in SoundTiming, the one table every cue is tuned in; there is no Rules.TearSoundStart any more)
 -- Soft built-in bell sample: no new external audio permission is needed.
 Rules.RevealBellSoundId = "rbxasset://sounds/electronicpingshort.wav"
 Rules.RevealBellVolume = .055
@@ -29,6 +30,7 @@ Rules.PackTiers = {
 function Rules.GetPackTier(key)
     if key=='EclipseReliquary'then return {Name='Secret+',Color=Color3.fromRGB(190,144,255),Rate=7},7 end
     if key=='MechLimited'then return {Name='Limited',Color=Color3.fromRGB(88,225,255),Rate=6},6 end
+    if key==Verity.Variant then return {Name='Verity',Color=Color3.fromRGB(255,213,46),Rate=7},7 end -- R147
     local variant=Rules.Variants[key]
     local rank=variant and (variant.Design or ({Small=1,Standard=2,Grand=3})[key]) or 2
     for _,spec in ipairs(Rules.SeedDesigns)do if spec.id=='SupernovaBloomSeed'then spec.name='Boom Bloom'end end
@@ -91,7 +93,7 @@ function Rules.SeedSizeCap(stage,key,packSize)
     return math.min(Rules.MaxSeedScale,Rules.SeedBaseScale(stage,key)*(1.4+math.max(0,size-1)))
 end
 function Rules.NewSeedScale(stage,key,packSize)
-    if key=='MechLimited'then return 1 end
+    -- R126: Mech packs now roll a size too; their seeds follow it like any pack (a 1x Mech pack still gives scale 1).
     local size=Rules.SanitizePackSize(packSize)
     for _,spec in ipairs(Rules.SeedDesigns)do if spec.id=='SupernovaBloomSeed'then spec.name='Boom Bloom'end end
 return require(script.Parent.SizeNumbers).Half(math.min(Rules.SeedBaseScale(stage,key)*size,Rules.SeedSizeCap(stage,key,size)))
@@ -122,6 +124,9 @@ Rules.Rarities = {
 }
 -- Shared approved V131 designs. Stable first-five IDs preserve old saves.
 Rules.SeedDesigns={{["biome"]="Forest",["index"]=1,["name"]="Watermelon",["rarity"]="Common",["design"]="fresh green to pale mint, three dark wavy stripes",["pattern"]="Stripes",["top"]="74b967",["bottom"]="d7eea1",["ink"]="245434",["addition"]="none",["stage"]=1,["id"]="SunflowerSeed"},{["biome"]="Forest",["index"]=2,["name"]="Pea",["rarity"]="Common",["design"]="lime to butter yellow, three round pea dots",["pattern"]="Dots",["top"]="b8e878",["bottom"]="e9f5b7",["ink"]="598a36",["addition"]="none",["stage"]=1,["id"]="CloverSeed"},{["biome"]="Forest",["index"]=3,["name"]="Blueberry",["rarity"]="Uncommon",["design"]="indigo to cornflower, pale speckles and tiny leaf tuft",["pattern"]="Specks",["top"]="666dce",["bottom"]="acd1ff",["ink"]="d6efff",["addition"]="leaves",["stage"]=1,["id"]="BluebellSeed"},{["biome"]="Forest",["index"]=4,["name"]="Strawberry",["rarity"]="Uncommon",["design"]="red to rose, cream seed specks, leafy green cap",["pattern"]="Specks",["top"]="ee5366",["bottom"]="ffa9b1",["ink"]="ffebae",["addition"]="cap",["stage"]=1,["id"]="StrawberrySeed"},{["biome"]="Forest",["index"]=5,["name"]="Apple",["rarity"]="Rare",["design"]="ruby to warm peach, apple leaf emblem and a short brown stem",["pattern"]="Leaf",["top"]="c9384b",["bottom"]="ffc387",["ink"]="4b9f42",["addition"]="stem",["stage"]=1,["id"]="AppleSeed"},{["biome"]="Forest",["index"]=6,["name"]="Mooncap",["rarity"]="Rare",["design"]="lavender to midnight, crescent marking and two tiny pale mushrooms",["pattern"]="Dots",["top"]="b2a2e4",["bottom"]="393860",["ink"]="ecedff",["addition"]="mushrooms",["stage"]=1,["id"]="MooncapSeed"},{["biome"]="Forest",["index"]=7,["name"]="Sunflower",["rarity"]="Legendary",["design"]="amber to lemon, short petal collar like a little sun, gentle gold rays",["pattern"]="Star",["top"]="ffb94a",["bottom"]="fff0a0",["ink"]="fff6c7",["addition"]="petals",["stage"]=1,["id"]="SunflowerBloomSeed"},{["biome"]="Forest",["index"]=8,["name"]="Elderbloom",["rarity"]="Mythic",["design"]="deep emerald to jade, two branching wooden antlers, white blossom buds, mint wisps",["pattern"]="Leaf",["top"]="206e56",["bottom"]="8aefba",["ink"]="e9ffe8",["addition"]="antlers",["stage"]=1,["id"]="ElderbloomSeed"},{["biome"]="Jungle",["index"]=1,["name"]="Banana",["rarity"]="Common",["design"]="yellow to chartreuse, three curved lime stripes",["pattern"]="Stripes",["top"]="f2d556",["bottom"]="f6f2ab",["ink"]="769d30",["addition"]="none",["stage"]=6,["id"]="BananaSeed"},{["biome"]="Jungle",["index"]=2,["name"]="Cocoa",["rarity"]="Common",["design"]="copper to cocoa brown, three cream dots",["pattern"]="Dots",["top"]="b17a45",["bottom"]="513528",["ink"]="f1d391",["addition"]="none",["stage"]=6,["id"]="CocoaSeed"},{["biome"]="Jungle",["index"]=3,["name"]="Pineapple",["rarity"]="Uncommon",["design"]="amber to yellow, diamond specks, compact spiky green leaf tuft",["pattern"]="Specks",["top"]="dc9b27",["bottom"]="ffeaaa",["ink"]="926031",["addition"]="cap",["stage"]=6,["id"]="PineappleSeed"},{["biome"]="Jungle",["index"]=4,["name"]="Monstera",["rarity"]="Uncommon",["design"]="jade to lime, dark split-leaf emblem, one curled leaf on side",["pattern"]="Leaf",["top"]="26ad83",["bottom"]="b4eb70",["ink"]="146644",["addition"]="leaves",["stage"]=6,["id"]="MonsteraSeed"},{["biome"]="Jungle",["index"]=5,["name"]="Venom Vine",["rarity"]="Rare",["design"]="plum to acid green, thorn nubs and lime droplet dots",["pattern"]="Dots",["top"]="81388e",["bottom"]="b7ed57",["ink"]="d3ff72",["addition"]="thorns",["stage"]=6,["id"]="VenomVineSeed"},{["biome"]="Jungle",["index"]=6,["name"]="Lantern Fern",["rarity"]="Rare",["design"]="emerald to teal, two hanging amber lantern buds, leaf emblem",["pattern"]="Leaf",["top"]="168a65",["bottom"]="74dcb9",["ink"]="e6f395",["addition"]="lanterns",["stage"]=6,["id"]="LanternFernSeed"},{["biome"]="Jungle",["index"]=7,["name"]="Tiger Orchid",["rarity"]="Legendary",["design"]="orange to ivory, bold black tiger stripes and two orchid petal fins",["pattern"]="Stripes",["top"]="f09b39",["bottom"]="fff1c7",["ink"]="433236",["addition"]="petals",["stage"]=6,["id"]="TigerOrchidSeed"},{["biome"]="Jungle",["index"]=8,["name"]="Ancient Worldroot",["rarity"]="Mythic",["design"]="teal to deep jungle green, root antlers curling around core, amber resin gems",["pattern"]="Leaf",["top"]="27bca8",["bottom"]="164f3d",["ink"]="ffd27f",["addition"]="antlers",["stage"]=6,["id"]="AncientWorldrootSeed"},{["biome"]="Desert",["index"]=1,["name"]="Prickly Pear",["rarity"]="Common",["design"]="sage to lime, cream dotted areoles",["pattern"]="Dots",["top"]="8ba850",["bottom"]="daeca4",["ink"]="fff2c1",["addition"]="none",["stage"]=2,["id"]="CactusSeed"},{["biome"]="Desert",["index"]=2,["name"]="Aloe",["rarity"]="Uncommon",["design"]="turquoise to sage, single leaf emblem and two aloe blades",["pattern"]="Leaf",["top"]="4bada3",["bottom"]="b2dab2",["ink"]="24736a",["addition"]="leaves",["stage"]=2,["id"]="AloeSeed"},{["biome"]="Desert",["index"]=4,["name"]="Crown Cactus",["rarity"]="Legendary",["design"]="green to warm jade, gold spines and short golden flower crest",["pattern"]="Dots",["top"]="64a468",["bottom"]="cdeea5",["ink"]="ffd378",["addition"]="crest",["stage"]=2,["id"]="AgaveSeed"},{["biome"]="Desert",["index"]=5,["name"]="Dune Lotus",["rarity"]="Mythic",["design"]="terracotta to rose gold, layered sandy lotus petals and sun disc",["pattern"]="Star",["top"]="cc7749",["bottom"]="ffe1a4",["ink"]="fff2c7",["addition"]="petals",["stage"]=2,["id"]="DatePalmSeed"},{["biome"]="Desert",["index"]=6,["name"]="Mirage Fig",["rarity"]="Secret",["design"]="midnight blue to sand, one luminous slit, broken hovering amber halo",["pattern"]="Leaf",["top"]="27354f",["bottom"]="d0ad80",["ink"]="fff2b4",["addition"]="brokenHalo",["stage"]=2,["id"]="MirageFigSeed"},{["biome"]="Desert",["index"]=7,["name"]="Solar Starfruit",["rarity"]="Cosmic",["design"]="indigo to amber, little stars, tilted golden orbital ring and sun motes",["pattern"]="Star",["top"]="59417f",["bottom"]="ffd582",["ink"]="fff4c5",["addition"]="orbit",["stage"]=2,["id"]="SolarStarfruitSeed"},{["biome"]="Desert",["index"]=8,["name"]="Sun King Palm",["rarity"]="King",["design"]="ivory to gold, tall sun crown, two jade palm fronds and red central gem",["pattern"]="Star",["top"]="ffcf69",["bottom"]="fff5c8",["ink"]="fff7dd",["addition"]="crown",["stage"]=2,["id"]="SunKingPalmSeed"},{["biome"]="Snow",["index"]=1,["name"]="Snow Melon",["rarity"]="Common",["design"]="mint to snow white, thin icy stripes",["pattern"]="Stripes",["top"]="9bceca",["bottom"]="efffff",["ink"]="579baf",["addition"]="none",["stage"]=3,["id"]="SnowdropSeed"},{["biome"]="Snow",["index"]=2,["name"]="Frost Fern",["rarity"]="Uncommon",["design"]="teal to frost blue, two short frosted fern leaves",["pattern"]="Leaf",["top"]="59a8a0",["bottom"]="d4f8f7",["ink"]="efffff",["addition"]="leaves",["stage"]=3,["id"]="FrostFernSeed"},{["biome"]="Snow",["index"]=3,["name"]="Iceberry",["rarity"]="Rare",["design"]="azure to baby blue, tiny translucent blue ice cluster on one side",["pattern"]="Dots",["top"]="468dcc",["bottom"]="c0efff",["ink"]="eeffff",["addition"]="crystals",["stage"]=3,["id"]="IceberrySeed"},{["biome"]="Snow",["index"]=4,["name"]="Aurora Lily",["rarity"]="Legendary",["design"]="violet to mint, translucent petal collar, restrained aurora ribbons",["pattern"]="Star",["top"]="7f75d6",["bottom"]="a8ffd8",["ink"]="efffff",["addition"]="petals",["stage"]=3,["id"]="WinterPineSeed"},{["biome"]="Snow",["index"]=5,["name"]="Glacier Lotus",["rarity"]="Mythic",["design"]="deep glacial blue to white, tall transparent ice petal spikes",["pattern"]="Leaf",["top"]="2784b8",["bottom"]="e6ffff",["ink"]="abffff",["addition"]="crystals",["stage"]=3,["id"]="CrystalLilySeed"},{["biome"]="Snow",["index"]=6,["name"]="Silent Frostbell",["rarity"]="Secret",["design"]="navy to silver, frosted bell cap and detached broken ice halo",["pattern"]="Dots",["top"]="354864",["bottom"]="d4e5ef",["ink"]="d4ffff",["addition"]="brokenHalo",["stage"]=3,["id"]="SilentFrostbellSeed"},{["biome"]="Snow",["index"]=7,["name"]="Polar Starbloom",["rarity"]="Cosmic",["design"]="midnight indigo to icy cyan, tiny stars, tilted ice orbit, floating shards",["pattern"]="Star",["top"]="363c91",["bottom"]="99e9ff",["ink"]="edffff",["addition"]="orbit",["stage"]=3,["id"]="PolarStarbloomSeed"},{["biome"]="Snow",["index"]=8,["name"]="Winter Crownwood",["rarity"]="King",["design"]="ice blue to pearl, huge clear glacier crown, sapphire jewel, white frosty rays",["pattern"]="Star",["top"]="79bedb",["bottom"]="f1ffff",["ink"]="ddffff",["addition"]="crown",["stage"]=3,["id"]="WinterCrownwoodSeed"},{["biome"]="Lava",["index"]=1,["name"]="Fire Pepper",["rarity"]="Common",["design"]="red to orange, small cream pepper flecks",["pattern"]="Specks",["top"]="c63929",["bottom"]="ffb45b",["ink"]="ffedac",["addition"]="none",["stage"]=4,["id"]="FirePepperSeed"},{["biome"]="Lava",["index"]=2,["name"]="Ember Pumpkin",["rarity"]="Uncommon",["design"]="orange to amber, dark pumpkin stripes and burnt stem",["pattern"]="Stripes",["top"]="df6824",["bottom"]="ffca60",["ink"]="663722",["addition"]="stem",["stage"]=4,["id"]="EmberBloomSeed"},{["biome"]="Lava",["index"]=3,["name"]="Ash Tomato",["rarity"]="Rare",["design"]="charcoal to ash rose, small glowing orange crack pattern and obsidian spikes",["pattern"]="Specks",["top"]="574650",["bottom"]="bc7070",["ink"]="ffc16a",["addition"]="thorns",["stage"]=4,["id"]="AshRoseSeed"},{["biome"]="Lava",["index"]=4,["name"]="Lava Lotus",["rarity"]="Legendary",["design"]="orange to yellow, four chunky black petals with glowing edges",["pattern"]="Star",["top"]="f15b21",["bottom"]="ffd872",["ink"]="ffef91",["addition"]="petals",["stage"]=4,["id"]="LavaLotusSeed"},{["biome"]="Lava",["index"]=5,["name"]="Dragonfruit",["rarity"]="Mythic",["design"]="magenta to scarlet, two curled black dragon horns and green scales",["pattern"]="Specks",["top"]="c73577",["bottom"]="fc8b75",["ink"]="b5d55a",["addition"]="horns",["stage"]=4,["id"]="DragonfruitSeed"},{["biome"]="Lava",["index"]=6,["name"]="Obsidian Maw",["rarity"]="Secret",["design"]="near black to purple, glowing orange slit, jagged broken obsidian halo",["pattern"]="Leaf",["top"]="292232",["bottom"]="695178",["ink"]="ff9d38",["addition"]="brokenHalo",["stage"]=4,["id"]="ObsidianMawSeed"},{["biome"]="Lava",["index"]=7,["name"]="Supernova Bloom",["rarity"]="Cosmic",["design"]="indigo to hot pink, fiery tilted orbit, tiny orange stars",["pattern"]="Star",["top"]="574099",["bottom"]="ff8baf",["ink"]="ffd76b",["addition"]="orbit",["stage"]=4,["id"]="SupernovaBloomSeed"},{["biome"]="Lava",["index"]=8,["name"]="Ember Emperor",["rarity"]="King",["design"]="black to molten gold, large black crown with lava seams, orange ruby and great horns",["pattern"]="Star",["top"]="51312c",["bottom"]="ffb358",["ink"]="ffe38e",["addition"]="crownHorns",["stage"]=4,["id"]="EmberEmperorSeed"},{["biome"]="Crystal",["index"]=1,["name"]="Amethyst Grape",["rarity"]="Common",["design"]="violet to lavender, three pale grape dots",["pattern"]="Dots",["top"]="965ec2",["bottom"]="dbc1fb",["ink"]="f4e5ff",["addition"]="none",["stage"]=5,["id"]="AmethystSeed"},{["biome"]="Crystal",["index"]=2,["name"]="Prism Pepper",["rarity"]="Uncommon",["design"]="teal to lilac, tiny diamond flecks and short quartz point",["pattern"]="Specks",["top"]="6cbecd",["bottom"]="d5b5f2",["ink"]="f4ffff",["addition"]="crystals",["stage"]=5,["id"]="PrismOrchidSeed"},{["biome"]="Crystal",["index"]=3,["name"]="Moon Melon",["rarity"]="Rare",["design"]="lavender to pearl, moon mark and two small silver leaf fins",["pattern"]="Leaf",["top"]="a296c9",["bottom"]="f4eafa",["ink"]="e7fdff",["addition"]="leaves",["stage"]=5,["id"]="MoonflowerSeed"},{["biome"]="Crystal",["index"]=4,["name"]="Starfruit",["rarity"]="Legendary",["design"]="gold to pale yellow, broad crystal star crest and tiny gold sparkles",["pattern"]="Star",["top"]="eab956",["bottom"]="fff1ab",["ink"]="ffffdf",["addition"]="crest",["stage"]=5,["id"]="StarfruitSeed"},{["biome"]="Crystal",["index"]=5,["name"]="Diamond Vine",["rarity"]="Mythic",["design"]="azure to clear ice, long transparent diamond cluster and silver vine curl",["pattern"]="Leaf",["top"]="75b6db",["bottom"]="e4fbff",["ink"]="fcffff",["addition"]="crystals",["stage"]=5,["id"]="DiamondVineSeed"},{["biome"]="Crystal",["index"]=6,["name"]="Hollow Geode",["rarity"]="Secret",["design"]="graphite to violet, oval face geode seam with bright violet crystals, broken ring",["pattern"]="Dots",["top"]="514363",["bottom"]="aa7acf",["ink"]="ebbbff",["addition"]="brokenHalo",["stage"]=5,["id"]="HollowGeodeSeed"},{["biome"]="Crystal",["index"]=7,["name"]="Orbit Lotus",["rarity"]="Cosmic",["design"]="indigo to lilac, stars, two tilted lavender orbit rings, floating prism gems",["pattern"]="Star",["top"]="4b438e",["bottom"]="cbadf3",["ink"]="fbebff",["addition"]="orbit",["stage"]=5,["id"]="OrbitLotusSeed"},{["biome"]="Crystal",["index"]=8,["name"]="Prism Monarch",["rarity"]="King",["design"]="pearl to violet, massive asymmetrical quartz crown with gold setting and rainbow core",["pattern"]="Star",["top"]="b08be0",["bottom"]="fff2fb",["ink"]="c8ffff",["addition"]="crown",["stage"]=5,["id"]="PrismMonarchSeed"},{["biome"]="Storm",["index"]=1,["name"]="Static Grass",["rarity"]="Common",["design"]="slate blue to pale cyan, three yellow flecks",["pattern"]="Specks",["top"]="63889e",["bottom"]="c9e9ee",["ink"]="ffde69",["addition"]="none",["stage"]=7,["id"]="StaticGrassSeed"},{["biome"]="Storm",["index"]=2,["name"]="Spark Reed",["rarity"]="Uncommon",["design"]="teal to electric blue, two reed-like yellow antennae",["pattern"]="Stripes",["top"]="337a9e",["bottom"]="9feff1",["ink"]="ffe783",["addition"]="antennae",["stage"]=7,["id"]="SparkReedSeed"},{["biome"]="Storm",["index"]=3,["name"]="Thunder Tulip",["rarity"]="Rare",["design"]="blue to cyan, thick yellow lightning mark and short electric arc",["pattern"]="Star",["top"]="377bbc",["bottom"]="a0f6ff",["ink"]="fff06e",["addition"]="bolts",["stage"]=7,["id"]="ThunderTulipSeed"},{["biome"]="Storm",["index"]=4,["name"]="Volt Orchid",["rarity"]="Legendary",["design"]="violet to electric blue, thick bolt-shaped yellow petals, bright small arcs",["pattern"]="Star",["top"]="7861c4",["bottom"]="73d8f4",["ink"]="fff388",["addition"]="bolts",["stage"]=7,["id"]="VoltOrchidSeed"},{["biome"]="Storm",["index"]=5,["name"]="Tempest Lotus",["rarity"]="Mythic",["design"]="cobalt to white, three swept lightning fins and circular electric arc",["pattern"]="Star",["top"]="3d69c9",["bottom"]="d9fcff",["ink"]="ffec6e",["addition"]="bolts",["stage"]=7,["id"]="TempestLotusSeed"},{["biome"]="Storm",["index"]=6,["name"]="Blackout Bloom",["rarity"]="Secret",["design"]="black navy to purple, one white electric slit, broken violet electric halo",["pattern"]="Leaf",["top"]="242a48",["bottom"]="7771bc",["ink"]="eef1ff",["addition"]="brokenHalo",["stage"]=7,["id"]="BlackoutBloomSeed"},{["biome"]="Storm",["index"]=7,["name"]="Pulsar Starfruit",["rarity"]="Cosmic",["design"]="midnight blue to lavender, star flecks, yellow charged orbital ring and sparks",["pattern"]="Star",["top"]="343e89",["bottom"]="afc9ff",["ink"]="ffe970",["addition"]="orbit",["stage"]=7,["id"]="PulsarStarfruitSeed"},{["biome"]="Storm",["index"]=8,["name"]="Storm Sovereign",["rarity"]="King",["design"]="royal blue to pale cyan, tall thick lightning crown, central diamond and orbiting electric bolts",["pattern"]="Star",["top"]="326ad0",["bottom"]="c8fbff",["ink"]="fff36c",["addition"]="crownBolts",["stage"]=7,["id"]="StormSovereignSeed"}}
+-- R148 (owner): Desert's new Rare (Aloe) and Legendary (Sand Fruit), in Desert's save slots 9 and 10 (Roster149).
+local Roster149=require(script.Parent.Roster149)
+for _,spec in ipairs(Roster149.Designs)do table.insert(Rules.SeedDesigns,table.clone(spec))end
 -- V139: preserve all eight identities per biome; promote the old lower entries.
 -- Stage numbers are stable save IDs, not physical progression order.
 Rules.MinimumSeedRarityByStage={[1]="Common",[6]="Common",[2]="Uncommon",[3]="Uncommon",[4]="Rare",[5]="Rare",[7]="Rare"}
@@ -164,12 +169,17 @@ end
 for id,rarity in pairs({SolarStarfruitSeed='King',MirageFigSeed='Cosmic',StarfruitSeed='Secret',PulsarStarfruitSeed='King',StormSovereignSeed='Cosmic'})do
  Rules.SeedRarityById[id]=rarity;Rules.SeedDesignById[id].rarity=rarity
 end
+-- R148 (owner): Fire Pepper is Lava's Mythic and Moon Melon Crystal's Legendary in every NEW pack. (Packs banked before the update cannot
+-- roll either seed at all; see the R148 odds block.) The retired Uncommon AloeSeed gets a distinct display name; its id never changes.
+for id,rarity in pairs(Roster149.Promote)do Rules.SeedRarityById[id]=rarity;Rules.SeedDesignById[id].rarity=rarity end
+Rules.SeedDesignById.FirePepperSeed.design='red to orange, cream pepper flecks, a curled green stem cap and three flickering flame wisps'
+Rules.SeedDesignById.AloeSeed.name='Aloe Sprout'
 function Rules.ObtainableStage(id)
  local spec=Rules.SeedDesignById[id];return spec and spec.stage
 end
 for i=#Rules.SeedDesigns,1,-1 do if Rules.IsRetired(Rules.SeedDesigns[i].id)then table.remove(Rules.SeedDesigns,i)end end
 function Rules.BuildSeedCatalog()
- local catalog={{},{},{},{},{},{},{},{}}
+ local catalog={{},{},{},{},{},{},{},{},{}} -- R147: stage 9 = Verity
  for id,spec in pairs(Rules.SeedDesignById)do
   local hex=spec.top
   catalog[spec.SaveStage][spec.index]={Id=id,Name=spec.name..' Seed',Emoji='🌱',Retired=Rules.IsRetired(id),ObtainStage=spec.stage,
@@ -181,7 +191,7 @@ local obtainableCache=setmetatable({},{__mode='k'})
 function Rules.ObtainablePool(config,stage)
  local pools=obtainableCache[config]
  if not pools then
-  pools={{},{},{},{},{},{},{},{}}
+  pools={{},{},{},{},{},{},{},{},{}} -- R147: stage 9 = Verity
   for _,catalog in ipairs(config.SeedCatalogByStage)do for _,seed in ipairs(catalog)do
    if not Rules.IsRetired(seed.Id)then table.insert(pools[Rules.ObtainableStage(seed.Id)],seed)end
   end end
@@ -291,7 +301,8 @@ function Rules.RollMutation(value)
 end
 function Rules.PackLabel(stage,variant,size,mutation)
     if variant=='EclipseReliquary'then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..'Void Pack'end
-    if variant=='MechLimited'then return 'Limited Mech Pack'end
+    if variant=='MechLimited'then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..'Limited Mech Pack'end -- R155: a bought Mech pack can be Gold / Diamond too (PremiumProgress:GrantMechPacks)
+    if variant==Verity.Variant then local m=Rules.MutationKey(mutation);return(m~='None'and m..' 'or'')..Verity.PackName end -- R147
     mutation=Rules.MutationKey(mutation)
     return (mutation~='None'and mutation..' 'or '')..
         (Rules.DesignBiomes[stage]or 'Biome')..' Seed Pack'
@@ -335,6 +346,12 @@ for index,s in ipairs(Mech.Seeds)do
  local spec={id=s.Id,name=s.Name,rarity=s.Rarity,stage=8,SaveStage=8,biome='Mech',index=index,top='36a6ff',bottom='1f2b39',ink='60dbff',pattern='Leaf',addition='none'}
  table.insert(Rules.SeedDesigns,spec);Rules.SeedDesignById[s.Id]=spec;Rules.SeedRarityById[s.Id]=s.Rarity
 end
+-- R147: the Verity seed (rarity King, its own Index category: stage 9, SaveStage 9). Planted like any plant (PlantCatalog), found
+-- only in the Verity pack (VerityPackOdds), never in a world pack, a Void pack or the Mech pool.
+do
+ local spec={id=Verity.Id,name=Verity.Name,rarity=Verity.Rarity,stage=Verity.Stage,SaveStage=Verity.Stage,biome=Verity.Biome,index=1,top='ffd52e',bottom='f0aa14',ink='fff8d0',pattern='None',addition='none'}
+ table.insert(Rules.SeedDesigns,spec);Rules.SeedDesignById[Verity.Id]=spec;Rules.SeedRarityById[Verity.Id]=Verity.Rarity
+end
 for name,weight in pairs(require(script.Parent.BalanceRules).RarityWeights)do Rules.Rarities[name].Weight=weight;Rules.Rarities[name].Duration=Rules.GetRevealDuration(name)end
 
 -- Versioned R81 world packs. Legacy unversioned and Small/Standard/Grand keep old Roll.
@@ -344,9 +361,27 @@ local O=require(script.Parent.PackOdds81)
 local approved=require(script.Parent.BalanceValues81)
 for i,key in ipairs(Rules.VariantOrder)do Rules.Variants[key].SpawnWeight=approved.SpawnWeights[i]end
 Rules.Variants.EclipseReliquary={Name='Void Pack',BagScale=.96,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=6,OddsLabel='All Secret / Cosmic / King seeds + 1/200 Mech roll'}
+-- R147: a Void pack handed to Verity comes back as a Verity pack (same stage 7, size, coat and weather; own odds).
+-- R148 (owner): it looks like our plain pack (the Standard design and size) painted yellow with a smiley on it (VerityPackArt).
+Rules.Variants[Verity.Variant]={Name=Verity.PackName,BagScale=1,SeedScale=1.35,RareBias=1,SpawnWeight=0,Trim=7,Design=2,OddsLabel='Verity seed 1/100 + Secret / Cosmic / Mech'}
 function Rules.RewardPool(config,stage,variant)
  if variant=='EclipseReliquary'then local _,all=require(script.Parent.VoidPackOdds85).Pools(config,Rules);return all end
  return Rules.ObtainablePool(config,stage)
+end
+-- R148: the seeds a pack can roll (odds above 0) in a stable reading order for hold tooltips and the owner's `odds` command: rarity rank (commonest
+-- first), then name. (Catalog order is save-slot order, which put the two new Desert seeds after the retired ones.) The special packs (Void, Verity,
+-- Limited Mech) keep their own pool order: the Verity pack's tooltip lists the Verity seed first (R147).
+function Rules.OddsRows(config,stage,variant,odds)
+ local rows={}
+ for _,seed in ipairs(Rules.RewardPool(config,stage,variant)or{})do if(odds[seed.Id]or 0)>0 then rows[#rows+1]=seed end end
+ if variant=='EclipseReliquary'or variant=='MechLimited'or variant==Verity.Variant then return rows end
+ local function rank(seed)local _,style=Rules.GetRarity(seed.Id);return style and style.Rank or 0 end
+ table.sort(rows,function(a,b)
+  local ra,rb=rank(a),rank(b);if ra~=rb then return ra<rb end
+  if a.Name~=b.Name then return a.Name<b.Name end
+  return a.Id<b.Id
+ end)
+ return rows
 end
 function Rules.SeedOdds(config,stage,variantKey,luck,version)
  if variantKey=='EclipseReliquary'then return stage==7 and require(script.Parent.VoidPackOdds85).Odds(config,Rules)or{}end
@@ -406,6 +441,154 @@ Rules.Roll=function(config,stage,draw,luck,variantKey,version)
   return N.Roll(require(script.Parent.VoidPackOdds85).Pools(config,Rules),Rules.GetRarity,'Rare',variantKey,1,draw)
  end
  return N.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw)
+end
+
+-- R137 (owner-approved, docs/proposals/pity_R136): new world/event packs carry OddsVersion 137 (PackOdds137: Legendary and
+-- Mythic rarer down the biome list, no pass-up into Mythic, a missing floor steps down). 112 packs keep PackOdds112 and
+-- older packs their old odds, exactly as before (Void and Mech packs too).
+local N137=require(script.Parent.PackOdds137)
+Rules.OddsVersion=N137.Version
+Rules.OddsVersions={[81]=true,[N.Version]=true,[N137.Version]=true}
+function Rules.ValidOddsVersion(version)return Rules.OddsVersions[version]==true end
+local roll112,odds112=Rules.Roll,Rules.SeedOdds
+local function current137(stage,variantKey,version)
+ return version==N137.Version and stage~=8 and N137.PackFloor[variantKey]~=nil
+end
+local function older(version)return version==N137.Version and N.Version or version end
+-- R138: boost = a pack's own rate boost (the free starter pack after the tutorial: 2x); only version-137 packs use it.
+function Rules.SanitizeRateBoost(value)return value==2 and 2 or nil end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost)
+ if version==nil then version=N137.Version end
+ if not current137(stage,variantKey,version)then return odds112(config,stage,variantKey,luck,older(version))end
+ local out={};local odds=N137.SeedOdds(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,stage,Rules.SanitizeRateBoost(boost))
+ for id,p in pairs(odds or{})do out[id]=100*p end
+ return out
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
+ if not current137(stage,variantKey,version)then return roll112(config,stage,draw,luck,variantKey,older(version))end
+ if type(draw)~='function'then return nil end
+ return N137.Roll(Rules.ObtainablePool(config,stage)or{},Rules.GetRarity,Rules.MinimumSeedRarityByStage[stage]or'Common',variantKey,luck,draw,stage,Rules.SanitizeRateBoost(boost))
+end
+
+-- R148 (owner, roster change): new world/event packs carry OddsVersion 149 = PackOdds137's numbers over today's roster
+-- (Desert Aloe Rare + Sand Fruit Legendary, Fire Pepper Mythic, Moon Melon Legendary). A pack made before this release
+-- (OddsVersion 137, 112, 81 or none) rolls the roster it was made with: the two new seeds are not in it, and neither are the two promoted
+-- seeds. Owner decision (no windfall): a banked pack cannot roll Fire Pepper or Moon Melon at all, not even at their new, rarer tiers, so
+-- nobody opens an old pack to a Mythic. Every seed outside their old Rare tier keeps exactly the odds it had before (the empty Mythic /
+-- Legendary tier hands up as it always did); the seeds that shared the old Rare tier absorb the promoted seed's share. Every Forest /
+-- Desert / Snow / Jungle / Storm / Void / Mech / Verity odd is as before. Void, Mech and Verity packs are untouched (Verity's wrapper
+-- stays outermost).
+Rules.NewInR149=Roster149.New
+Rules.PromotedInR149=Roster149.Promote
+Rules.OddsVersion=149
+Rules.OddsVersions[149]=true
+local rollPre149,oddsPre149=Rules.Roll,Rules.SeedOdds
+local livePool=Rules.ObtainablePool
+local legacyDepth=0 -- > 0 only while a pre-R148 world pack is rolled or priced (never yields)
+local legacyPools=setmetatable({},{__mode='k'})
+function Rules.ObtainablePool(config,stage)
+ local pool=livePool(config,stage)
+ if legacyDepth==0 or not pool then return pool end
+ local byStage=legacyPools[config];if not byStage then byStage={};legacyPools[config]=byStage end
+ if not byStage[stage]then
+  local out={};for _,seed in ipairs(pool)do if not Roster149.New[seed.Id]and not Roster149.Promote[seed.Id]then out[#out+1]=seed end end;byStage[stage]=out
+ end
+ return byStage[stage]
+end
+local function worldPack(stage,variantKey)return type(stage)=='number'and stage>=1 and stage<=7 and variantKey~='EclipseReliquary'and variantKey~='MechLimited'end
+local function legacy(fn,...)
+ legacyDepth+=1
+ local result=table.pack(pcall(fn,...))
+ legacyDepth-=1
+ if not result[1]then error(result[2],0)end
+ return table.unpack(result,2,result.n)
+end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost)
+ if version==nil then version=149 end
+ if version==149 then return oddsPre149(config,stage,variantKey,luck,N137.Version,boost)end
+ if worldPack(stage,variantKey)then return legacy(oddsPre149,config,stage,variantKey,luck,version,boost)end
+ return oddsPre149(config,stage,variantKey,luck,version,boost)
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
+ if version==149 then return rollPre149(config,stage,draw,luck,variantKey,N137.Version,boost)end
+ if worldPack(stage,variantKey)then
+  return legacy(rollPre149,config,stage,draw,luck,variantKey,version,boost)
+ end
+ return rollPre149(config,stage,draw,luck,variantKey,version,boost)
+end
+
+-- R147 (owner): the Verity pack. The OUTERMOST wrapper, so it never depends on a pack's saved odds version (Void packs carry
+-- OddsVersion 137 but roll the 112 path, and the hold tooltip passes version 0). Everything else is passed through untouched.
+--  * SeedOdds: a Verity pack (stage 7) = VerityPackOdds; stage 9 (the Verity Index category) = the Verity seed at 1% (the
+--    catalog's BaseChance, so the Index chip reads 1/100); other packs and stages as before.
+--  * Roll: a Verity pack rolls VerityPackOdds (a draw function, like the 112/137 Void roll); the Verity seed is not in any other pack.
+--  * RewardPool: the hold tooltip's list (Verity seed, Secret / Cosmic seeds, Mech seeds without the Crowncore Tree).
+local VerityPackOdds=require(script.Parent.VerityPackOdds)
+local roll137,odds137,pool137=Rules.Roll,Rules.SeedOdds,Rules.RewardPool
+Rules.RewardPool=function(config,stage,variant)
+ if variant==Verity.Variant then local _,all=VerityPackOdds.Pools(config,Rules);return all end
+ return pool137(config,stage,variant)
+end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost)
+ if variantKey==Verity.Variant then return stage==Verity.PackStage and VerityPackOdds.Odds(config,Rules)or{}end
+ if stage==Verity.Stage then return {[Verity.Id]=100*Verity.VerityChance}end
+ return odds137(config,stage,variantKey,luck,version,boost)
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost)
+ if variantKey==Verity.Variant then
+  if stage~=Verity.PackStage then return nil end
+  return VerityPackOdds.Roll(config,Rules,draw)
+ end
+ if stage==Verity.Stage then return nil end
+ return roll137(config,stage,draw,luck,variantKey,version,boost)
+end
+
+-- R154 (owner: "the 2x luck is universal" / "the elderbloom only pack is not supposed to be intentional"): the OUTERMOST wrapper; the rules live in PackLuck154.
+--  * passLuck, a new LAST argument of SeedOdds and Roll: the luck passes the player owns (the 4 Leaf Clover = 2; PlayerDataService:PassLuck) and nothing else.
+--    The Void (current odds path: OddsVersion 112 / 137 / 149), Verity and Limited Mech packs take only this luck (boots never change them), shifted toward their
+--    rarer seeds the way a biome pack's tiers are. Omitted / 1 = their odds exactly as before. (A Void pack banked before R112 keeps its old table.)
+--  * the 80% rule, the LAST step of every roll of a live pack: a world pack at OddsVersion 149 (SeedOdds: also no version), a current Void pack, every Verity and
+--    Mech pack, at any luck. No seed over 80%, the others at least 19%, 1% to an upgrade. Banked world packs (OddsVersion 137 / 112 / 81 / none) are not changed
+--    (the R148 "no windfall"). A pack the rule leaves alone rolls exactly as before (same draws).
+--  * RawSeedOdds = the odds without both (what R153 printed): the fixed "original rate" display (SeedRarity153) reads it, so the Index / card / chat / plaque keep
+--    each seed's base-luck rate in its home pack.
+local PackLuck=require(script.Parent.PackLuck154)
+local roll153,odds153=Rules.Roll,Rules.SeedOdds
+Rules.RawSeedOdds=odds153
+Rules.PackLuck=PackLuck
+local currentVoid={[N.Version]=true,[N137.Version]=true,[149]=true}
+-- 'Void' / 'Verity' / 'Mech' for a fixed-odds pack whose odds the clover changes, else nil.
+function Rules.FixedOddsKind(stage,variantKey,version)
+ if variantKey=='EclipseReliquary'then return stage==7 and currentVoid[version]and'Void'or nil end
+ if variantKey==Verity.Variant then return stage==Verity.PackStage and'Verity'or nil end
+ if variantKey=='MechLimited'then return stage==8 and'Mech'or nil end
+ return nil
+end
+-- True when the 80% rule applies (a live pack); version as the roll sees it.
+function Rules.LiveOdds(stage,variantKey,version)
+ if Rules.FixedOddsKind(stage,variantKey,version)then return true end
+ return version==149 and worldPack(stage,variantKey)and N137.PackFloor[variantKey]~=nil
+end
+local function fixedOdds(config,stage,variantKey,version,passLuck)
+ local kind=Rules.FixedOddsKind(stage,variantKey,version)
+ local luck=PackLuck.PassLuck(passLuck)
+ if kind and luck>1 then return PackLuck.FixedOdds(kind,config,Rules,luck)end
+ return nil
+end
+Rules.SeedOdds=function(config,stage,variantKey,luck,version,boost,passLuck)
+ local seen=version==nil and 149 or version
+ local odds=fixedOdds(config,stage,variantKey,seen,passLuck)or odds153(config,stage,variantKey,luck,version,boost)
+ if Rules.LiveOdds(stage,variantKey,seen)then odds=PackLuck.Shape(odds,Rules.GetRarity)end
+ return odds
+end
+Rules.Roll=function(config,stage,draw,luck,variantKey,version,boost,passLuck)
+ local clover=fixedOdds(config,stage,variantKey,version,passLuck)
+ if clover then return PackLuck.Roll(config,(PackLuck.Shape(clover,Rules.GetRarity)),Rules.GetRarity,draw)end
+ if type(draw)=='function'and Rules.LiveOdds(stage,variantKey,version)then
+  local shaped,changed=PackLuck.Shape(odds153(config,stage,variantKey,luck,version,boost),Rules.GetRarity)
+  if changed then return PackLuck.Roll(config,shaped,Rules.GetRarity,draw)end
+ end
+ return roll153(config,stage,draw,luck,variantKey,version,boost)
 end
 
 return Rules

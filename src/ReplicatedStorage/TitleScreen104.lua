@@ -11,13 +11,21 @@ function T.Layout(width,height)
  local buttonHeight=math.min(58,math.max(48,height*.085))
  local bottom=math.max(20,math.min(46,height*.06))
  local buttonY=height-bottom-buttonHeight/2
- local logoWidth=math.min(1160,width*.91,(height-bottom-buttonHeight-50)*1.7768)
+ -- R157: the tip line floats in the middle of the gap between the logo (with the pack) and the button: one line on a PC / landscape phone, two on a portrait phone.
+ -- The gap is kept at least tipGap = the line's height + 20 px (10 px of air each side: the pulse stays inside it). Where the gap was already that big (a
+ -- 1920 x 1080 PC, a portrait phone) the logo, the pack and the button do not move; where it was not, the logo gets a little smaller (844 x 390: 443 px wide, was 477).
+ local tipSize=math.clamp(math.floor(height*.03),16,32)
+ local tipHeight=math.ceil(tipSize*1.15*(width<520 and 2 or 1))+4
+ local tipGap=tipHeight+20
+ local buttonTop=buttonY-buttonHeight/2
+ local logoWidth=math.min(1160,width*.91,(height-bottom-buttonHeight-26-tipGap)*1.7768)
  logoWidth=math.max(1,logoWidth)
  local logoHeight=logoWidth/1.7768
- local logoY=math.min(height*.43,buttonY-buttonHeight/2-24-logoHeight/2)
+ local logoY=math.min(height*.43,buttonTop-tipGap-logoHeight/2)
  logoY=math.max(logoHeight/2+8,logoY)
  return {LogoWidth=logoWidth,LogoHeight=logoHeight,LogoY=logoY,ButtonY=buttonY,
-  ButtonWidth=math.max(1,math.min(300,width-40)),ButtonHeight=buttonHeight}
+  ButtonWidth=math.max(1,math.min(300,width-40)),ButtonHeight=buttonHeight,
+  TipY=(logoY+logoHeight/2+buttonTop)/2,TipWidth=math.max(1,math.min(780,width-48)),TipHeight=tipHeight,TipSize=tipSize}
 end
 function T.Image(value)
  if type(value)=='number'and value==value and value>0 and value%1==0 and value<9e15 then return 'rbxassetid://'..string.format('%.0f',value)end
@@ -43,6 +51,17 @@ function T.Start(player,pg)
  local desiredScale,currentScale=1,1
  local previewBag,previewRest,previewAmplitude
  local promptBefore=Prompts.Enabled
+ -- R150: the start click. Loaded while the title is up (its voices warm in the meantime), so Enter / gamepad A / a click all sound the same.
+ -- R157b fix: not before the whole game has arrived. The title runs from ReplicatedFirst before game.Loaded; requiring InteractionAudio the moment it appeared ran its body while AudioMixer had not
+ -- replicated yet, the require failed (Roblox keeps a failed require's error) and every HUD script that later required InteractionAudio died with "Requested module experienced an error while loading".
+ -- A click before the game has loaded simply has no click sound (Audio stays nil; start() checks it). The guard is the R152 line (a stand-in without IsLoaded runs on).
+ local Audio
+ task.spawn(function()
+  do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end
+  if dead then return end
+  local module=RS:WaitForChild('InteractionAudio',10)
+  if module then local ok,loaded=pcall(require,module);if ok then Audio=loaded end end
+ end)
  local oldSelected=Gui.SelectedObject
  local binding='StealAPackTitle104'
  local promptConnection
@@ -85,6 +104,7 @@ function T.Start(player,pg)
  local function start()
   if dead or(phase~='Ready'and phase~='Opening')or Gui.MenuIsOpen then return false end
   phase='Leaving';leaving=0;button.Active=false;button.Selectable=false
+  if Audio then Audio.Play('MenuClick')end -- R150: Enter / A used to be silent; the button's own click is off (ButtonSound=false) so this is the only one
   return true
  end
  local function guard(fn)
@@ -132,9 +152,10 @@ function T.Start(player,pg)
   end)
   loaded()
   if logo.Image~=''then task.spawn(function()pcall(Content.PreloadAsync,Content,{logo});loaded()end)end
-  button=make('TextButton',group,{Name='ClickToStart',AnchorPoint=Vector2.new(.5,.5),Text='Click to Start',
+  button=make('TextButton',group,{Name='ClickToStart',AnchorPoint=Vector2.new(.5,.5),Text='Click to play!',
    Font=Enum.Font.FredokaOne,TextSize=26,TextColor3=RGB(255,255,242),BackgroundColor3=RGB(72,154,51),
    BorderSizePixel=0,AutoButtonColor=false,Selectable=true,Active=true,Modal=true})
+  button:SetAttribute('ButtonSound',false)
   make('UICorner',button,{CornerRadius=UDim.new(0,16)})
   make('UIStroke',button,{Thickness=3,Color=RGB(25,68,31)})
   local shine=make('UIGradient',button,{Rotation=90,Color=ColorSequence.new(RGB(157,233,101),RGB(74,164,65))})
@@ -186,13 +207,50 @@ function T.Start(player,pg)
   connect(button.SelectionLost,function()desiredScale=1 end)
   if Input.GamepadEnabled then Gui.SelectedObject=button end
   local layout
+  -- R157 (owner: "add tips in the starting screen"; Style B, then "in the middle", "a new tip every 10 s", a small pulse like Minecraft's splash, highlighted words): one tip line
+  -- floating between the logo and Click to play!. A new tip every Tips.Interval s (fades out / in) and a gentle pulse (+-Tips.PulseAmount in size, a full breath every Tips.PulsePeriod s)
+  -- through a UIScale about the line's centre. R157b (owner: "too jittery"): slower and smaller than the first version (+-5% every 0.5 s), and the bob is gone: the line is never moved,
+  -- so nothing hops from one pixel to the next. Reduced Motion: no fade, no pulse (the text just changes). The list, its timings and the highlight mini-markup are
+  -- ReplicatedStorage.TitleTips156 (one line per tip), required below with WaitForChild + pcall like the title's other modules. A missing / broken list just leaves the line out.
+  -- Nothing is allocated per frame: the lines and the order are built once, and the line's position is only written on a resize.
+  local tipLabel,tipStroke,tipScale,tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha,tipPulse
   local function resize()
    local size=group.AbsoluteSize;layout=T.Layout(size.X,size.Y)
    visual.Size=UDim2.fromOffset(layout.LogoWidth,layout.LogoHeight)
    button.Size=UDim2.fromOffset(layout.ButtonWidth,layout.ButtonHeight)
    button.Position=UDim2.fromOffset(size.X/2,layout.ButtonY)
+   if tipLabel then
+    tipLabel.Size=UDim2.fromOffset(layout.TipWidth,layout.TipHeight)
+    tipLabel:FindFirstChildOfClass('UITextSizeConstraint').MaxTextSize=layout.TipSize
+    tipLabel.Position=UDim2.fromOffset(size.X/2,layout.TipY) -- (written here only: the line never moves while it shows)
+   end
   end
   connect(group:GetPropertyChangedSignal('AbsoluteSize'),resize);resize()
+  task.spawn(function()
+   local good,list=pcall(function()return require(RS:WaitForChild('TitleTips156',10))end)
+   if dead or not good or type(list)~='table'or type(list.Tips)~='table'or #list.Tips==0 then return end
+   local label
+   local built,why=pcall(function()
+    -- a list with a missing / wrong number or line must not reach the frame step (an error there would close the title): check it once, here
+    for _,key in ipairs({'Interval','Fade','PulseAmount','PulsePeriod'})do assert(type(list[key])=='number'and list[key]==list[key],'Tips.'..key)end
+    assert(list.Fade>0 and list.Interval>list.Fade*2 and list.PulsePeriod>0,'Tips timings')
+    local lines={};for i=1,#list.Tips do lines[i]=list.Line(i);assert(type(lines[i])=='string','Tips.Line('..i..')')end
+    local random=Random.new()
+    local order=T.TipOrder and table.clone(T.TipOrder)or list.Order(random) -- (T.TipOrder: a fixed order for the tests and the preview)
+    label=make('TextLabel',group,{Name='TipLine',AnchorPoint=Vector2.new(.5,.5),BackgroundTransparency=1,Text=lines[order[1]],RichText=true,
+     Font=Enum.Font.FredokaOne,TextScaled=true,TextWrapped=true,TextColor3=RGB(255,255,242),TextXAlignment=Enum.TextXAlignment.Center,
+     TextTransparency=1,Active=false,Interactable=false,Selectable=false}) -- (no input at all: it never takes the click meant for the button; the first frame step fades it in)
+    make('UITextSizeConstraint',label,{MaxTextSize=26,MinTextSize=11})
+    tipStroke=make('UIStroke',label,{Thickness=2,Color=RGB(23,37,16),LineJoinMode=Enum.LineJoinMode.Round,Transparency=1})
+    tipScale=make('UIScale',label,{Scale=1})
+    tips,tipLines,tipOrder,tipRandom,tipIndex,tipClock,pulseClock,tipAlpha,tipPulse=list,lines,order,random,1,0,0,nil,1
+    tipLabel=label;resize()
+   end)
+   if not built then
+    tipLabel=nil;if label then label:Destroy()end
+    warn('[Title tips] '..tostring(why))
+   end
+  end)
   -- Load the real highest forest tier for the temporary native title. No
   -- unrelated shop pack, mesh, design, or world animation is changed.
   task.spawn(function()
@@ -251,6 +309,22 @@ function T.Start(player,pg)
    local lobby=map and map:FindFirstChild('Lobby');local spawn=lobby and lobby:FindFirstChild('FallbackSpawn')
    if spawn and spawn:IsA('BasePart')then return spawn.Position,125 end
   end
+  -- R157: the tip line's clock (run from frame while the title shows, not while it leaves). It builds no table, closure, string or UDim2: the text and the order are ready-made, and a
+  -- property is only written when its value changes.
+  local function stepTip(dt,reduced)
+   tipClock+=dt;pulseClock+=dt
+   if tipClock>=tips.Interval then
+    tipClock-=tips.Interval;tipIndex+=1
+    if tipIndex>#tipOrder then tipIndex=1;tips.Order(tipRandom,tipOrder,tipOrder[#tipOrder])end -- every tip has shown: a new shuffle (reshuffled in place), never the same tip twice in a row
+    tipLabel.Text=tipLines[tipOrder[tipIndex]]
+   end
+   -- fade in over Fade s, hold, fade out over the last Fade s (the text changes while it is invisible); Reduced Motion: no fade, the text just changes
+   local alpha=reduced and 1 or math.min(1,tipClock/tips.Fade,(tips.Interval-tipClock)/tips.Fade)
+   if alpha~=tipAlpha then tipAlpha=alpha;tipLabel.TextTransparency=1-alpha;tipStroke.Transparency=1-alpha end
+   -- the pulse: a slow sine on the label's UIScale, about its centre (the line is never moved); Reduced Motion: scale 1
+   local pulse=reduced and 1 or 1+tips.PulseAmount*math.sin(pulseClock*math.pi*2/tips.PulsePeriod)
+   if pulse~=tipPulse then tipPulse=pulse;tipScale.Scale=pulse end
+  end
   local function frame(dt)
    dt=math.clamp(dt,0,.1);clock+=dt
    local reduced=Gui.ReducedMotionEnabled
@@ -261,6 +335,7 @@ function T.Start(player,pg)
    -- Keep text on a stable pixel baseline; float the 3D pack inside its own
    -- viewport so sub-pixel GUI rounding cannot make the whole wordmark jitter.
    visual.Position=UDim2.fromOffset(group.AbsoluteSize.X/2,layout.LogoY+(1-reveal)*14)
+   if tipLabel and phase~='Leaving'then stepTip(dt,reduced)end
    if previewBag and previewBag.Parent then
     local bob=reduced and 0 or math.sin(clock*.7)*previewAmplitude
     local sway=reduced and 0 or math.sin(clock*.35)*.009

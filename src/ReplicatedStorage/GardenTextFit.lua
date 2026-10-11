@@ -28,14 +28,30 @@ function M.Layout(text,width,height,font,maximum,minimum)
  end
  return line..ellipsis,minimum,true
 end
--- TextSize is in logical GUI pixels; AbsoluteSize already includes ancestor UIScales.
-function M.LogicalSize(label,size)
- local scale=1;local node=label
+-- The product of every UIScale above the label (and on it), and the product of those named HudScale (HudLayout.ApplyScale: a computer's HUD, drawn smaller than it is laid out).
+local function scalesOf(label)
+ local scale,hud=1,1;local node=label
  while node and not node:IsA('ScreenGui')do
   local transform=node:FindFirstChildOfClass('UIScale');if transform then scale*=math.max(.001,transform.Scale)end
+  local hudScale=node:FindFirstChild('HudScale');if hudScale and hudScale:IsA('UIScale')then hud*=math.max(.001,hudScale.Scale)end
   node=node.Parent
  end
+ return scale,hud
+end
+-- TextSize is in logical GUI pixels; AbsoluteSize already includes ancestor UIScales.
+function M.LogicalSize(label,size)
+ local scale=scalesOf(label)
  return size.X/scale,size.Y/scale
+end
+-- R158 review: a minimum is a size in REAL screen px, but a size is in the label's own (HUD) px, which a computer's HUD scale k (under 1 on a window smaller than 1920 x 720) draws
+-- k times smaller: a 7 px minimum would show as 3 px on an 800 x 600 window. Floor(minimum, k, height) is the smallest size, in the label's own px, that keeps the minimum in real px:
+-- minimum / k, but never more than ONE line of a box `height` tall can hold (the same rule Layout fits by), and never under the minimum itself. Only a readable-text minimum is held
+-- that way: one above RealCap px (the status card's 13 / 16, the wallet's 29: they are the label's design size, not a legibility floor) keeps its HUD-px value. At k = 1 (a phone, a
+-- window of 1920 x 720 or more) every minimum is as it was.
+M.RealCap=9
+function M.Floor(minimum,k,height)
+ if not k or k>=1 or minimum>M.RealCap then return minimum end
+ return math.max(minimum,math.min(math.ceil(minimum/k-1e-6),math.floor((height-2)/1.15)))
 end
 function M.Attach(label,maximum,minimum)
  local entry=entries[label]
@@ -52,8 +68,12 @@ function M.Attach(label,maximum,minimum)
   local constraint=label:FindFirstChildOfClass('UITextSizeConstraint');if constraint then constraint.MinTextSize=entry.Minimum;constraint.MaxTextSize=entry.Maximum end
   local size=label.AbsoluteSize
   if size and size.X>0 and size.Y>0 then
-   local width,height=M.LogicalSize(label,size)
-   local displayed,fontSize,truncated=M.Layout(entry.Full,width,height,label.Font,entry.Maximum,entry.Minimum)
+   local scale,hud=scalesOf(label)
+   local width,height=size.X/scale,size.Y/scale
+   -- (R158 review: under a HUD scale the minimum is held in real px - Floor - and the biggest size may rise to it)
+   local minimum,maximum=entry.Minimum,entry.Maximum
+   if hud<1 then minimum=M.Floor(minimum,hud,height);maximum=math.max(maximum,minimum)end
+   local displayed,fontSize,truncated=M.Layout(entry.Full,width,height,label.Font,maximum,minimum)
    entry.Displayed=displayed;label.Text=displayed;label.TextSize=fontSize;label:SetAttribute('TextShortened',truncated)
   end
   label:SetAttribute('FullText',entry.Full);writing=false

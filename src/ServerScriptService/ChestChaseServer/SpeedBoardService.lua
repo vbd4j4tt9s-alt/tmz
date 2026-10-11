@@ -12,6 +12,8 @@ function S.FromLog(log)
  local e=math.floor(log);local digits=string.format('%.0f',10^(log-e)*1e14)
  return Points.Normalize(digits..string.rep('0',math.max(0,e-14)))
 end
+-- R158i: the TOP SPEED board writes the SHOWN speed (points - 19,999, never below 1: SpeedDisplay), the money board its cash; the sort and the stores keep the real points.
+local function scoreText(spec,score)return spec.Stat=='Speed'and require(game:GetService('ReplicatedStorage').SpeedDisplay).Compact(score)or Cash.Compact(score)end
 local specs={{Key='hub.top1',Stat='Speed',Title='TOP SPEED',Badge='SPEED',Prefix=''}, {Key='hub.cash.top1',Stat='Cash',Title='MOST MONEY',Badge='MONEY',Prefix='$'}}
 function S.new(data)
  local self=setmetatable({Data=data,Stores={},Rows={},Names={},Boards={},Writes={},Last={},Updated={},Failed={},Stopped=false},S)
@@ -80,11 +82,11 @@ function S:Render()
    Landscape.Apply(model);local board=model:FindFirstChild('Board');local gui=board and board:FindFirstChild('Display');if not gui then continue end
    local state=self.Boards[spec.Key];if not state or state.Gui~=gui then state=self:_build(spec,gui);self.Boards[spec.Key]=state end
    local rows=self:Top(spec.Stat);state.Empty.Visible=#rows==0
-   state.Empty.Text=self.Failed[spec.Stat]and'Global rankings unavailable. Retrying…'or self.Updated[spec.Stat]and'Be the first to rank!'or'Loading global rankings…'
+   state.Empty.Text=self.Failed[spec.Stat]and'Can\'t load the rankings. Trying again…'or self.Updated[spec.Stat]and'Be the first to rank!'or'Loading global rankings…'
    state.Scope.Text=self.Failed[spec.Stat]and'GLOBAL • RETRYING UPDATE'or'GLOBAL • UPDATES EVERY MINUTE'
    -- Rows for every player's own scrollable board (LeaderboardClient). The server sign keeps a short top 10 fallback.
    local packed={}
-   for i,entry in ipairs(rows)do local info=self.Names[entry.UserId];packed[i]={u=entry.UserId,n=info and info.DisplayName or('Player '..entry.UserId),s=spec.Prefix..Cash.Compact(entry.Score)}end
+   for i,entry in ipairs(rows)do local info=self.Names[entry.UserId];packed[i]={u=entry.UserId,n=info and info.DisplayName or('Player '..entry.UserId),s=spec.Prefix..scoreText(spec,entry.Score)}end
    local okJson,json=pcall(Http.JSONEncode,Http,packed)
    model:SetAttribute('LeaderboardTitle',spec.Title);model:SetAttribute('LeaderboardBadge',spec.Badge)
    model:SetAttribute('LeaderboardStatus',self.Failed[spec.Stat]and'retry'or self.Updated[spec.Stat]and'ok'or'loading')
@@ -92,7 +94,7 @@ function S:Render()
    if okJson then model:SetAttribute('LeaderboardRows',json)end
    local shown=math.min(#rows,S.ServerRows)
    state.List.CanvasSize=UDim2.fromOffset(0,shown*108)
-   for i,entry in ipairs(rows)do if i>shown then break end;local row=self:_row(state,i,spec);row.Frame.Visible=true;local info=self.Names[entry.UserId];row.Name.Text=info and info.DisplayName or('Player '..entry.UserId);row.Avatar.Image='rbxthumb://type=AvatarHeadShot&id='..entry.UserId..'&w=150&h=150';row.Score.Text=spec.Prefix..Cash.Compact(entry.Score)end
+   for i,entry in ipairs(rows)do if i>shown then break end;local row=self:_row(state,i,spec);row.Frame.Visible=true;local info=self.Names[entry.UserId];row.Name.Text=info and info.DisplayName or('Player '..entry.UserId);row.Avatar.Image='rbxthumb://type=AvatarHeadShot&id='..entry.UserId..'&w=150&h=150';row.Score.Text=spec.Prefix..scoreText(spec,entry.Score)end
    for i=shown+1,#state.Rows do state.Rows[i].Frame.Visible=false end
   end end
  end

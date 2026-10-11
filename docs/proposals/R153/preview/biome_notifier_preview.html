@@ -1,0 +1,310 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Biome notifier previews</title>
+<style>
+/*FONTS*/
+*{box-sizing:border-box}
+body{margin:0;background:#0e141d;color:#dce6f2;font-family:'Mont',sans-serif}
+#sheet{width:1800px;padding:30px 32px 36px}
+h1{margin:0 0 6px;font-size:30px;font-weight:700;color:#fff}
+.sub{font-size:14px;line-height:1.5;color:#9fb0c6;max-width:1500px;margin:0 0 6px}
+.sec{margin:34px 0 4px;font-size:20px;font-weight:700;color:#8fe3ff}
+.secsub{font-size:13px;line-height:1.5;color:#8da0b8;margin:0 0 12px;max-width:1500px}
+.grid{display:flex;flex-wrap:wrap;gap:22px 24px}
+.cell{display:block}
+.frame{position:relative;overflow:hidden;border-radius:6px;box-shadow:0 0 0 1px #2a3547}
+.cap{margin-top:7px;font-size:13px;line-height:1.35;color:#c6d3e4}
+.cap b{color:#fff}
+.tag{display:inline-block;min-width:34px;text-align:center;padding:1px 8px;border-radius:5px;font-weight:700;font-size:12px;color:#0e141d;margin-right:7px}
+.t0{background:#ff9d8f}.tA{background:#8dffb0}.tB{background:#8fe3ff}.tC{background:#ffd978}
+.dim{color:#8da0b8}
+.pcrow{display:flex;gap:24px;align-items:flex-start}
+.pcnotes{width:430px;font-size:13px;line-height:1.5;color:#b9c8dc}
+.rowlabel{width:90px;font-size:15px;font-weight:700;color:#fff;padding-top:4px}
+.biorow{display:flex;gap:24px;margin-bottom:14px;align-items:flex-start}
+table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.45}
+th{background:#1a2333;color:#8fe3ff;text-align:left;padding:8px 10px;border:1px solid #2a3547}
+td{padding:8px 10px;border:1px solid #2a3547;vertical-align:top;background:#111927}
+td.k{font-weight:700;color:#fff;white-space:nowrap}
+</style></head><body><div id="sheet"></div>
+<script>
+const DATA=/*DATA*/null;
+const LOGO=DATA.logos;
+// ------------------------------------------------------------------ biome styles (BiomeTitleStyle.lua, copied as the code defines them)
+const INK='rgb(14,20,26)';
+const STY={
+ Forest:{Name:'FOREST',Label:'Forest',Color:[101,225,94],Accent:[206,255,137],Logo:'Forest'},
+ Lava:{Name:'LAVA',Label:'Lava',Color:[255,110,48],Accent:[255,214,79],Logo:'Lava'},
+ Storm:{Name:'STORM PEAKS',Label:'Storm Peaks',Color:[123,186,255],Accent:[255,239,122],Logo:'Storm'},
+};
+const rgb=(c,a)=>a==null?`rgb(${c[0]},${c[1]},${c[2]})`:`rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const mix=(a,b,t)=>[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*t));
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const smooth=p=>p*p*(3-2*p);
+const easeOut=p=>1-Math.pow(1-clamp(p,0,1),3);
+// ------------------------------------------------------------------ DOM helpers
+function h(tag,style,kids,text){
+ const e=document.createElement(tag);if(style)Object.assign(e.style,style);
+ if(text!=null)e.textContent=text;
+ (kids||[]).forEach(k=>k&&e.appendChild(k));return e;
+}
+const px=v=>(Math.round(v*100)/100)+'px';
+function outline(w,color){const o=[];for(let i=0;i<16;i++){const a=i/16*2*Math.PI;o.push(`${(Math.cos(a)*w).toFixed(2)}px ${(Math.sin(a)*w).toFixed(2)}px 0 ${color}`)}return o.join(',')}
+const mctx=document.createElement('canvas').getContext('2d');
+function tw(text,size,fam,weight){mctx.font=`${weight||400} ${size}px "${fam}"`;return mctx.measureText(text).width}
+// ------------------------------------------------------------------ devices; the safe area starts under a drawn Roblox top bar (CoreUISafeInsets; its real height varies)
+const BAR=44;
+const DEV={
+ pc:{key:'pc',name:'PC 1280x720',w:1280,h:720},
+ land:{key:'land',name:'phone landscape 844x390',w:844,h:390},
+ port:{key:'port',name:'phone portrait 390x844',w:390,h:844},
+};
+// HudNoticeLayout.Calculate, exactly: the row the biome title gets (Y, width, height) -> the notifier's own scale ("NoticeFit")
+function hudRow(dev){
+ const sh=dev.h-BAR,compact=sh<480;
+ const y=Math.max(8,compact?(dev.w<740?120:44):56);
+ const maxW=Math.max(120,compact?dev.w*.44:dev.w-24);
+ const rowH=compact?58:94;const rowW=Math.min(maxW,490);
+ return {y,rowH,rowW,fit:Math.min(rowW/490,rowH/110)};
+}
+// ------------------------------------------------------------------ track backgrounds: sky, a keyboard track in perspective (key tops and fronts), a runner seen from behind
+const PAL={
+ Forest:{sky:[[104,166,234],[196,226,247]],keys:[[26,140,92],[150,192,72],[60,158,70],[34,112,74]],ground:[66,150,76],far:[84,150,92]},
+ Lava:{sky:[[50,34,62],[218,108,66]],keys:[[54,44,48],[84,50,44],[40,34,40],[230,98,40]],ground:[54,38,42],far:[74,42,46]},
+ Storm:{sky:[[70,104,176],[176,198,234]],keys:[[74,96,136],[112,134,174],[52,70,108],[94,116,156]],ground:[64,84,120],far:[84,104,142]},
+};
+const bgCache={};
+function bgFor(devKey,biome){
+ const k=devKey+biome;if(bgCache[k])return bgCache[k];
+ const dev=DEV[devKey],w=dev.w,H=dev.h,P=PAL[biome];
+ const c=document.createElement('canvas');c.width=w;c.height=H;const g=c.getContext('2d');
+ let seed=biome.length*977+w;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+ const land=w>H,hy=Math.round(H*(land?.42:.34));
+ const sg=g.createLinearGradient(0,0,0,hy);sg.addColorStop(0,rgb(P.sky[0]));sg.addColorStop(1,rgb(P.sky[1]));g.fillStyle=sg;g.fillRect(0,0,w,hy+2);
+ // clouds
+ const nC=biome==='Forest'?5:7;
+ for(let i=0;i<nC;i++){const cx=rnd()*w,cy=hy*(.12+rnd()*.55),r=(land?30:22)*(.6+rnd()*.8);
+  g.fillStyle=biome==='Forest'?'rgba(255,255,255,.5)':biome==='Lava'?'rgba(110,60,64,.35)':'rgba(34,46,80,.42)';
+  for(let j=0;j<5;j++){g.beginPath();g.ellipse(cx+(j-2)*r*.7,cy+Math.sin(j*2)*r*.15,r,r*.5,0,0,7);g.fill()}}
+ // far hills / peaks / volcano
+ g.fillStyle=rgb(P.far);g.beginPath();g.moveTo(0,hy);
+ for(let x=0;x<=w;x+=12){const n=Math.sin(x*.011+biome.length)*.5+Math.sin(x*.027)*.3;
+  const hh=biome==='Storm'?(Math.abs(Math.sin(x*.016))*26+8)*(land?1:.7):biome==='Lava'?(Math.max(0,1-Math.abs(x-w*.7)/(w*.16))*40+6):(10+n*8);
+  g.lineTo(x,hy-Math.max(2,hh))}
+ g.lineTo(w,hy);g.fill();
+ g.fillStyle=rgb(P.ground);g.fillRect(0,hy,w,H-hy);
+ // keyboard: rows from the camera up to the horizon; a key's width grows with its distance from the horizon, its depth is about 0.42 of it
+ const rows=[];let y=H+40;
+ while(true){const s=(y-hy)/(H-hy),kw=w*(land?.17:.36)*s,rh=Math.max(1,kw*.42);rows.push({y1:y,y0:y-rh,kw});y-=rh;if(y-hy<2)break}
+ const letters='QWERTYUIOPASDFGHJKLZXCVBNM';
+ for(let i=rows.length-1;i>=0;i--){
+  const r=rows[i],gap=Math.max(.6,r.kw*.05),top=r.y1-r.y0,face=top*.24,cols=Math.ceil(w/r.kw)+3,off=((i*37)%10)/10*r.kw*.4;
+  for(let cI=-1;cI<cols;cI++){
+   const x=w/2+(cI-cols/2)*r.kw+off-r.kw*.2,col=P.keys[Math.floor(rnd()*P.keys.length)];
+   g.fillStyle=rgb(mix(col,[0,0,0],.4));g.fillRect(x+gap,r.y1-face-gap,r.kw-gap*2,face);
+   g.fillStyle=rgb(col);g.fillRect(x+gap,r.y0+gap*.5,r.kw-gap*2,top-face-gap*1.5);
+   g.fillStyle='rgba(255,255,255,.14)';g.fillRect(x+gap,r.y0+gap*.5,r.kw-gap*2,Math.max(.6,top*.06));
+   if(r.kw>26){g.fillStyle=rgb(mix(col,[0,0,0],.7));g.font=`700 ${Math.round(Math.min(r.kw*.34,top*.6))}px Mont`;g.textAlign='center';g.textBaseline='middle';
+    g.fillText(letters[Math.floor(rnd()*letters.length)],x+r.kw/2,r.y0+(top-face)/2+gap)}
+  }
+ }
+ const hzH=Math.max(24,(H-hy)*.22),hz=g.createLinearGradient(0,hy,0,hy+hzH);hz.addColorStop(0,rgb(P.sky[1],.75));hz.addColorStop(1,rgb(P.sky[1],0));g.fillStyle=hz;g.fillRect(0,hy,w,hzH);
+ // runner (seen from behind)
+ const u=H*(land?.0078:.0062),cx=w/2,by=H*.93;
+ g.fillStyle='#22305a';g.fillRect(cx-4*u,by-8*u,3.4*u,8*u);g.fillRect(cx+.6*u,by-8*u,3.4*u,8*u);
+ g.fillStyle='#d6453d';g.fillRect(cx-5*u,by-18*u,10*u,10.5*u);
+ g.fillStyle='#e6b98a';g.fillRect(cx-7.5*u,by-17.5*u,2.5*u,8*u);g.fillRect(cx+5*u,by-17.5*u,2.5*u,8*u);
+ g.fillStyle='#e6b98a';g.beginPath();g.arc(cx,by-22*u,4*u,0,7);g.fill();
+ g.fillStyle='#5a3a22';g.beginPath();g.arc(cx,by-23*u,4*u,3.3,6.1);g.fill();
+ return bgCache[k]=c.toDataURL('image/png');
+}
+// ------------------------------------------------------------------ the notifiers. Each builder returns {el, m} (m = settled bounding box in the safe area) for a time t (seconds since it appeared)
+function env(T,age){ // fade in over IN, fully shown until SHOW, fade away over OUT
+ let a,leave=0;
+ if(age<T.IN)a=1-age/T.IN;else if(age<T.SHOW)a=0;else{leave=clamp((age-T.SHOW)/T.OUT,0,1);a=smooth(leave)}
+ return {alpha:a,leave,done:age>=T.SHOW+T.OUT};
+}
+// TODAY: BiomeEntryNotifier.client.lua (R125), 490 x 110 design box, medallion + pill + words, scaled by HudNotices' "NoticeFit"
+const TODAY_T={IN:.25,SHOW:2.4,OUT:.7};
+function buildToday(st,dev,t){
+ const W=490,Hh=110,row=hudRow(dev);
+ const nameW=Math.min(320,tw(st.Name,40,'Fredoka One')+6);
+ const capW=tw('ENTERING',14,'Mont',700)+4;
+ const block=Math.max(nameW,capW,120);
+ const left=Math.floor((W-(88+12+block))/2),x=left+100;
+ const e=env(TODAY_T,t),enter=Math.min(t/.35,1),settle=1-Math.pow(1-enter,3);
+ const dy=Math.floor(-10*(1-settle)-8*e.leave+.5),pop=.7+.3*settle+.08*Math.sin(enter*Math.PI);
+ const A=st.Accent,C=st.Color;
+ const grp=h('div',{position:'absolute',left:px(dev.w/2-W/2),top:px(row.y),width:W+'px',height:Hh+'px',transformOrigin:'50% 0',transform:`scale(${row.fit})`});
+ const content=h('div',{position:'absolute',left:0,top:0,width:W+'px',height:Hh+'px',transform:`translateY(${dy}px)`,opacity:1-e.alpha});
+ grp.appendChild(content);
+ const abs=(s)=>Object.assign({position:'absolute'},s);
+ // soft pill: fill fades out to the right, the edge line does not
+ content.appendChild(h('div',abs({left:px(left+44),top:'24px',width:px(56+block+34),height:'64px',borderRadius:'32px',background:'rgba(10,18,24,.62)',
+  WebkitMaskImage:'linear-gradient(90deg,rgba(0,0,0,.7) 0%,#000 14%,#000 78%,transparent 100%)'})));
+ content.appendChild(h('div',abs({left:px(left+44),top:'24px',width:px(56+block+34),height:'64px',borderRadius:'32px',border:`1.5px solid ${rgb(A,.4)}`})));
+ // medallion
+ const medal=h('div',abs({left:px(left),top:'11px',width:'88px',height:'88px',transformOrigin:'0 0',transform:`scale(${pop})`}));
+ medal.appendChild(h('div',abs({left:'5px',top:'5px',width:'78px',height:'78px',borderRadius:'50%',boxShadow:`0 0 0 3px ${INK}`,
+  background:`linear-gradient(180deg,${rgb(mix(A,[255,255,255],.25))},${rgb(mix(C,[0,0,0],.25))})`})));
+ medal.appendChild(h('div',abs({left:'11px',top:'11px',width:'66px',height:'66px',borderRadius:'50%',border:`1.5px solid ${rgb(A,.55)}`})));
+ const lg=h('img',abs({left:'14px',top:'14px',width:'60px',height:'60px'}));lg.src=LOGO[st.Logo];medal.appendChild(lg);
+ medal.appendChild(h('div',abs({left:'20px',top:'13px',width:'26px',height:'12px',borderRadius:'50%',background:'rgba(255,255,255,.28)',transform:'rotate(-28deg)'})));
+ content.appendChild(medal);
+ // words
+ content.appendChild(h('div',abs({left:px(x+2),top:'22px',width:px(block),height:'16px',font:`700 14px/16px "Mont"`,color:rgb(A),textShadow:outline(1,'rgba(14,20,26,.6)')}),[],'ENTERING'));
+ const tstyle={left:px(x),top:'36px',width:px(nameW+30),height:'48px',font:`400 40px/48px "Fredoka One"`,whiteSpace:'nowrap'};
+ content.appendChild(h('div',abs({...tstyle,color:INK,textShadow:outline(2.5,INK)}),[],st.Name));
+ content.appendChild(h('div',abs({...tstyle,color:'transparent',backgroundImage:`linear-gradient(180deg,#fff 0%,${rgb(A)} 55%,${rgb(C)} 100%)`,WebkitBackgroundClip:'text',backgroundClip:'text'}),[],st.Name));
+ content.appendChild(h('div',abs({left:px(x),top:'88px',width:px(block),height:'2px',background:rgb(A,.85),
+  WebkitMaskImage:'linear-gradient(90deg,transparent 0,#000 15%,#000 85%,transparent 100%)'})));
+ [x-2,x+block+2].forEach(cx=>content.appendChild(h('div',abs({left:px(cx-3.5),top:px(89-3.5),width:'7px',height:'7px',background:rgb(A),transform:'rotate(45deg)'}))));
+ [[8,x+nameW+4,38,1],[5,x+nameW+14,52,2]].forEach(([s,cx,cy,i])=>{
+  const k=.5+.5*Math.sin(t*5+i*2.1);
+  content.appendChild(h('div',abs({left:px(cx-s/2),top:px(cy-s/2),width:s+'px',height:s+'px',background:rgb(mix(A,[255,255,255],.5)),transform:'rotate(45deg)',opacity:Math.max(0,.85*k)*(1-e.alpha)})));
+ });
+ return {el:grp,m:{w:(134+block)*row.fit,h:88*row.fit,boxW:W*row.fit,boxH:Hh*row.fit,x:dev.w/2-(134+block)*row.fit/2,y:row.y+11*row.fit,text:Math.round(40*row.fit)+' px name, '+(14*row.fit).toFixed(1)+' px "ENTERING"'},done:e.done};
+}
+// A: slim top-centre chip: small icon + name; slides down and fades; shorter
+const A_T={IN:.2,SHOW:1.6,OUT:.4};
+const CHIP={pc:{H:30,icon:22,font:16},port:{H:27,icon:20,font:14},land:{H:24,icon:18,font:13}};
+function chipBox(variant,st,dev){
+ const sp=CHIP[dev.key],nameW=tw(st.Label,sp.font,'Fredoka One');
+ const pad=(sp.H-sp.icon)/2,padL=variant==='A'?pad+3:pad+4,gap=6,padR=variant==='A'?sp.H*.5+2:12;
+ return {sp,nameW,w:Math.round(padL+sp.icon+gap+nameW+padR),padL,gap};
+}
+function buildChip(variant,st,dev,t){
+ const T=variant==='A'?A_T:C_T,b=chipBox(variant,st,dev),sp=b.sp,row=hudRow(dev);
+ const e=env(T,t),inn=easeOut(t/(T.IN*1.4));
+ let left,top,dx=0,dy=0;
+ if(variant==='A'){left=dev.w/2-b.w/2;top=row.y;dy=-14*(1-inn)-6*smooth(e.leave)}
+ else{left=12;top=8;dx=-26*(1-inn)-14*smooth(e.leave)}
+ const A=st.Accent;
+ const chip=h('div',{position:'absolute',left:px(left),top:px(top),width:b.w+'px',height:sp.H+'px',transform:`translate(${px(dx)},${px(dy)})`,opacity:1-e.alpha,
+  background:variant==='A'?'rgba(12,20,34,.72)':'rgba(12,20,34,.8)',borderRadius:variant==='A'?(sp.H/2)+'px':'8px',
+  border:`1px solid ${rgb(A,.55)}`,overflow:'hidden'});
+ if(variant==='C')chip.appendChild(h('div',{position:'absolute',left:0,top:0,width:'3px',height:'100%',background:rgb(A)}));
+ const lg=h('img',{position:'absolute',left:px(b.padL-1),top:px((sp.H-sp.icon)/2-1),width:sp.icon+'px',height:sp.icon+'px'});lg.src=LOGO[st.Logo];chip.appendChild(lg);
+ chip.appendChild(h('div',{position:'absolute',left:px(b.padL-1+sp.icon+b.gap),top:0,height:(sp.H-2)+'px',font:`400 ${sp.font}px/${sp.H-2}px "Fredoka One"`,whiteSpace:'nowrap',
+  color:rgb(st.Color),textShadow:outline(1.2,'rgba(10,16,24,.55)')},[],st.Label));
+ return {el:chip,m:{w:b.w,h:sp.H,x:left,y:top,text:sp.font+' px name, '+sp.icon+' px icon'},done:e.done};
+}
+const C_T={IN:.25,SHOW:1.75,OUT:.35};
+// B: text only: "entering" (lowercase, small) over the name in the biome colour, soft shadow, no box
+const B_T={IN:.3,SHOW:1.8,OUT:.6};
+const TXT={pc:{cap:12,name:24},port:{cap:11,name:21},land:{cap:11,name:19}};
+function buildText(st,dev,t){
+ const sp=TXT[dev.key],row=hudRow(dev),e=env(B_T,t),inn=easeOut(t/(B_T.IN*1.4));
+ const nameW=tw(st.Label,sp.name,'Fredoka One'),capW=tw('entering',sp.cap,'Mont',600);
+ const w=Math.ceil(Math.max(nameW,capW))+16,capH=Math.round(sp.cap*1.25),nameH=Math.round(sp.name*1.2),hh=capH+nameH;
+ const box=h('div',{position:'absolute',left:px(dev.w/2-w/2),top:px(row.y),width:w+'px',height:hh+'px',textAlign:'center',transform:`translateY(${px(-6*(1-inn))})`,opacity:1-e.alpha});
+ const sh='0 2px 5px rgba(8,12,20,.6)';
+ box.appendChild(h('div',{height:capH+'px',font:`600 ${sp.cap}px/${capH}px "Mont"`,color:'rgba(255,255,255,.9)',textShadow:outline(1.2,'rgba(14,20,26,.75)')+','+sh},[],'entering'));
+ box.appendChild(h('div',{height:nameH+'px',font:`400 ${sp.name}px/${nameH}px "Fredoka One"`,color:rgb(st.Color),whiteSpace:'nowrap',textShadow:outline(1.8,'rgba(14,20,26,.8)')+','+sh},[],st.Label));
+ return {el:box,m:{w:Math.ceil(Math.max(nameW,capW)),h:hh,x:dev.w/2-Math.max(nameW,capW)/2,y:row.y,text:sp.name+' px name, '+sp.cap+' px "entering"'},done:e.done};
+}
+const BUILD={T:buildToday,A:(s,d,t)=>buildChip('A',s,d,t),B:buildText,C:(s,d,t)=>buildChip('C',s,d,t)};
+const TIMES={T:TODAY_T,A:A_T,B:B_T,C:C_T};
+const total=o=>TIMES[o].SHOW+TIMES[o].OUT;
+const SETTLED={T:1.2,A:.8,B:.9,C:.8};
+const OPTNAME={T:'NOW',A:'A',B:'B',C:'C'};
+const TAGC={T:'t0',A:'tA',B:'tB',C:'tC'};
+// ------------------------------------------------------------------ panels
+function topbar(){
+ const bar=h('div',{position:'absolute',left:0,top:0,width:'100%',height:BAR+'px'});
+ [[12,'☰'],[58,'✉']].forEach(([x,ch])=>bar.appendChild(h('div',{position:'absolute',left:x+'px',top:'4px',width:'36px',height:'36px',borderRadius:'50%',background:'rgba(18,22,30,.55)',color:'rgba(255,255,255,.85)',font:'700 16px/36px "Mont"',textAlign:'center'},[],ch)));
+ return bar;
+}
+function panel(devKey,biome,opt,t,crop){
+ const dev=DEV[devKey];crop=crop||{x:0,y:0,w:dev.w,h:dev.h};
+ const frame=h('div',{width:crop.w+'px',height:crop.h+'px'});frame.className='frame';
+ const screen=h('div',{position:'absolute',left:px(-crop.x),top:px(-crop.y),width:dev.w+'px',height:dev.h+'px',backgroundImage:`url(${bgFor(devKey,biome)})`});
+ screen.appendChild(topbar());
+ const safe=h('div',{position:'absolute',left:0,top:BAR+'px',width:dev.w+'px',height:(dev.h-BAR)+'px'});
+ const n=BUILD[opt](STY[biome],dev,t);if(!n.done)safe.appendChild(n.el);
+ screen.appendChild(safe);frame.appendChild(screen);return frame;
+}
+const METRICS={};
+function metrics(devKey,biome,opt){
+ const k=devKey+'/'+biome+'/'+opt;if(METRICS[k])return METRICS[k];
+ const dev=DEV[devKey],n=BUILD[opt](STY[biome],dev,SETTLED[opt]),m=n.m;
+ return METRICS[k]=Object.assign({areaPct:100*m.w*m.h/(dev.w*dev.h)},m);
+}
+function cellCap(devKey,biome,opt){
+ const m=metrics(devKey,biome,opt),extra=opt==='T'?` <span class="dim">(its reserved row: ${Math.round(m.boxW)} x ${Math.round(m.boxH)})</span>`:'';
+ return Object.assign(h('div'),{className:'cap',innerHTML:`<span class="tag ${TAGC[opt]}">${OPTNAME[opt]}</span><b>${Math.round(m.w)} x ${Math.round(m.h)} px</b> <span class="dim">(${m.areaPct.toFixed(2)}% of the screen)</span>${extra}<br><span class="dim">${m.text} &middot; ${total(opt).toFixed(1)} s on screen</span>`});
+}
+function cell(devKey,biome,opt,t,crop,noCap){
+ const c=h('div');c.className='cell';c.style.width=((crop||{w:DEV[devKey].w}).w)+'px';c.appendChild(panel(devKey,biome,opt,t==null?SETTLED[opt]:t,crop));
+ if(!noCap)c.appendChild(cellCap(devKey,biome,opt));return c;
+}
+function section(title,sub){const f=document.createDocumentFragment();const a=h('div');a.className='sec';a.textContent=title;f.appendChild(a);if(sub){const b=h('div');b.className='secsub';b.innerHTML=sub;f.appendChild(b)}return f}
+function grid(){const g=h('div');g.className='grid';return g}
+// ------------------------------------------------------------------ the sheet
+const desc={
+ T:{words:'"ENTERING" (caps, small) + "STORM PEAKS" (caps, 40 px, outlined) + medallion + pill + underline + 2 sparkles',anim:'drops in 10 px and settles over 0.35 s, medallion pops (0.7 to 1.0, small overshoot), 2 sparkles pulse; fade in 0.25 s, shown to 2.4 s, then rises 8 px while fading over 0.7 s',time:'3.1 s (fully shown 2.15 s)'},
+ A:{words:'icon + "Storm Peaks" (Title Case, biome colour); no "entering" line',anim:'slides down 14 px while it fades in (0.2 s), still, then fades and lifts 6 px (0.4 s); no pop, no sparkles',time:'2.0 s (fully shown 1.4 s)'},
+ B:{words:'"entering" (lowercase, white) over "Storm Peaks" (biome colour, dark edge + soft shadow); no box, no icon',anim:'fades in over 0.3 s with a 6 px settle, still, fades out over 0.6 s; nothing moves otherwise',time:'2.4 s (fully shown 1.5 s)'},
+ C:{words:'icon + "Storm Peaks" (Title Case, biome colour) with a thin accent bar on the left; top-left, under the top bar',anim:'slides in from the left 26 px while fading in (0.25 s), still, slides back out and fades (0.35 s); centre of the screen never covered',time:'2.1 s (fully shown 1.5 s)'},
+};
+function build(){
+ const S=document.getElementById('sheet');
+ const head=h('div');head.innerHTML=`<h1>Biome notifier: today vs three smaller options</h1>
+ <div class="sub">Preview only, nothing in the game is changed. Everything is drawn at true pixel size (1 px here = 1 Roblox px) on a mock track: "Storm Peaks" is the biome unless a row says otherwise.
+ The logos are the game's own artwork (decoded from BiomeIconData.lua), the colours are BiomeTitleStyle.lua's, the "now" notifier is rebuilt from BiomeEntryNotifier.client.lua's numbers (490 x 110 box, 88 px medallion, 40 px name,
+ scaled by HudNotices / HudNoticeLayout to fit each screen), and the screen position is HudNoticeLayout's. Fredoka One and Montserrat (for Gotham) stand in for Roblox's fonts, so widths are close, not exact.
+ The strip at the very top of each screen is a mock of Roblox's own top bar (the game's UI starts under it).</div>`;
+ S.appendChild(head);
+ // 1. phone landscape, whole screens
+ S.appendChild(section('Phone, landscape 844 x 390 (whole screen, true size)','Today the notifier is already squeezed to 0.53 of its design size here (HudNotices gives it a 58 px row), so its "ENTERING" line is about 7 px tall. A / B / C stay readable at 11 to 13 px.'));
+ let g=grid();['T','A','B','C'].forEach(o=>g.appendChild(cell('land','Storm',o)));S.appendChild(g);
+ // 2. phone portrait: top crops
+ S.appendChild(section('Phone, portrait 390 x 844 (top 230 px of the screen, true size)','The rest of the screen is empty track and HUD. Today: scale 0.75.'));
+ g=grid();['T','A','B','C'].forEach(o=>g.appendChild(cell('port','Storm',o,null,{x:0,y:0,w:390,h:230})));S.appendChild(g);
+ // 3. PC: top crops stacked
+ S.appendChild(section('PC 1280 x 720 (top 215 px of the screen, true size)','The rest of the screen is empty track and HUD. Today: scale 0.85.'));
+ ['T','A','B','C'].forEach(o=>{
+  const row=h('div');row.className='pcrow';row.style.marginBottom='14px';
+  row.appendChild(cell('pc','Storm',o,null,{x:0,y:0,w:1280,h:215},true));
+  const notes=cellCap('pc','Storm',o);notes.style.width='430px';notes.style.marginTop='0';notes.innerHTML+=`<br><span class="dim">${desc[o].words}.<br>${desc[o].anim}.</span>`;row.appendChild(notes);S.appendChild(row);
+ });
+ // 4. three biomes
+ S.appendChild(section('Each option in three biomes (phone landscape, true size)','Forest, Lava, Storm Peaks with their real colours and logos. Same time in each option as above (fully shown). Options A and C show the name in the biome colour on a dark chip; B is the name in the biome colour with a soft dark edge and shadow.'));
+ [['Forest','Forest (green track, daytime sky)'],['Lava','Lava (dark track, dusk sky)'],['Storm','Storm Peaks (slate track, cloudy sky)']].forEach(([bk,label])=>{
+  const lab=h('div',{margin:'10px 0 6px',font:'700 14px "Mont"',color:'#cfe0f5'},[],label);S.appendChild(lab);
+  const row=h('div');row.className='biorow';
+  row.style.gap='20px';
+  ['T','A','B','C'].forEach(o=>{const crop=o==='C'?{x:0,y:0,w:410,h:185}:{x:217,y:0,w:410,h:185};row.appendChild(cell('land',bk,o,null,crop,true))});
+  S.appendChild(row);
+ });
+ // 5. motion strips
+ S.appendChild(section('Motion: five moments of each (phone landscape, from just under the top bar, true size)','NOW: fade in 0.25 s while it drops 10 px and the medallion pops, shown until 2.4 s, then fades 0.7 s while rising 8 px (3.1 s). A: slides down 14 px while fading in 0.2 s, shown to 1.6 s, fades 0.4 s (2.0 s). B: fades in 0.3 s, shown to 1.8 s, fades 0.6 s (2.4 s). C: slides in from the left 0.25 s, shown to 1.75 s, slides out 0.35 s (2.1 s).'));
+ const TL={T:[.08,.3,1.5,2.65,2.95],A:[.05,.14,1.0,1.8,1.95],B:[.08,.25,1.2,2.1,2.35],C:[.06,.18,1.0,1.9,2.05]};
+ ['T','A','B','C'].forEach(o=>{
+  const row=h('div');row.className='biorow';row.style.marginBottom='10px';
+  const lab=h('div');lab.className='rowlabel';lab.innerHTML=`<span class="tag ${TAGC[o]}">${OPTNAME[o]}</span>`;row.appendChild(lab);
+  TL[o].forEach(t=>{
+   const crop=o==='C'?{x:0,y:BAR,w:300,h:110}:{x:272,y:BAR,w:300,h:110};
+   const c=h('div');c.className='cell';c.appendChild(panel('land','Storm',o,t,crop));
+   c.appendChild(Object.assign(h('div'),{className:'cap',innerHTML:`t = ${t.toFixed(2)} s`}));row.appendChild(c);
+  });
+  S.appendChild(row);
+ });
+ // 6. numbers table
+ S.appendChild(section('Numbers side by side (Storm Peaks, the longest name)'));
+ const rows=[['T','Today (R125 / R14x notifier)'],['A','A: slim chip'],['B','B: text only'],['C','C: corner toast']];
+ let html='<table><tr><th></th><th>PC 1280 x 720</th><th>Phone landscape 844 x 390</th><th>Phone portrait 390 x 844</th><th>On screen</th><th>What it says</th><th>Animation</th></tr>';
+ rows.forEach(([o,label])=>{
+  const cellv=dk=>{const m=metrics(dk,'Storm',o),n=metrics(dk,'Storm','T');return `<b>${Math.round(m.w)} x ${Math.round(m.h)}</b> px<br><span class="dim">${m.areaPct.toFixed(2)}% of screen${o==='T'?'':'<br>'+Math.round(100*m.h/n.h)+'% of now\'s height, '+Math.round(100*m.w*m.h/(n.w*n.h))+'% of its area'}</span>`};
+  html+=`<tr><td class="k"><span class="tag ${TAGC[o]}">${OPTNAME[o]}</span></td><td>${cellv('pc')}</td><td>${cellv('land')}</td><td>${cellv('port')}</td><td>${desc[o].time}</td><td>${desc[o].words}</td><td>${desc[o].anim}</td></tr>`;
+ });
+ html+='</table>';
+ const t=h('div');t.innerHTML=html;S.appendChild(t);
+ const foot=h('div');foot.className='secsub';foot.style.marginTop='10px';
+ foot.innerHTML='Sizes are the visible box (medallion to the end of the pill for "now"; the whole chip, toast or text block for A / B / C) in screen px, measured from the same builders that draw the panels. "Now" also reserves a 94 px (58 px on landscape phones) row at the top of the screen that the other notices stack under; A needs a 24 to 30 px row, B a 37 to 44 px row, and C none (it sits in the corner, outside the stack).';
+ S.appendChild(foot);
+ ['Forest','Lava'].forEach(b=>['pc','land','port'].forEach(d=>['T','A','B','C'].forEach(o=>metrics(d,b,o)))); // numbers for the notes (not drawn)
+}
+Promise.all(['400 40px "Fredoka One"','500 14px "Mont"','600 14px "Mont"','700 14px "Mont"'].map(f=>document.fonts.load(f))).then(()=>document.fonts.ready).then(()=>{
+ build();window.METRICS=METRICS;window.ready=true;
+});
+</script></body></html>

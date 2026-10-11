@@ -1,0 +1,12 @@
+{
+ "note": "Cameras for R153's before / after garden-front previews (render_base_area.mjs of R151). pos / look are world studs (hub floor top y = 4); ortho = [centre x, centre z, half width, half height] (+Z up the image, -X to the right).",
+ "views": [
+  {"name": "top3", "title": "Base 3 spur from above", "ortho": [-137, -358, 36, 20.25], "shadowAt": [-137, 4, -358], "shadowExtent": 60,
+   "caption": "Base 3's garden front from straight above, the view in the owner's screenshot: the spur between the west street and the base."},
+  {"name": "top5", "title": "Base 5 spur from above", "ortho": [-74, -418, 36, 20.25], "shadowAt": [-74, 4, -418], "shadowExtent": 60,
+   "caption": "Base 5 (its entrance faces the south street): the spur and the south street's cream curb."},
+  {"name": "obl3", "title": "Base 3 spur at an angle", "fov": 55, "pos": [-100, 38, -338], "look": [-137, 4, -358], "shadowAt": [-137, 4, -358], "shadowExtent": 70,
+   "avatars": [[-116, 4.2, -352, 1.9, 13775418]],
+   "caption": "The same garden front from the west street."}
+ ]
+}

@@ -1,5 +1,6 @@
 -- R52: reference-style blue frame, planted feet and tall white ranking cards.
 local M={Width=18,Height=26}
+local Shadow=require(script.Parent.SmallShadow154) -- R154 (lag audit B1): a part under 1.5 studs casts no shadow
 function M.Apply(model)
  if not model then return end
  local walk=require(script.Parent.WalkthroughProps90)
@@ -10,7 +11,7 @@ function M.Apply(model)
  local origin=CFrame.new(board.Position.X,ground,board.Position.Z)*rotation
  for _,p in ipairs(model:GetChildren())do if p:IsA('BasePart')and p~=board and p~=base then p:Destroy()end end
  local function part(name,size,offset,color,material)
-  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=origin*CFrame.new(offset);p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanTouch=false;p.Parent=model;return p
+  local p=Instance.new('Part');p.Name=name;p.Size=size;p.CFrame=origin*CFrame.new(offset);p.Color=color;p.Material=material or Enum.Material.SmoothPlastic;p.Anchored=true;p.CanTouch=false;p.Parent=model;return Shadow.Part(p)
  end
  local blue=Color3.fromRGB(69,158,241);local light=Color3.fromRGB(142,215,255)
  base.Size=Vector3.new(24,1.4,10);base.CFrame=origin*CFrame.new(0,.7,0);base.Color=blue

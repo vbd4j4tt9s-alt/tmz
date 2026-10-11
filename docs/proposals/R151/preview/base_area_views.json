@@ -1,0 +1,295 @@
+{
+ "note": "Cameras for render_base_area.mjs / make_base_area_sheets.py. pos / look are world studs (the track runs to +Z; hub floor top y = 4). Player eye height: the camera sits over the avatar's head like Roblox's default follow camera. avatars: [x, y, z, yaw, shirt colour].",
+ "views": [
+  {
+   "name": "spawn",
+   "title": "Leaving your base (spawn view)",
+   "caption": "Ben spawns inside Base 1 (west side) looking out at the hub, as every player does. TODAY: grass to the horizon, the market's back wall, Base 2's fence 300 studs away. AFTER: his base arch, a paved spur with a welcome mat in his base colour, the avenue with lamps and bunting, trees, and the gate towers to the right.",
+   "fov": 64,
+   "pos": [
+    -184,
+    13.5,
+    -183
+   ],
+   "look": [
+    -40,
+    10,
+    -205
+   ],
+   "avatars": [
+    [
+     -170,
+     5,
+     -181,
+     -1.57,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    -110,
+    4,
+    -205
+   ],
+   "shadowExtent": 160
+  },
+  {
+   "name": "street",
+   "title": "Between two bases",
+   "caption": "On the west street, at the mouth of the alley between Base 1 and Base 3. TODAY: an empty grass corridor ending at a plain 48-stud wall. AFTER: the Lava garden walk with ember trees and glowing rocks, a lamp, benches at the end, base banners 1 and 3 on the wall and the framed LAVA mural (5 of 7) closing the view.",
+   "fov": 60,
+   "pos": [
+    -118,
+    12,
+    -266
+   ],
+   "look": [
+    -330,
+    20,
+    -269
+   ],
+   "avatars": [
+    [
+     -130,
+     4.2,
+     -270,
+     1.57,
+     4245975
+    ]
+   ],
+   "shadowAt": [
+    -220,
+    4,
+    -269
+   ],
+   "shadowExtent": 140
+  },
+  {
+   "name": "entrance",
+   "title": "At a base entrance",
+   "caption": "Base 3 from the west street. AFTER: an arch in the base's colour with the owner's name (LEO'S BASE; FREE BASE when empty), a number medallion, pennants, a flower verge, and the reserved trophy-shelf slot (ghost, left). The 32-stud opening, fence tier art, treadmill and mystery pedestal are untouched.",
+   "fov": 60,
+   "pos": [
+    -98,
+    12,
+    -366
+   ],
+   "look": [
+    -150,
+    13,
+    -357
+   ],
+   "avatars": [
+    [
+     -116,
+     4.2,
+     -352,
+     1.9,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    -140,
+    4,
+    -358
+   ],
+   "shadowExtent": 90
+  },
+  {
+   "name": "walls",
+   "title": "The walls up close",
+   "caption": "The east wall at the end of the Desert garden. TODAY: sage plastic, 48 studs, a thin wood cap and wood strips. AFTER: the same wall part (same size, place and collision) in cream plaster, with a stone plinth, a gold string course, pilasters with topiary balls, a clipped hedge on top, and the framed DESERT mural (3 of 7) with its number key and plaque.",
+   "fov": 60,
+   "pos": [
+    262,
+    12,
+    -279
+   ],
+   "look": [
+    335,
+    27,
+    -266
+   ],
+   "avatars": [
+    [
+     274,
+     4.2,
+     -272,
+     -1.2,
+     4245975
+    ]
+   ],
+   "shadowAt": [
+    300,
+    4,
+    -269
+   ],
+   "shadowExtent": 90
+  },
+  {
+   "name": "backwall",
+   "title": "The back wall down the main axis",
+   "caption": "From the south street down the back lane between Base 5 and Base 6. AFTER: the SNOW mural (4 of 7) closes the hub's main axis, base banners 5 and 6 hang on the wall behind their bases, pines line the lane; the Seed Fountain is behind the camera.",
+   "fov": 58,
+   "pos": [
+    0,
+    12,
+    -426
+   ],
+   "look": [
+    0,
+    25,
+    -618
+   ],
+   "avatars": [
+    [
+     3,
+     4.3,
+     -436,
+     3.14,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -520
+   ],
+   "shadowExtent": 130
+  },
+  {
+   "name": "gate",
+   "title": "The track gate",
+   "caption": "From the front street. TODAY: a 180-stud gap between two plain walls. AFTER: the keyboard arch - one big key per biome with that keeper's speed (Forest 0 ... Storm Peaks 2.6B, the same numbers as the keeper signs; on each player's own screen a key turns green with a tick once they are faster - here the player has Jungle speed), seven flags, THE TRACK crest, and a run-up paved in seven biome lanes up to the existing safe line.",
+   "fov": 64,
+   "pos": [
+    0,
+    12,
+    -192
+   ],
+   "look": [
+    0,
+    34,
+    -100
+   ],
+   "avatars": [
+    [
+     -6,
+     4.2,
+     -172,
+     3.14,
+     13775418
+    ],
+    [
+     26,
+     4.1,
+     -132,
+     3.0,
+     4245975
+    ]
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -130
+   ],
+   "shadowExtent": 140
+  },
+  {
+   "name": "aerial",
+   "title": "Overview (drone, from above the gate)",
+   "caption": "TODAY: a walled field. PHASE 1: the frame - cream walls with hedge, pilasters, towers, seven murals and base banners; a ring of streets joining every base, the market square, the stage circle and the gate; base arches. PHASE 1+2: trees, flower beds, lamps, benches, bunting and the Seed Fountain. The two back corners stay empty for the R151 Best Pull / Biggest Fruit displays.",
+   "fov": 58,
+   "pos": [
+    0,
+    215,
+    -30
+   ],
+   "look": [
+    0,
+    0,
+    -400
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -360
+   ],
+   "shadowExtent": 380,
+   "fogNear": 900,
+   "fogFar": 2600
+  },
+  {
+   "name": "avenue",
+   "title": "Down the avenue to the market",
+   "caption": "From the front street down the avenue. TODAY: grass and the market's back wall. AS BUILT: the paved avenue with curbs, blossom trees and potted topiary at its mouth, lamps, crossed bunting, flower beds, the brick market square with its lamps and planters, and the stage and fountain beyond.",
+   "fov": 62,
+   "pos": [
+    -4,
+    13,
+    -168
+   ],
+   "look": [
+    0,
+    10,
+    -272
+   ],
+   "avatars": [
+    [
+     3,
+     4.2,
+     -180,
+     3.0,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -230
+   ],
+   "shadowExtent": 120
+  },
+  {
+   "name": "darkened",
+   "title": "When the lights go out",
+   "caption": "There is no day/night yet, but The Darkened's arrival (and storms) darkens the hub. The R151 lamps (22 posts; 8 carry a real PointLight) and the 14 wall lanterns glow, so the streets stay readable; with a future hub day/night (benchmark M4) the same lamps become night lamps. (Approximate: the real blackout is darker past a short distance.)",
+   "fov": 62,
+   "pos": [
+    -4,
+    13,
+    -168
+   ],
+   "look": [
+    0,
+    10,
+    -272
+   ],
+   "avatars": [
+    [
+     3,
+     4.2,
+     -180,
+     3.0,
+     13775418
+    ]
+   ],
+   "shadowAt": [
+    0,
+    4,
+    -230
+   ],
+   "shadowExtent": 120,
+   "night": true
+  }
+ ],
+ "plan": {
+  "ortho": [
+   0,
+   -361,
+   350,
+   275
+  ],
+  "w": 1400,
+  "h": 1100
+ }
+}

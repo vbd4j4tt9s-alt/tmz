@@ -1,1 +1,0 @@
--- R112: the "FASTER! N run speed" notice was removed at the owner's request; the speed number in the wallet jumps instead.

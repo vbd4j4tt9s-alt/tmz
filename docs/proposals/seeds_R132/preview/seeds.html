@@ -1,0 +1,123 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Market preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_market.luau scene: Roblox parts as boxes / balls / cylinders, SurfaceGui text on faces,
+// neon as glowing unlit colour. No Roblox textures, real fonts or Future lighting: a design preview, not a screenshot.
+import * as THREE from 'three';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+const W=1600,H=900;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(W,H);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+function textCanvas(gui,wStuds,hStuds){
+  const scale=Math.min(1,1400/Math.max(gui.canvas[0],gui.canvas[1]));
+  const cw=Math.max(64,Math.round(gui.canvas[0]*scale)),ch=Math.max(64,Math.round(gui.canvas[1]*scale));
+  const cv=document.createElement('canvas');cv.width=cw;cv.height=ch;const g=cv.getContext('2d');
+  for(const l of gui.lines){
+    const x=l.x*cw,y=l.y*ch,w=l.w*cw,h=l.h*ch;let size=h*.9;
+    g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;
+    while(size>6&&g.measureText(l.text).width>w*.98){size*=.94;g.font=`900 ${size}px "Arial Rounded MT Bold","DejaVu Sans",sans-serif`;}
+    g.textAlign='center';g.textBaseline='middle';
+    if(l.stroke){g.lineWidth=Math.max(2,size*.12);g.strokeStyle='rgba(10,30,45,.85)';g.strokeText(l.text,x+w/2,y+h/2);}
+    g.fillStyle=`rgb(${l.color[0]},${l.color[1]},${l.color[2]})`;g.fillText(l.text,x+w/2,y+h/2);
+  }
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+function grid(){
+  const cv=document.createElement('canvas');cv.width=cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#3e9f4a';g.fillRect(0,0,256,256);g.strokeStyle='rgba(255,255,255,.10)';g.lineWidth=4;g.strokeRect(0,0,256,256);
+  g.fillStyle='rgba(0,0,0,.05)';g.fillRect(0,0,128,128);g.fillRect(128,128,128,128);
+  const t=new THREE.CanvasTexture(cv);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(100,100);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+window.build=function(scene,mode){
+  const s=new THREE.Scene();const dusk=mode==='dusk';
+  s.background=new THREE.Color(dusk?0x2b3557:0x9fd3f2);s.fog=new THREE.Fog(s.background,220,520);
+  s.add(new THREE.AmbientLight(dusk?0x8090b0:0xbfc8d8,dusk?.35:.75));
+  s.add(new THREE.HemisphereLight(dusk?0x6070a0:0xeaf6ff,dusk?0x203020:0x5f8f55,dusk?.55:1.15));
+  const sun=new THREE.DirectionalLight(dusk?0xffa070:0xfff2dd,dusk?.55:2.4);
+  const c=scene.center;sun.position.set(c[0]+60,c[1]+(dusk?25:90),c[2]-50);sun.target.position.set(c[0],c[1],c[2]);
+  sun.castShadow=true;sun.shadow.mapSize.set(4096,4096);Object.assign(sun.shadow.camera,{left:-80,right:80,top:80,bottom:-80,near:1,far:300});sun.shadow.bias=-.0004;
+  s.add(sun,sun.target);
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600),new THREE.MeshStandardMaterial({map:grid(),roughness:.95}));
+  ground.rotation.x=-Math.PI/2;ground.position.set(c[0],c[1]-.02,c[2]);ground.receiveShadow=true;s.add(ground);
+  const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(.5,28,18),cyl=new THREE.CylinderGeometry(.5,.5,1,40);cyl.rotateZ(-Math.PI/2);
+  for(const p of scene.parts){
+    if(p.name==='HumanoidRootPart'||p.name==='Baseplate')continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const visible=p.t<.995;
+    if(visible){
+      let geo=box,sx=p.size[0],sy=p.size[1],sz=p.size[2];
+      if(p.shape==='Ball'){geo=sphere}else if(p.shape==='Cylinder'){geo=cyl;const d=Math.min(sy,sz);sy=d;sz=d}
+      let mat;
+      if(p.material==='Neon'){const k=dusk?2.4:1.6;mat=new THREE.MeshBasicMaterial({color:col(p.color).multiplyScalar(k),transparent:p.t>0,opacity:1-p.t,depthWrite:p.t<.5,toneMapped:false});}
+      else if(p.material==='Glass'){mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.05,metalness:0,transparent:true,opacity:Math.max(.18,1-p.t),depthWrite:false});}
+      else mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:.72,metalness:0,transparent:p.t>0,opacity:1-p.t});
+      const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+      mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(sx,sy,sz));
+      mesh.castShadow=p.material!=='Neon'&&p.t<.3;mesh.receiveShadow=p.material!=='Neon';s.add(mesh);
+    }
+    for(const gui of p.guis){
+      const sx=p.size[0],sy=p.size[1],sz=p.size[2];let w,h,local=new THREE.Matrix4();
+      const off=.03;
+      switch(gui.face){
+        case'Front':w=sx;h=sy;local.makeRotationY(Math.PI).setPosition(0,0,-sz/2-off);break;
+        case'Back':w=sx;h=sy;local.makeTranslation(0,0,sz/2+off);break;
+        case'Right':w=sz;h=sy;local.makeRotationY(Math.PI/2).setPosition(sx/2+off,0,0);break;
+        case'Left':w=sz;h=sy;local.makeRotationY(-Math.PI/2).setPosition(-sx/2-off,0,0);break;
+        default:w=sx;h=sz;local.makeRotationX(-Math.PI/2).setPosition(0,sy/2+off,0);
+      }
+      const plane=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:textCanvas(gui,w,h),transparent:true,toneMapped:false,depthWrite:false}));
+      plane.matrixAutoUpdate=false;plane.matrix.copy(m).multiply(local);plane.renderOrder=2;s.add(plane);
+    }
+  }
+  if(dusk)for(const l of scene.lights){const pl=new THREE.PointLight(col(l.color),40,l.range*2.2,1.6);pl.position.set(...l.p);s.add(pl);}
+  return s;
+};
+const rarityColor={Common:'#dfecf2',Uncommon:'#62eb82',Rare:'#5badff',Legendary:'#ffcf59',Mythic:'#e67dff',Secret:'#ff77a0',Cosmic:'#9fb2ff',King:'#ffeca1'};
+function card(label,w,h){
+  const cv=document.createElement('canvas');cv.width=360;cv.height=440;const g=cv.getContext('2d');
+  const r=26,b=10;g.fillStyle=rarityColor[label.rarity]||'#ddd';
+  const rr=(x,y,w,h,r)=>{g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()};
+  rr(0,0,360,440,r);g.fill();g.fillStyle='#24513c';rr(b,b,360-2*b,440-2*b,r-6);g.fill();
+  g.font='900 30px "DejaVu Sans",sans-serif';g.textAlign='center';g.fillStyle=rarityColor[label.rarity]||'#fff';
+  g.strokeStyle='rgba(0,0,0,.8)';g.lineWidth=6;g.strokeText(label.text,180,392);g.fillText(label.text,180,392);
+  g.font='700 22px "DejaVu Sans",sans-serif';g.fillStyle='rgba(255,255,255,.75)';g.fillText(label.rarity,180,422);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+window.shootSeeds=function(scene,title){
+  const s=new THREE.Scene();s.background=new THREE.Color(0x173828);
+  s.add(new THREE.AmbientLight(0xffffff,.9));s.add(new THREE.HemisphereLight(0xffffff,0x334433,.8));
+  const key=new THREE.DirectionalLight(0xffffff,1.6);key.position.set(-3,6,-10);s.add(key);
+  const box=new THREE.BoxGeometry(1,1,1),sphere=new THREE.SphereGeometry(.5,28,18),cyl=new THREE.CylinderGeometry(.5,.5,1,32);cyl.rotateZ(-Math.PI/2);
+  const wedge=new THREE.BoxGeometry(1,1,1);
+  for(const p of scene.parts){
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    let geo=box,sx=p.size[0],sy=p.size[1],sz=p.size[2];
+    if(p.shape==='Ball')geo=sphere;else if(p.shape==='Cylinder'){geo=cyl;const d=Math.min(sy,sz);sy=d;sz=d}
+    let mat;
+    if(p.material==='Neon')mat=new THREE.MeshBasicMaterial({color:col(p.color).multiplyScalar(1.4),transparent:p.t>0,opacity:1-p.t,toneMapped:false});
+    else if(p.material==='Glass')mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.08,transparent:true,opacity:Math.max(.3,1-p.t),depthWrite:false});
+    else mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:p.material==='Metal'?.35:.6,metalness:p.material==='Metal'?.5:0,transparent:p.t>0,opacity:1-p.t});
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(sx,sy,sz));s.add(mesh);
+  }
+  const g=scene.gap;
+  for(const l of scene.labels){
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(g*.94,g*1.25*.94),new THREE.MeshBasicMaterial({map:card(l),toneMapped:false}));
+    plane.position.set(l.p[0],l.p[1]+1.55-g*1.25*.06,1.6);plane.rotation.y=Math.PI;s.add(plane);
+  }
+  const w=scene.cols*g,h=scene.rows*g*1.25+.5;
+  const cam=new THREE.OrthographicCamera(-w/2,w/2,h/2,-h/2,.1,100);
+  cam.position.set(-(scene.cols-1)*g/2,-(scene.rows-1)*g*1.25/2-.1,-20);cam.lookAt(cam.position.x,cam.position.y,0);
+  const W2=scene.cols*200,H2=Math.round(scene.rows*250+29);renderer.setSize(W2,H2);
+  const comp=new EffectComposer(renderer);comp.addPass(new RenderPass(s,cam));comp.addPass(new UnrealBloomPass(new THREE.Vector2(W2,H2),.35,.4,.85));comp.addPass(new OutputPass());
+  comp.render();return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

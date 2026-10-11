@@ -1,0 +1,127 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Bat swing preview</title>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js"}}</script>
+<style>html,body{margin:0;background:#222}</style></head>
+<body>
+<script type="module">
+// R158 bats: an APPROXIMATE blocky R15 / R6 rig (classic colours) with the game's fallback bat (BatArt.Fallback x BatConfig.AppearanceScale 1.5),
+// posed from dump_poses158.luau's joint rotations (parent space). The character is drawn at the game's PlayerScaleMultiplier 1.25; the bat is not
+// scaled with it (the server makes it after the avatar is scaled). Rig numbers match solve_keys158.py. No Roblox lighting, materials or animation
+// blending beyond what the pose modules do; the legs stand still (in the game they keep running / jumping under the swing).
+import * as THREE from 'three';
+const SCALE=1.25;
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;document.body.appendChild(renderer.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xbfe3ff);
+scene.add(new THREE.HemisphereLight(0xffffff,0x6a8f4a,1.15));
+const sun=new THREE.DirectionalLight(0xffffff,1.6);sun.position.set(-8,20,-10);sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-14,right:14,top:14,bottom:-14,near:1,far:60});scene.add(sun);
+// checker ground like the reference's baseplate
+const tex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d');g.fillStyle='#7ccf3e';g.fillRect(0,0,64,64);g.fillStyle='#6fc236';g.fillRect(0,0,32,32);g.fillRect(32,32,32,32);
+ const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(30,30);t.magFilter=THREE.NearestFilter;return t})();
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(240,240),new THREE.MeshLambertMaterial({map:tex}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+const C={skin:0xf5cd30,torso:0x0d69ac,legs:0x287f47,wood:0xb28b5b,grip:0x2b2725};
+function box(w,h,d,color,x,y,z,parent){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color}));m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+function cyl(r,h,color,y,parent){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,18),new THREE.MeshLambertMaterial({color}));m.position.y=y;m.castShadow=true;parent.add(m);return m}
+function face(head,size){ // eyes + smile on the -z side: the way the character faces
+ const g=new THREE.Group();head.add(g);const k=size/1.2;
+ box(.16*k,.26*k,.02,0x111111,-.22*k,.12*k,-size/2-.01,g);box(.16*k,.26*k,.02,0x111111,.22*k,.12*k,-size/2-.01,g);box(.5*k,.08*k,.02,0x111111,0,-.22*k,-size/2-.01,g)}
+function makeBat(parent){
+ // BatArt.Fallback x 1.5 along +y from the grip: knob -.75, handle +-.675 (dark), neck .525-2.175, barrel 1.91-5.74
+ const g=new THREE.Group();parent.add(g);g.rotation.x=-Math.PI/2; // RightGrip: the handle's +y lies along the hand's front (-z)
+ g.scale.setScalar(1/SCALE);
+ cyl(.32,.21,C.grip,-.75,g);cyl(.21,1.35,C.grip,0,g);cyl(.255,1.65,C.wood,1.35,g);cyl(.48,3.83,C.wood,3.825,g);
+ const cap=new THREE.Mesh(new THREE.SphereGeometry(.48,18,10),new THREE.MeshLambertMaterial({color:C.wood}));cap.position.y=5.74;cap.scale.y=.35;g.add(cap);
+ const tip=new THREE.Object3D();tip.position.y=5.6;g.add(tip);const mid=new THREE.Object3D();mid.position.y=3.6;g.add(mid);
+ return {group:g,tip,mid};
+}
+function buildR15(){
+ const root=new THREE.Group();root.scale.setScalar(SCALE);scene.add(root);const J={};
+ box(2,.4,1,C.legs,0,2.2,0,root);                                     // LowerTorso
+ for(const s of [-1,1]){box(.98,1.02,1,C.legs,.5*s,1.5,0,root);box(.98,.95,1,C.legs,.5*s,.5,0,root)}
+ const waist=new THREE.Group();waist.position.set(0,2.4,0);root.add(waist);J.Waist=waist;
+ box(2,1.6,1,C.torso,0,.8,0,waist);
+ const head=box(1.2,1.2,1.2,C.skin,0,2.2,0,waist);face(head,1.2);
+ for(const side of ['Right','Left']){
+  const s=side==='Right'?1:-1;
+  const sh=new THREE.Group();sh.position.set(1*s,1.35,0);waist.add(sh);J[side+'Shoulder']=sh;
+  box(.98,1.1,.98,C.skin,.5*s,-.45,0,sh);
+  const el=new THREE.Group();el.position.set(.5*s,-.9,0);sh.add(el);J[side+'Elbow']=el;
+  box(.96,.85,.96,C.skin,0,-.4,0,el);
+  const wr=new THREE.Group();wr.position.set(0,-.8,0);el.add(wr);J[side+'Wrist']=wr;
+  box(.98,.3,.98,C.skin,0,-.15,0,wr);
+  if(side==='Right'){const grip=new THREE.Group();grip.position.set(0,-.2,0);wr.add(grip);J.bat=makeBat(grip)}
+ }
+ return {root,J};
+}
+function buildR6(){
+ const root=new THREE.Group();root.scale.setScalar(SCALE);scene.add(root);const J={};
+ const rj=new THREE.Group();rj.position.set(0,3,0);root.add(rj);J.RootJoint=rj;
+ box(2,2,1,C.torso,0,0,0,rj);const head=box(1.2,1.2,1.2,C.skin,0,1.6,0,rj);face(head,1.2);
+ for(const s of [-1,1])box(.98,2,1,C.legs,.5*s,-2,0,rj);
+ for(const side of ['Right','Left']){
+  const s=side==='Right'?1:-1;const sh=new THREE.Group();sh.position.set(s,.5,0);rj.add(sh);J[side+'Shoulder']=sh;
+  box(.98,2,.98,C.skin,.5*s,-.5,0,sh);
+  if(side==='Right'){const grip=new THREE.Group();grip.position.set(.5,-1.5,0);sh.add(grip);J.bat=makeBat(grip)}
+ }
+ return {root,J};
+}
+const rigs={R15:buildR15(),R6:buildR6()};
+const BASE={RightShoulder:[Math.SQRT1_2,Math.SQRT1_2,0,0]};
+function pose(frame){
+ for(const name of Object.keys(rigs))rigs[name].root.visible=name===frame.rig;
+ const rig=rigs[frame.rig];
+ for(const [name,g] of Object.entries(rig.J)){if(name==='bat')continue;const q=frame.joints[name]||[1,0,0,0];g.quaternion.set(q[1],q[2],q[3],q[0])}
+ rig.root.updateMatrixWorld(true);return rig;
+}
+function tipOf(frame,which){const rig=pose(frame);const v=new THREE.Vector3();(which==='mid'?rig.J.bat.mid:rig.J.bat.tip).getWorldPosition(v);return [v.x,v.y,v.z]}
+// overlays -------------------------------------------------------------------------------------------------------------------------------------
+const overlay=new THREE.Group();scene.add(overlay);
+function clearOverlay(){while(overlay.children.length){const c=overlay.children.pop();c.geometry&&c.geometry.dispose()}}
+function line(points,color,width){ // a ribbon of thin boxes so it shows in software WebGL at any width
+ for(let i=1;i<points.length;i++){const a=new THREE.Vector3(...points[i-1]),b=new THREE.Vector3(...points[i]);const len=a.distanceTo(b);if(len<1e-4)continue;
+  const m=new THREE.Mesh(new THREE.BoxGeometry(width,width,len),new THREE.MeshBasicMaterial({color}));m.position.copy(a).add(b).multiplyScalar(.5);m.lookAt(b);overlay.add(m)}}
+function sector(radius,half,color,opacity,y){
+ const s=new THREE.Shape();s.moveTo(0,0);const n=40;for(let i=0;i<=n;i++){const a=-half+2*half*i/n;s.lineTo(Math.sin(a)*radius,Math.cos(a)*radius)}s.lineTo(0,0);
+ const m=new THREE.Mesh(new THREE.ShapeGeometry(s),new THREE.MeshBasicMaterial({color,transparent:true,opacity,side:THREE.DoubleSide,depthWrite:false}));
+ m.rotation.x=-Math.PI/2;m.position.y=y;overlay.add(m); // the shape's +y -> world -z (in front of the character)
+ const ring=new THREE.Mesh(new THREE.CircleGeometry(4,32),new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=y+.01;overlay.add(ring)}
+function rect(w,d,color,opacity,y){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,d),new THREE.MeshBasicMaterial({color,transparent:true,opacity,depthWrite:false,side:THREE.DoubleSide}));m.rotation.x=-Math.PI/2;m.position.set(0,y,-d/2);overlay.add(m);
+ line([[-w/2,y+.02,0],[-w/2,y+.02,-d],[w/2,y+.02,-d],[w/2,y+.02,0],[-w/2,y+.02,0]],color,.12)}
+// views ----------------------------------------------------------------------------------------------------------------------------------------
+const VIEWS={
+ front34:{pos:[-10.5,7.8,-17.5],at:[.3,3.3,-2.2],fov:36},
+ side:{pos:[18,5.2,-2.6],at:[0,3.4,-2.6],fov:38},
+ top:{pos:[0,30,-4.5],at:[0,0,-4.5],fov:44,up:[0,0,-1]},
+ back34:{pos:[9,8.5,13],at:[0,3.4,-2],fov:38},
+};
+// the proposed swing trail (a Trail between two bat attachments, mid-barrel and tip): a ribbon over the trail window, fading toward its old end
+function ribbon(mids,tips,color,opacity){
+ const n=mids.length;if(n<2)return;const pos=[],col=[],idx=[];const c=new THREE.Color(color);
+ for(let i=0;i<n;i++){const a=(i/(n-1))**1.5*opacity;pos.push(...mids[i],...tips[i]);col.push(c.r,c.g,c.b,a*.35,c.r,c.g,c.b,a)}
+ for(let i=0;i<n-1;i++){const k=i*2;idx.push(k,k+1,k+2,k+1,k+3,k+2)}
+ const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,4));g.setIndex(idx);
+ overlay.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,depthWrite:false,side:THREE.DoubleSide})))}
+// the proposed hit impact: an 8-ray star (today's KeeperHitEffects burst, pooled) + a few sparks, facing the camera
+function burst(at,size,color){
+ const g=new THREE.Group();g.position.set(...at);g.quaternion.copy(camera.quaternion);overlay.add(g);
+ for(let i=0;i<8;i++){const a=i*Math.PI/4;const long=i%2?size*.62:size;const m=new THREE.Mesh(new THREE.PlaneGeometry(long,size*.13),new THREE.MeshBasicMaterial({color,transparent:true,opacity:.95,depthTest:false}));
+  m.position.set(Math.cos(a)*long*.62,Math.sin(a)*long*.62,0);m.rotation.z=a;g.add(m)}
+ const core=new THREE.Mesh(new THREE.CircleGeometry(size*.28,20),new THREE.MeshBasicMaterial({color:0xffffff,depthTest:false}));g.add(core);
+ for(let i=0;i<7;i++){const a=i*2.4+.3,r=size*(1.25+.25*(i%3));const sp=new THREE.Mesh(new THREE.CircleGeometry(size*.07,8),new THREE.MeshBasicMaterial({color:0xfff3b0,depthTest:false}));sp.position.set(Math.cos(a)*r,Math.sin(a)*r,0);g.add(sp)}
+}
+const camera=new THREE.PerspectiveCamera(40,1,.1,500);
+window.shoot=(frame,view,w,h,opts={})=>{
+ clearOverlay();
+ const v=VIEWS[view];camera.fov=v.fov;camera.aspect=w/h;camera.position.set(...v.pos);camera.up.set(...(v.up||[0,1,0]));camera.lookAt(...v.at);camera.updateProjectionMatrix();
+ if(opts.sector)sector(14,75*Math.PI/180,0xff7a00,.22,.03);
+ if(opts.box)rect(16,14,0x2060ff,.16,.05);
+ if(opts.trail&&opts.trail.length){for(const seg of opts.trail)line(seg.points,seg.color,seg.width||.16)}
+ if(opts.ribbon)ribbon(opts.ribbon.mids,opts.ribbon.tips,opts.ribbon.color,opts.ribbon.opacity||.85);
+ if(opts.burst)burst(opts.burst.at,opts.burst.size||1.6,opts.burst.color||0xffe8ac);
+ pose(frame);
+ renderer.setSize(w,h);renderer.render(scene,camera);return renderer.domElement.toDataURL('image/png');
+};
+window.tips=(frames,which)=>frames.map(f=>tipOf(f,which));
+window.ready=true;
+</script></body></html>

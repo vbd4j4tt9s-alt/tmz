@@ -91,7 +91,9 @@ function Effects.Start(model,style,selected,low,options)
   if closed then return end;closed=true
   if tickConnection then tickConnection:Disconnect()end
   if destroyConnection then destroyConnection:Disconnect()end
-  for part,saved in pairs(restore)do if part.Parent then part.Color=saved.Color;part.Material=saved.Material end end
+  -- R149 review part 2: a fruit that was picked and flies to the harvester (PlantGrowthFx) is no longer in this plant: it keeps its Neon coat until it lands,
+  -- instead of snapping back to its plain colour mid-flight when this clean-up runs.
+  for part,saved in pairs(restore)do if part.Parent and part:IsDescendantOf(model)then part.Color=saved.Color;part.Material=saved.Material end end
   folder:Destroy();table.clear(entries);table.clear(restore)
  end
  step(0)

@@ -1,0 +1,45 @@
+{
+ "note": "Cameras for the R151 hub snow render (render_base_area.mjs + base_area.html, the R151 base-area renderer). 'player' [x, z] is where the player stands in the scene run (hub_snow_scene.luau): the snow's level of detail - and, before R151, its whole radius - is around him; for the base and market shots the camera sits behind and above him like Roblox's default camera zoomed out (~45 studs), so the wide shot shows the ground (the drifts are low: at eye height the far ones are edge-on).",
+ "views": [
+  {
+   "name": "base",
+   "title": "Leaving Base 1, camera zoomed out (across the festival square to the market)",
+   "player": [-118, -186],
+   "fov": 70,
+   "pos": [-136, 40, -172],
+   "look": [30, 0, -320],
+   "avatars": [[-118, 4, -186, -2.1, 13775418]],
+   "shadowAt": [-20, 4, -260],
+   "shadowExtent": 300,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "market",
+   "title": "From the market, camera zoomed out (to the back of the hub and the display board)",
+   "player": [44, -316],
+   "fov": 70,
+   "pos": [40, 44, -290],
+   "look": [120, 0, -540],
+   "avatars": [[44, 4, -316, 2.4, 4285074]],
+   "shadowAt": [80, 4, -450],
+   "shadowExtent": 300,
+   "fogNear": 700,
+   "fogFar": 2000
+  },
+  {
+   "name": "aerial",
+   "title": "The whole hub from above the gate",
+   "player": [0, -150],
+   "fov": 62,
+   "pos": [0, 230, -40],
+   "look": [0, 0, -400],
+   "avatars": [],
+   "shadowAt": [0, 4, -360],
+   "shadowExtent": 420,
+   "fogNear": 900,
+   "fogFar": 3000
+  }
+ ],
+ "plan": {"w": 1400, "h": 1100, "ortho": [0, -361, 350, 275]}
+}

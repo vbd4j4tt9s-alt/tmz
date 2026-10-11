@@ -1,6 +1,7 @@
 -- R66: charge light at a fixed distance; a burst travels outward, never the emblem.
 local R={}
-function R.SeedAt(rank)return rank==8 and 3.35 or rank==7 and 2.45 or rank==6 and 1.35 or .1 end
+-- R136: Legendary (.7 s) and Mythic (1.0 s) get a short charge-up before the seed bursts out (was .1 like Common).
+function R.SeedAt(rank)return rank==8 and 3.35 or rank==7 and 2.45 or rank==6 and 1.35 or rank==5 and 1.0 or rank==4 and .7 or .1 end
 function R.Sample(rank,t,reduced)
  local at=R.SeedAt(rank);local charge=math.clamp(t/at,0,1);local age=math.max(0,t-at)
  local burst=t>=at;local release=math.clamp(age/.75,0,1)

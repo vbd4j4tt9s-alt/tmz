@@ -1,0 +1,39 @@
+# R149 part 1: the scripts (src paths) taken from the release commit into the part-1 tree.
+# Part-1 tree = 766ec4d + these files at the R149 release commit + their MANIFEST rows + Config.Version 'V150 R149p1' (git commit b198901, local only).
+# Rebuild: worktree at 766ec4d, git checkout <release> -- $(grep -v '^#' this file), add the 7 MANIFEST rows of the new ones, set Config.Version='V150 R149p1', commit = X;
+#   part 1: build_installer.py "R149 part 1" ChestChase_R149p1_Backup installers/R149_install_part1.lua --base 766ec4d   (in X)
+#   part 2: build_installer.py "R149 part 2" ChestChase_R149p2_Backup installers/R149_install_part2.lua --base X         (in the release tree)
+src/ReplicatedStorage/KeyboardTrack.lua
+src/StarterPlayer/StarterPlayerScripts/KeyboardTrack.client.lua
+src/StarterPlayer/StarterPlayerScripts/WeatherWorld149.client.lua
+src/ReplicatedStorage/WeatherWorld149.lua
+src/StarterPlayer/StarterPlayerScripts/SnowBiome149.client.lua
+src/ReplicatedStorage/SnowPatches149.lua
+src/ServerScriptService/ChestChaseServer/ZFightFix149.lua
+src/ServerScriptService/ChestChaseServer/MapService.lua
+src/ReplicatedStorage/KeeperAccents.lua
+src/StarterPlayer/StarterPlayerScripts/BeastAnimation.client.lua
+src/ServerScriptService/ChestChaseServer/MarketLayout.lua
+src/ServerScriptService/ChestChaseServer/BiomeVisuals.lua
+src/StarterPlayer/StarterPlayerScripts/WorldEvents.client.lua
+src/StarterPlayer/StarterPlayerScripts/StormWeather.client.lua
+src/StarterPlayer/StarterPlayerScripts/TrackHoleClient.client.lua
+src/ReplicatedStorage/KeyboardSurface149.lua
+src/ServerScriptService/ChestChaseServer/GardenFenceArt.lua
+src/ServerScriptService/ChestChaseServer/TrackHoleService.lua
+src/ReplicatedStorage/WeatherPresentation.lua
+src/StarterPlayer/StarterPlayerScripts/VerityClient.client.lua
+src/ReplicatedStorage/VerityPackArt.lua
+src/ReplicatedStorage/VerityVoice.lua
+src/ReplicatedStorage/VerityConfig.lua
+src/ServerScriptService/ChestChaseServer/VerityService.lua
+src/ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua
+src/ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua
+src/ReplicatedStorage/StudioTestHelp.lua
+src/ReplicatedStorage/VoidPackFx.lua
+src/StarterPlayer/StarterPlayerScripts/VeiledEventClient81.client.lua
+src/StarterPlayer/StarterPlayerScripts/SeedPackRender.client.lua
+src/ReplicatedStorage/VerityCatalog.lua
+src/ReplicatedStorage/SeedPackRenderer.lua
+src/ReplicatedStorage/PlantArtLava.lua
+src/ReplicatedStorage/PlantArtSnow.lua

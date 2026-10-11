@@ -1,0 +1,22 @@
+[
+  ["Workspace", "Keycap/Keyboard"],
+  ["Workspace", "Verity"],
+  ["StarterPlayer", "StarterPlayerScripts", "KeyboardBoot142"],
+  ["StarterPlayer", "StarterPlayerScripts", "KeyboardBoot143"],
+  ["StarterPlayer", "StarterPlayerScripts", "KeyboardBoot144"],
+  ["StarterPlayer", "StarterPlayerScripts", "KeyboardBoot145"],
+  ["StarterPlayer", "StarterPlayerScripts", "KeyboardBoot146"],
+  ["ReplicatedStorage", "KeyboardCore142"],
+  ["ReplicatedStorage", "KeyboardCore143"],
+  ["ReplicatedStorage", "KeyboardScene142"],
+  ["ReplicatedStorage", "KeyboardScene143"],
+  ["ReplicatedStorage", "KeyboardClient142"],
+  ["ReplicatedStorage", "KeyboardClient143"],
+  ["ReplicatedStorage", "KeyboardClient144"],
+  ["ReplicatedStorage", "KeyboardClient145"],
+  ["ReplicatedStorage", "KeyboardClient146"],
+  ["ReplicatedStorage", "Keyboard142State"],
+  ["ReplicatedStorage", "Keyboard143State"],
+  ["ServerScriptService", "ChestChaseServer", "KeyboardServer142"],
+  ["ServerScriptService", "ChestChaseServer", "KeyboardServer143"]
+]

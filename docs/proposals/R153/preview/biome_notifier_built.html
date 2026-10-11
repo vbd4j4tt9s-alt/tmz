@@ -1,0 +1,199 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Biome notifier B, as built</title>
+<style>
+/*FONTS*/
+*{box-sizing:border-box}
+body{margin:0;background:#0e141d;color:#dce6f2;font-family:'Mont',sans-serif}
+#sheet{width:1800px;padding:30px 32px 36px}
+h1{margin:0 0 6px;font-size:30px;font-weight:700;color:#fff}
+.sub{font-size:14px;line-height:1.5;color:#9fb0c6;max-width:1500px;margin:0 0 6px}
+.sec{margin:34px 0 4px;font-size:20px;font-weight:700;color:#8fe3ff}
+.secsub{font-size:13px;line-height:1.5;color:#8da0b8;margin:0 0 12px;max-width:1500px}
+.grid{display:flex;flex-wrap:wrap;gap:22px 24px}
+.cell{display:block}
+.frame{position:relative;overflow:hidden;border-radius:6px;box-shadow:0 0 0 1px #2a3547}
+.cap{margin-top:7px;font-size:13px;line-height:1.35;color:#c6d3e4}
+.cap b{color:#fff}
+.dim{color:#8da0b8}
+.tag{display:inline-block;min-width:34px;text-align:center;padding:1px 8px;border-radius:5px;font-weight:700;font-size:12px;color:#0e141d;margin-right:7px;background:#8fe3ff}
+.mrow{display:flex;gap:10px;margin-bottom:8px;align-items:center}
+.mlabel{width:104px;font-size:13px;font-weight:700;color:#fff}
+.mnote{width:250px;font-size:12px;line-height:1.4;color:#b9c8dc}
+.colhead{font-size:12px;color:#8da0b8;margin:0 0 4px}
+table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.45}
+th{background:#1a2333;color:#8fe3ff;text-align:left;padding:8px 10px;border:1px solid #2a3547}
+td{padding:8px 10px;border:1px solid #2a3547;vertical-align:top;background:#111927}
+td.k{font-weight:700;color:#fff;white-space:nowrap}
+</style></head><body><div id="sheet"></div>
+<script>
+const DATA=/*DATA*/null;
+const BUILT=DATA.built;
+// ------------------------------------------------------------------ helpers
+const rgb=(c,a)=>a==null?`rgb(${c[0]},${c[1]},${c[2]})`:`rgba(${c[0]},${c[1]},${c[2]},${a})`;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function h(tag,style,kids,text){const e=document.createElement(tag);if(style)Object.assign(e.style,style);if(text!=null)e.textContent=text;(kids||[]).forEach(k=>k&&e.appendChild(k));return e}
+const px=v=>(Math.round(v*100)/100)+'px';
+const mctx=document.createElement('canvas').getContext('2d');
+function tw(text,size,font){const fam=font==='FredokaOne'?'Fredoka One':'Mont',w=font==='FredokaOne'?400:500;mctx.font=`${w} ${size}px "${fam}"`;return mctx.measureText(text).width}
+// WCAG contrast
+const lin=c=>{c/=255;return c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4)};
+const lum=c=>.2126*lin(c[0])+.7152*lin(c[1])+.0722*lin(c[2]);
+const ratio=(a,b)=>{let x=lum(a),y=lum(b);if(x<y)[x,y]=[y,x];return(x+.05)/(y+.05)};
+// ------------------------------------------------------------------ the notifier, drawn from the numbers the real script produced (dump_built_notifier.luau)
+// A Roblox UIStroke draws OUTSIDE the glyphs, under the fill: CSS text-stroke is centred on the outline, so it is drawn twice as thick and the fill paints over its inner half (paint-order).
+// Shadow copy = the same text, dark, partly see-through, DROP px lower, with the same stroke (what the script builds). Fonts are stand-ins (Fredoka One for FredokaOne, Montserrat for GothamMedium).
+const fade=(base,alpha)=>base+(1-base)*alpha; // the script's rule: every transparency fades from its resting value to 1
+function labelEl(l,grpW,alpha,isShadow){
+ const fam=l.Font==='FredokaOne'?'"Fredoka One"':'"Mont"',wgt=l.Font==='FredokaOne'?400:500;
+ const ta=1-fade(l.TextT,alpha),sa=1-fade(l.Edge.T,alpha);
+ return h('div',{position:'absolute',left:px(-20+l.X+20),top:px(l.Y),width:px(grpW+40),height:l.H+'px',textAlign:'center',whiteSpace:'nowrap',
+  font:`${wgt} ${l.Size}px/${l.H}px ${fam}`,color:rgb(l.Color,ta),WebkitTextStroke:`${2*l.Edge.Thickness}px ${rgb(l.Edge.Color,sa)}`,paintOrder:'stroke fill',strokeLinejoin:'round',zIndex:isShadow?1:2},[],l.Text);
+}
+// b = one biome snapshot of one device; alpha = fade (1 invisible .. 0 fully shown); y = settle offset px. Returns the element placed in the safe area (as HudNotices does) and its measured box.
+function notice(b,alpha,y){
+ const w=Math.ceil(Math.max(tw(b.Label,b.Name.Size,'FredokaOne'),tw('entering',b.Caption.Size,'GothamMedium')));
+ const g=h('div',{position:'absolute',left:px(b.Row.X-w/2),top:px(b.Row.Y),width:w+'px',height:b.Group.H+'px'});
+ const c=h('div',{position:'absolute',left:0,top:0,width:'100%',height:'100%',transform:`translateY(${y}px)`});
+ [b.CaptionShadow,b.NameShadow].forEach(l=>c.appendChild(labelEl(l,w,alpha,true)));
+ [b.Caption,b.Name].forEach(l=>c.appendChild(labelEl(l,w,alpha,false)));
+ g.appendChild(c);return {el:g,w,h:b.Group.H};
+}
+// the timeline sample at (or just after) t seconds
+function sampleAt(tl,t){for(const s of tl)if(s.T>=t-1e-9)return s;return tl[tl.length-1]}
+// ------------------------------------------------------------------ backgrounds: the mock track of the earlier preview (sky, keyboard in perspective, runner from behind)
+const BAR=44;
+const DEV={pc:{key:'pc',name:'PC 1280 x 720',w:1280,h:720},land:{key:'land',name:'phone landscape 844 x 390',w:844,h:390},port:{key:'port',name:'phone portrait 390 x 844',w:390,h:844}};
+const PAL={
+ Forest:{sky:[[104,166,234],[196,226,247]],keys:[[26,140,92],[150,192,72],[60,158,70],[34,112,74]],ground:[66,150,76],far:[84,150,92],cloud:'rgba(255,255,255,.5)'},
+ Lava:{sky:[[50,34,62],[218,108,66]],keys:[[54,44,48],[84,50,44],[40,34,40],[230,98,40]],ground:[54,38,42],far:[74,42,46],cloud:'rgba(110,60,64,.35)'},
+ Storm:{sky:[[70,104,176],[176,198,234]],keys:[[74,96,136],[112,134,174],[52,70,108],[94,116,156]],ground:[64,84,120],far:[84,104,142],cloud:'rgba(34,46,80,.42)'},
+};
+const mix=(a,b,t)=>[0,1,2].map(i=>Math.round(a[i]+(b[i]-a[i])*t));
+const bgCache={};
+function bgFor(devKey,biome){
+ const k=devKey+biome;if(bgCache[k])return bgCache[k];
+ const dev=DEV[devKey],w=dev.w,H=dev.h,P=PAL[biome];
+ const c=document.createElement('canvas');c.width=w;c.height=H;const g=c.getContext('2d');
+ let seed=biome.length*977+w;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+ const land=w>H,hy=Math.round(H*(land?.42:.34));
+ const sg=g.createLinearGradient(0,0,0,hy);sg.addColorStop(0,rgb(P.sky[0]));sg.addColorStop(1,rgb(P.sky[1]));g.fillStyle=sg;g.fillRect(0,0,w,hy+2);
+ const nC=biome==='Forest'?5:7;
+ for(let i=0;i<nC;i++){const cx=rnd()*w,cy=hy*(.12+rnd()*.55),r=(land?30:22)*(.6+rnd()*.8);g.fillStyle=P.cloud;
+  for(let j=0;j<5;j++){g.beginPath();g.ellipse(cx+(j-2)*r*.7,cy+Math.sin(j*2)*r*.15,r,r*.5,0,0,7);g.fill()}}
+ g.fillStyle=rgb(P.far);g.beginPath();g.moveTo(0,hy);
+ for(let x=0;x<=w;x+=12){const n=Math.sin(x*.011+biome.length)*.5+Math.sin(x*.027)*.3;
+  const hh=biome==='Storm'?(Math.abs(Math.sin(x*.016))*26+8)*(land?1:.7):biome==='Lava'?(Math.max(0,1-Math.abs(x-w*.7)/(w*.16))*40+6):(10+n*8);g.lineTo(x,hy-Math.max(2,hh))}
+ g.lineTo(w,hy);g.fill();g.fillStyle=rgb(P.ground);g.fillRect(0,hy,w,H-hy);
+ const rows=[];let y=H+40;
+ while(true){const s=(y-hy)/(H-hy),kw=w*(land?.17:.36)*s,rh=Math.max(1,kw*.42);rows.push({y1:y,y0:y-rh,kw});y-=rh;if(y-hy<2)break}
+ const letters='QWERTYUIOPASDFGHJKLZXCVBNM';
+ for(let i=rows.length-1;i>=0;i--){
+  const r=rows[i],gap=Math.max(.6,r.kw*.05),top=r.y1-r.y0,face=top*.24,cols=Math.ceil(w/r.kw)+3,off=((i*37)%10)/10*r.kw*.4;
+  for(let cI=-1;cI<cols;cI++){
+   const x=w/2+(cI-cols/2)*r.kw+off-r.kw*.2,col=P.keys[Math.floor(rnd()*P.keys.length)];
+   g.fillStyle=rgb(mix(col,[0,0,0],.4));g.fillRect(x+gap,r.y1-face-gap,r.kw-gap*2,face);
+   g.fillStyle=rgb(col);g.fillRect(x+gap,r.y0+gap*.5,r.kw-gap*2,top-face-gap*1.5);
+   g.fillStyle='rgba(255,255,255,.14)';g.fillRect(x+gap,r.y0+gap*.5,r.kw-gap*2,Math.max(.6,top*.06));
+   if(r.kw>26){g.fillStyle=rgb(mix(col,[0,0,0],.7));g.font=`700 ${Math.round(Math.min(r.kw*.34,top*.6))}px Mont`;g.textAlign='center';g.textBaseline='middle';
+    g.fillText(letters[Math.floor(rnd()*letters.length)],x+r.kw/2,r.y0+(top-face)/2+gap)}
+  }
+ }
+ const hzH=Math.max(24,(H-hy)*.22),hz=g.createLinearGradient(0,hy,0,hy+hzH);hz.addColorStop(0,rgb(P.sky[1],.75));hz.addColorStop(1,rgb(P.sky[1],0));g.fillStyle=hz;g.fillRect(0,hy,w,hzH);
+ const u=H*(land?.0078:.0062),cx=w/2,by=H*.93;
+ g.fillStyle='#22305a';g.fillRect(cx-4*u,by-8*u,3.4*u,8*u);g.fillRect(cx+.6*u,by-8*u,3.4*u,8*u);
+ g.fillStyle='#d6453d';g.fillRect(cx-5*u,by-18*u,10*u,10.5*u);
+ g.fillStyle='#e6b98a';g.fillRect(cx-7.5*u,by-17.5*u,2.5*u,8*u);g.fillRect(cx+5*u,by-17.5*u,2.5*u,8*u);
+ g.beginPath();g.arc(cx,by-22*u,4*u,0,7);g.fill();g.fillStyle='#5a3a22';g.beginPath();g.arc(cx,by-23*u,4*u,3.3,6.1);g.fill();
+ return bgCache[k]=c.toDataURL('image/png');
+}
+function topbar(){
+ const bar=h('div',{position:'absolute',left:0,top:0,width:'100%',height:BAR+'px'});
+ [[12,'☰'],[58,'✉']].forEach(([x,ch])=>bar.appendChild(h('div',{position:'absolute',left:x+'px',top:'4px',width:'36px',height:'36px',borderRadius:'50%',background:'rgba(18,22,30,.55)',color:'rgba(255,255,255,.85)',font:'700 16px/36px "Mont"',textAlign:'center'},[],ch)));
+ return bar;
+}
+function panel(devKey,biome,bk,alpha,y,crop){
+ const dev=DEV[devKey];crop=crop||{x:0,y:0,w:dev.w,h:dev.h};
+ const frame=h('div',{width:crop.w+'px',height:crop.h+'px'});frame.className='frame';
+ const screen=h('div',{position:'absolute',left:px(-crop.x),top:px(-crop.y),width:dev.w+'px',height:dev.h+'px',backgroundImage:`url(${bgFor(devKey,biome)})`});
+ screen.appendChild(topbar());
+ const safe=h('div',{position:'absolute',left:0,top:BAR+'px',width:dev.w+'px',height:(dev.h-BAR)+'px'});
+ safe.appendChild(notice(BUILT.Devices[devKey].Biomes[bk],alpha,y).el);screen.appendChild(safe);frame.appendChild(screen);return frame;
+}
+const ids=['1','6','2','3','4','5','7'];
+const section=(t,s)=>{const f=document.createDocumentFragment();f.appendChild(Object.assign(h('div'),{className:'sec',textContent:t}));if(s)f.appendChild(Object.assign(h('div'),{className:'secsub',innerHTML:s}));return f};
+const grid=()=>Object.assign(h('div'),{className:'grid'});
+function cellOf(node,capHtml){const c=h('div');c.className='cell';c.style.width=node.style.width;c.appendChild(node);if(capHtml)c.appendChild(Object.assign(h('div'),{className:'cap',innerHTML:capHtml}));return c}
+// a flat sky patch with the notice on it: the biome's own colours (BiomeMood air / horizon) and the harsh cases
+function patch(devKey,bk,bg,pw,ph){
+ const b=BUILT.Devices[devKey].Biomes[bk];const f=h('div',{width:pw+'px',height:ph+'px'});f.className='frame';
+ f.style.background=typeof bg==='string'?bg:rgb(bg);
+ const n=notice(b,0,0);n.el.style.top=px((ph-b.Group.H)/2);n.el.style.left=px(pw/2-n.w/2);f.appendChild(n.el);return f;
+}
+function skiesFor(bk){
+ const s=BUILT.Skies[bk];
+ return [['own sky (air)',s.Air],['own horizon haze',s.Decay],['white cloud',[255,255,255]],['slate sky',[70,104,176]],['night',[10,12,20]]];
+}
+// ------------------------------------------------------------------ the sheet
+function build(){
+ const S=document.getElementById('sheet');
+ S.appendChild(Object.assign(h('div'),{innerHTML:`<h1>Biome notifier B (text only), as built</h1>
+ <div class="sub">Drawn from the numbers of the real <b>BiomeEntryNotifier.client.lua</b> (run on the Roblox mock for every biome on the three screens: text sizes, UIStroke thickness and colour, the shadow copies and their transparency,
+ the fade and settle timeline, the <b>HudNoticeLayout</b> row) and the real colours (BiomeTitleStyle, the sky colours of BiomeMood). True pixel size (1 px = 1 Roblox px) on the mock track of the earlier preview; the strip at the top of
+ each screen is a mock of Roblox's top bar. Fonts are stand-ins (Fredoka One for FredokaOne, Montserrat for GothamMedium) so widths are close, not exact; Roblox's UIStroke and text rendering will differ a little in the details.</div>`}));
+ // 1. three screens, Storm Peaks
+ S.appendChild(section('1. Storm Peaks on the three screens (fully shown)','Phone landscape (whole screen), phone portrait (top 230 px) and PC (top 215 px). No box, no logo: two lines of text, dark edge, soft shadow.'));
+ let g=grid();
+ [['land','Storm',null],['port','Storm',{x:0,y:0,w:390,h:230}],['pc','Storm',{x:0,y:0,w:1280,h:215}]].forEach(([d,b,crop])=>{
+  const bk='7',nb=BUILT.Devices[d].Biomes[bk];const w=Math.ceil(Math.max(tw(nb.Label,nb.Name.Size,'FredokaOne'),tw('entering',nb.Caption.Size,'GothamMedium')));
+  g.appendChild(cellOf(panel(d,b,bk,0,0,crop),`<b>${DEV[d].name}</b>: ${w} x ${nb.Group.H} px (${(100*w*nb.Group.H/(DEV[d].w*DEV[d].h)).toFixed(2)}% of the screen) &middot; ${nb.Name.Size} px name, ${nb.Caption.Size} px "entering" &middot; edge ${nb.Name.Edge.Thickness} / ${nb.Caption.Edge.Thickness} px &middot; reserved row ${nb.Row.W} x ${nb.Row.H}`));
+ });
+ S.appendChild(g);
+ // 2. readability matrix, PC size
+ const note=(bk)=>{const st=BUILT.Styles[bk],d=BUILT.Devices.pc.Biomes[bk],edge=d.Name.Edge.Color,fill=st.Color;let worst=1e9,ws='';
+  skiesFor(bk).forEach(([n,c])=>{const best=Math.max(ratio(fill,c),ratio(edge,c));if(best<worst){worst=best;ws=n}});
+  return `fill vs edge <b>${ratio(fill,edge).toFixed(1)}:1</b><br>worst sky (${ws}): <b>${worst.toFixed(1)}:1</b><br><span class="dim">best of fill / edge vs the sky</span>`};
+ S.appendChild(section('2. Readable on every biome and every sky (PC size, 24 px / 2 px edge)','Each biome name on its own sky colours (BiomeMood air and horizon haze: the brightest it gets), on a white cloud, on a mid slate sky and at night. Flat colours: the harshest case, no clouds or track to help. The edge is the same dark ink for every biome (no per-biome tweak was needed): the fill is at least 6.6:1 against it and, over every sky tried, the edge or the fill is at least 3.4:1 against the sky.'));
+ const head=h('div');head.className='mrow';head.appendChild(h('div',{width:'104px'}));
+ ['own sky (air)','own horizon haze','white cloud','slate sky','night'].forEach(n=>head.appendChild(Object.assign(h('div',{width:'250px'}),{className:'colhead',textContent:n})));head.appendChild(h('div',{width:'250px'}));S.appendChild(head);
+ ids.forEach(bk=>{
+  const row=h('div');row.className='mrow';row.appendChild(h('div',null,[],BUILT.Styles[bk].Label));row.firstChild.className='mlabel';
+  skiesFor(bk).forEach(([n,c])=>row.appendChild(patch('pc',bk,c,250,84)));
+  row.appendChild(Object.assign(h('div'),{className:'mnote',innerHTML:note(bk)}));S.appendChild(row);
+ });
+ // 3. the same on a landscape phone: the smallest text
+ S.appendChild(section('3. The same on a landscape phone (19 px name, 11 px "entering", 1.5 / 1.25 px edge)','The smallest size, so the hardest. Same skies.'));
+ ids.forEach(bk=>{
+  const row=h('div');row.className='mrow';row.appendChild(h('div',null,[],BUILT.Styles[bk].Label));row.firstChild.className='mlabel';
+  skiesFor(bk).forEach(([n,c])=>row.appendChild(patch('land',bk,c,200,64)));S.appendChild(row);
+ });
+ // 4. motion
+ const tl=BUILT.Timeline.Normal,tr=BUILT.Timeline.Reduced;
+ S.appendChild(section('4. Motion (PC, Storm Peaks, from the script\'s own frames)',`Fades in over 0.3 s while it settles down 6 px, fully shown to 1.8 s, fades out over 0.6 s: <b>${BUILT.Total.toFixed(1)} s</b> on screen (${BUILT.Total.toFixed(2)} s measured at 60 fps). Nothing else moves. Reduced Motion: the same fade, no settle.`));
+ const TS=[0,.1,.2,.3,1.0,2.0,2.2,2.35];
+ [['Normal',tl],['Reduced Motion',tr]].forEach(([label,line])=>{
+  const row=h('div');row.className='mrow';row.appendChild(Object.assign(h('div'),{className:'mlabel',textContent:label}));
+  TS.forEach(t=>{const s=sampleAt(line,t);
+   const dev=DEV.pc,fr=h('div',{width:'190px',height:'74px'});fr.className='frame';
+   const b=BUILT.Devices.pc.Biomes['7'];
+   const sc=h('div',{position:'absolute',left:px(-(dev.w/2-95)),top:px(-(BAR+b.Row.Y-12)),width:dev.w+'px',height:dev.h+'px',backgroundImage:`url(${bgFor('pc','Storm')})`});
+   sc.appendChild(topbar());
+   const safe=h('div',{position:'absolute',left:0,top:BAR+'px',width:dev.w+'px',height:(dev.h-BAR)+'px'});safe.appendChild(notice(b,s.NameT,s.Y).el);sc.appendChild(safe);fr.appendChild(sc);
+   const c=h('div');c.className='cell';c.style.width='190px';c.appendChild(fr);c.appendChild(Object.assign(h('div'),{className:'cap',innerHTML:`t = ${t.toFixed(2)} s &middot; fade ${(100*(1-s.NameT)).toFixed(0)}% &middot; y ${s.Y} px`}));row.appendChild(c);
+  });S.appendChild(row);
+ });
+ // 5. numbers
+ S.appendChild(section('5. Numbers (Storm Peaks, the longest name)'));
+ let html='<table><tr><th>Screen</th><th>Text block</th><th>Sizes</th><th>Edge (UIStroke) and shadow</th><th>Reserved row</th><th>Where</th></tr>';
+ [['pc','94 x 490'],['land','58 x 490'],['port','94 x 490']].forEach(([d,old])=>{
+  const nb=BUILT.Devices[d].Biomes['7'];const w=Math.ceil(Math.max(tw(nb.Label,nb.Name.Size,'FredokaOne'),tw('entering',nb.Caption.Size,'GothamMedium')));
+  html+=`<tr><td class="k">${DEV[d].name}</td><td><b>${w} x ${nb.Group.H}</b> px<br><span class="dim">${(100*w*nb.Group.H/(DEV[d].w*DEV[d].h)).toFixed(2)}% of the screen</span></td>
+  <td>name ${nb.Name.Size} px (FredokaOne)<br>"entering" ${nb.Caption.Size} px (GothamMedium)</td>
+  <td>name edge ${nb.Name.Edge.Thickness} px, "entering" edge ${nb.Caption.Edge.Thickness} px, solid dark (${nb.Name.Edge.Color.join(',')})<br>shadow copy ${nb.NameShadow.Y-nb.Name.Y} px lower, text ${Math.round(100*(1-nb.NameShadow.TextT))}% and edge ${Math.round(100*(1-nb.NameShadow.Edge.T))}% opaque</td>
+  <td><b>${nb.Row.W} x ${nb.Row.H}</b> px<br><span class="dim">was ${old} (box)</span></td><td>top centre, ${nb.Row.Y} px under the top of the safe area</td></tr>`;
+ });
+ html+='</table>';S.appendChild(Object.assign(h('div'),{innerHTML:html}));
+ const names=ids.map(bk=>BUILT.Styles[bk].Label+' '+rgb(BUILT.Styles[bk].Color)).join(' &middot; ');
+ S.appendChild(Object.assign(h('div',{marginTop:'10px'}),{className:'secsub',innerHTML:`Biome colours (BiomeTitleStyle.Color): ${names}. Words: "entering" (lowercase, white, 8% see-through) over the Title Case name (BiomeTitleStyle.Label).`}));
+}
+Promise.all(['400 40px "Fredoka One"','500 14px "Mont"','600 14px "Mont"','700 14px "Mont"'].map(f=>document.fonts.load(f))).then(()=>document.fonts.ready).then(()=>{build();window.ready=true});
+</script></body></html>

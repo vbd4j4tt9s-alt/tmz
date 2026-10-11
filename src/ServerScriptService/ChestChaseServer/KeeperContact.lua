@@ -1,5 +1,7 @@
 -- R52. A keeper can commit its strike only while visible body geometry overlaps
 -- a real character body part. Accessories, tools and invisible roots cannot hit.
+-- R152: face parts (both faces of the baked models: KeeperFaceState) and cosmetic pieces (KeeperCosmetic: the Crystal Knight's
+-- Sword_Point past today's blade) never hit; a keeper's parts are listed again when its body is swapped (BeastModels).
 local Contact={}
 local RS=game:GetService('ReplicatedStorage');local Strike=require(RS:WaitForChild('KeeperStrikeFrames'));local PartPose=require(RS:WaitForChild('KeeperUpgradePose'))
 local bodies={Head=true,Torso=true,UpperTorso=true,LowerTorso=true,
@@ -7,12 +9,16 @@ local bodies={Head=true,Torso=true,UpperTorso=true,LowerTorso=true,
  LeftUpperArm=true,LeftLowerArm=true,LeftHand=true,RightUpperArm=true,RightLowerArm=true,RightHand=true,
  LeftUpperLeg=true,LeftLowerLeg=true,LeftFoot=true,RightUpperLeg=true,RightLowerLeg=true,RightFoot=true}
 local cache=setmetatable({},{__mode='k'})
+function Contact.Hits(part)
+ return not part:GetAttribute('VeiledCosmetic')and not part:GetAttribute('KeeperFaceState')and not part:GetAttribute('KeeperCosmetic')
+end
 function Contact.Parts(keeper)
- local parts=cache[keeper];if parts then return parts end
- parts={};for _,part in ipairs(keeper:GetDescendants())do
-  if part:IsA('BasePart')and part~=keeper.PrimaryPart and part.Transparency<.95 and part.Size.Magnitude>.15 and not part:GetAttribute('VeiledCosmetic')and not part:FindFirstAncestor('ColossusSurges')then table.insert(parts,part)end
+ local body=keeper:FindFirstChild('BeastBody')
+ local entry=cache[keeper];if entry and entry.Body==body then return entry.Parts end
+ local parts={};for _,part in ipairs(keeper:GetDescendants())do
+  if part:IsA('BasePart')and part~=keeper.PrimaryPart and part.Transparency<.95 and part.Size.Magnitude>.15 and Contact.Hits(part)and not part:FindFirstAncestor('ColossusSurges')then table.insert(parts,part)end
  end
- cache[keeper]=parts;return parts
+ cache[keeper]={Body=body,Parts=parts};return parts
 end
 function Contact.Touching(keeper,character)
  local root=character and character:FindFirstChild('HumanoidRootPart')
@@ -23,7 +29,8 @@ function Contact.Touching(keeper,character)
  params.FilterDescendantsInstances={character};params.RespectCanCollide=false;params.MaxParts=0
  local stage=keeper:GetAttribute('CreatureStage')or keeper:GetAttribute('Stage')
  local frame=keeper.PrimaryPart and keeper.PrimaryPart.CFrame
- local targets=not special and stage and Strike.Frames(stage,workspace:GetServerTimeNow(),keeper:GetAttribute('KeeperAttackAt'))
+ local body=not special and keeper:FindFirstChild('BeastBody')
+ local targets=not special and stage and Strike.Frames(stage,workspace:GetServerTimeNow(),keeper:GetAttribute('KeeperAttackAt'),nil,body and body:GetAttribute('KeeperMeshVariant'))
  if not special and frame and targets then
   for _,part in ipairs(Contact.Parts(keeper))do
    local rest=part:GetAttribute('RestCFrame');local group=part:GetAttribute('BeastGroup')

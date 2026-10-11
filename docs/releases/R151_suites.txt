@@ -1,0 +1,68 @@
+# R151 full suite run on the release commit (557d5ce src = the installer's final tree). 64 suites.
+# The two FAIL lines below were frozen-file guards pinning Config.lua (Version 'V150 R151' + TrainingInterval 1/5, both intended); guards updated, both re-run: PASS.
+PASS R127 2s :: 53 checks, 0 failures 25 checks, 0 failures 
+PASS R128 1s :: 8 checks, 0 failures 22 checks, 0 failures 21 checks, 0 failures 
+PASS R129 2s :: 119 checks, 0 failures 20 checks, 0 failures 
+PASS R130 1s :: 30 checks, 0 failures 11 checks, 0 failures 38 checks, 0 failures 
+PASS R131 4s :: 11 checks, 0 failures 11 checks, 0 failures 
+PASS R132 1s :: 45 checks, 0 failures 14 checks, 0 failures 
+PASS R134 3s :: 69 checks, 0 failures 
+PASS R135 1s :: 57 checks, 0 failures 
+PASS R136 1s :: 24 checks, 0 failures 
+PASS R137 12s :: 43 checks, 0 failures 22 checks, 0 failures 11 checks, 0 failures 14 checks, 0 failures 
+PASS R138 2s :: 18 checks, 0 failures 16 checks, 0 failures 18 checks, 0 failures 436 checks, 0 failures 
+PASS R139 1s :: 33 checks, 0 failures 21 checks, 0 failures 
+PASS R140 1s :: 129 checks, 0 failures 71 checks, 0 failures 
+PASS R147 4s :: 285 checks, 0 failures 187 checks, 0 failures 
+PASS audio_R123 1s :: sync checks 37, fails 0 
+PASS boots_R117 1s :: 374 checks, 0 failures 637 checks, 0 failures 
+PASS borders_R123 0s :: 2455 checks, 0 failures 
+PASS bushes_R124 0s :: 112 checks, 0 failures 
+PASS giving_R122 1s :: 186/186 checks passed 35/35 checks passed 
+PASS holes_R122 1s :: PASS: 106 checks, 0 failures PASS: 79 checks, 0 failures 
+PASS perf_R121 13s :: random toggles: 20000 steps x 12 views, mismatches	0 
+PASS polish_R124 1s :: 61 checks, 0 failures 11 checks, 0 failures 85 checks, 0 failures 11 checks, 0 failures 
+PASS shop_R120 91s :: 15 checks, 0 failures 6043 checks, 0 failures 
+PASS trails_R117 0s :: 241 checks, 0 failed 
+PASS trails_R118 1s :: 174 checks, 0 failed 241 checks, 0 failed 
+PASS treadmill_bonus_R123 2s :: test_server: 109/109 checks passed test_client: 129/129 checks passed test_layout: 718/718 checks passed 
+PASS veiled_R122 2s :: event checks 128, fails 0 art checks 73, fails 0 arrival checks 46, fails 0 
+PASS wall_notifier_R122run_wall 0s :: wall checks 168, fails 0 
+PASS R147run_keyboard 35s :: 465 checks, 0 failures 
+PASS R147run_verity 2s :: 185 checks, 0 failures 242 checks, 0 failures 
+PASS R147run_verity_art 2s :: 387 checks, 0 failures 
+PASS R147run_verity_pack 7s :: 170 checks, 0 failures 
+PASS R147run_verity_ui 2s :: 339 checks, 0 failures 
+PASS R148run_index_limited 64s :: ok   Storm: base64 -> zstd frame (content size 36864, no checksum) -> 36864 bytes of RGBA ok   Mech: base64 -> zstd frame (content size 36864, no checksum) -> 36864 bytes of RGBA ok   Limited: base64 -> zstd frame (content size 36864, no checksum) -> 36864 bytes of RGBA 216 checks, 0 failures 
+PASS R148run_purchase 2s :: 329 checks, 0 failures 71 checks, 0 failures 75 checks, 0 failures 
+PASS R148run_roster 53s :: 257 checks, 0 failures 978 checks, 0 failures 
+PASS R149run_tiger_gear 0s :: == static checks 505 checks, 0 failures 
+PASS R149run_weather 3s :: 192 checks, 0 failures 64 checks, 0 failures PASS: 41 checks, 0 failures 
+PASS R149run_fruit_models 168s :: R149 fruit mesh fallback (content): 12 checks, 0 failures R149 fruit mesh fallback (server): 10 checks, 0 failures R149 fruit mesh fallback (serverok): 6 checks, 0 failures R149 fruit mesh fallback (garden): 7 checks, 0 failures 
+PASS R149run_verity 4s :: 124 checks, 0 failures 185 checks, 0 failures 242 checks, 0 failures all Verity suites passed 
+PASS R149run_verity_pack 5s :: 673 checks, 0 failures 944 checks, 0 failures all Verity pouch checks passed 
+PASS R149run_keyboard 35s :: 465 checks, 0 failures 
+PASS R149run_growth 102s :: growth fx: 147 checks, 0 failures growth client: 53 checks, 0 failures growth hotbar: 36 checks, 0 failures growth unripe: 34 checks, 0 failures 
+PASS R149run_market 1s :: market tops: 6 checks, 0 failures 
+PASS R149run_zfight 33s :: scene before/start: 10341 parts, 17 steps ok, 0 failed scene before/snow: 11272 parts, 17 steps ok, 0 failed scene after/start: 9366 parts, 17 steps ok, 0 failed scene after/snow: 12502 parts, 17 steps ok, 0 failed 
+PASS R150run_bonus_ui 11s :: test_bonus_style: 188/188 checks passed test_bonus_ui: 372/372 checks passed test_bonus_audio: 37/37 checks passed test_bonus_layout: 5467/5467 checks passed 
+PASS R150run_pedestal 1s :: 57 checks, 0 failures 156 checks, 0 failures 
+PASS R150run_sfx 5s :: R150 server checks 25, fails 0 == tools/tests/test_fast_travel (R150: arrival whoosh + Denied kinds; R150 review: its stale R114 'phone: centred and fits' check, a failure since R140, now checks the pair + DAILY / INVITE group) 70 checks, ALL PASS R150 SFX suites passed 
+FAIL R151run_hub_displays 0s :: 
+PASS R151run_announce 2s :: test_client: 92/92 checks passed test_settings: 46/46 checks passed test_settings_client: 27/27 checks passed R151 announcement suites passed 
+PASS R151run_rare_pull 61s :: test_bonus_ui: 372/372 checks passed test_bonus_audio: 37/37 checks passed test_bonus_layout: 5467/5467 checks passed R151 pull reveal suites passed 
+PASS R151run_packs 112s :: 4117 checks, 0 failures 98 checks, 0 failures all pack shape checks passed all pack checks passed 
+PASS R151run_base_area 56s :: R151 base area: 67 passed, 0 failed R151 hub trees: 57 passed, 0 failed R151 base area suite passed 
+PASS R151run_perf 29s :: 75 checks, 0 failures 
+PASS R151run_offline 3s :: 61 checks, 0 failures 11 checks, 0 failures 85 checks, 0 failures 11 checks, 0 failures 
+PASS R151run_fruit_fixes 84s :: verity face: 57 checks, 0 failures 201 checks, 0 failures fruit flight: 3362 checks, 0 failures R151 fruit fixes passed (pass "all" as the 2nd argument to run the older suites too) 
+PASS R151run_verity_pouch 3s :: 944 checks, 0 failures all Verity pouch checks passed 
+PASS R151run_pack_shapes 27s :: 4117 checks, 0 failures 98 checks, 0 failures all pack shape checks passed 
+PASS R151run_cloudy 8s :: 175 checks, 0 failures 79 checks, 0 failures R151 Cloudy lanterns on the owner's place: 30 passed, 0 failed R151 Cloudy suites passed 
+PASS R151run_hub_trees 1s :: R151 hub trees: 57 passed, 0 failed 
+PASS R151run_speed_popups 7s :: == static checks test_speed_popups_style: test_speed_popups_style: 183 checks, 0 failed test_speed_popups_client: test_speed_popups_client: 339 checks, 0 failed R151 speed popups suites passed 
+PASS R151run_treadmills 12s :: R151 treadmills: 243 passed, 0 failed treadmill dress checks: all passed 532 checks, 0 failures R151 treadmill suites passed 
+FAIL R151run_badges 0s :: sha256sum: WARNING: 1 computed checksum did NOT match FAIL: a frozen file (odds / rules / config) changed 
+PASS R151static_checks 1s :: 
+PASS R151run_hub_displays (re-run after the guard update)
+PASS R151run_badges (re-run after the guard update)

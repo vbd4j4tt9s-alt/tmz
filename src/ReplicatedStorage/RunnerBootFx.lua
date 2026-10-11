@@ -67,11 +67,11 @@ function X.Install(E,emitter)
   if #a.Coils>0 then
    local coil=r.Theme.Coils
    if want and not b.Reduced then
-    -- Four brightness steps; colours are only written when a coil changes step.
+    -- R153: the glow runs up the coils smoothly (it jumped between four brightness steps); a colour is written when it moved by 1/250.
     local phase=now*coil.Speed*(1+math.clamp(speed/120,0,1.5))
     for _,c in ipairs(a.Coils)do
-     local k=math.floor(((math.sin(phase-c.Index*1.3)+1)*.5)^2*3+.5)
-     if c.Step~=k then c.Step=k;c.Part.Color=c.Color:Lerp(coil.Hot,k/3*.85)end
+     local k=((math.sin(phase-c.Index*1.3)+1)*.5)^2
+     if c.Step==nil or math.abs(c.Step-k)>=.004 then c.Step=k;c.Part.Color=c.Color:Lerp(coil.Hot,k*.85)end
     end
    else
     for _,c in ipairs(a.Coils)do if c.Step~=nil then c.Step=nil;c.Part.Color=c.Color end end
@@ -159,7 +159,7 @@ function X.Install(E,emitter)
   for i,p in ipairs(m.Ring)do
    local angle=(i-1)*2*math.pi/RING
    p.Size=V(width,.06,length);p.CFrame=CF(m.Center+V(math.cos(angle)*radius,.05,math.sin(angle)*radius))*CFrame.Angles(0,-angle,0)
-   if math.abs(p.Transparency-a)>=.04 or a>=1 then p.Transparency=a end
+   if math.abs(p.Transparency-a)>=.01 or a>=1 then p.Transparency=a end
   end
  end
  function E:StepMoments(now)
@@ -172,7 +172,7 @@ function X.Install(E,emitter)
      -- The bolt holds for a third of its life, re-forks once, then fades; the light fades with it.
      if not m.Flicked and t>=s.Life*.3 then m.Flicked=true;jag(m,m.Top,m.Center,.9)end
      local a=t<s.Life*.4 and 0 or math.min(1,(t-s.Life*.4)/(s.Life*.6))
-     for _,p in ipairs(m.Bolt)do if math.abs(p.Transparency-a)>=.05 or a>=1 then p.Transparency=a end end
+     for _,p in ipairs(m.Bolt)do if math.abs(p.Transparency-a)>=.01 or a>=1 then p.Transparency=a end end
      if m.Light and m.Light.Enabled then m.Light.Brightness=s.Light*(1-math.min(1,t/s.Life))end
     end
    end

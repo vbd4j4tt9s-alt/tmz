@@ -1,3 +1,4 @@
+do local ok,loaded=pcall(function()return game:IsLoaded()end);if ok and loaded==false then game.Loaded:Wait()end end -- R152: start once the whole game has arrived (a module missing on join used to break the client scripts)
 local GardenTheme=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenTheme'))
 local TextFit=require(game:GetService('ReplicatedStorage'):WaitForChild('GardenTextFit'))
 local MenuStyle=require(game:GetService("ReplicatedStorage"):WaitForChild("GardenMenuStyle"))
@@ -31,6 +32,7 @@ local getShopState = requireChild(remotes, "GetShopState")
 local purchaseShopItem = requireChild(remotes, "PurchaseShopItem")
 local equipShopItem = requireChild(remotes, "EquipShopItem")
 local InteractionAudio=require(ReplicatedStorage:WaitForChild('InteractionAudio'))
+local LocalSfx=require(ReplicatedStorage:WaitForChild('LocalSfx'));LocalSfx.Preload({LocalSfx.WhooshId})
 local openEconomyUI = requireChild(remotes, "OpenEconomyUI")
 
 local function isLegacyTravelButton(instance)
@@ -208,9 +210,11 @@ local wallet = GardenWallet.new(screenGui)
 local claimCash=remotes:WaitForChild('CollectSaleCash')
 local pendingCash=remotes:WaitForChild('GetPendingSales')
 local rewardGui=Instance.new('ScreenGui');rewardGui.Name='CurrencyRewards';rewardGui.ResetOnSpawn=false;rewardGui.DisplayOrder=75;rewardGui.Parent=playerGui
+local menuBalance -- set below: the Sell window's own balance line (the HUD counters hide while it is open)
+-- R152: sale money pops, flies to its counter and claims itself on arrival (no hover or tap); the claim callback is unchanged.
 local saleEffects=require(ReplicatedStorage:WaitForChild('SaleMoneyEffects')).new(rewardGui,wallet,function(id,index)
  return claimCash:InvokeServer(id,index)
-end)
+end,{Anchor=function(currency)return menuBalance and menuBalance(currency)end})
 -- Rejoin recovery and owner-command sales use the same persisted receipts.
 task.spawn(function()
  while screenGui.Parent do
@@ -313,6 +317,11 @@ GardenTheme.Text(title,26,true)
 GardenTheme.Text(cashLabel,18,true,GardenTheme.Colors.Gold)
 title.Position=UDim2.fromOffset(16,10);title.Size=UDim2.new(1,-76,0,30)
 cashLabel.Position=UDim2.fromOffset(16,48);cashLabel.Size=UDim2.new(1,-32,0,22);cashLabel.TextXAlignment=Enum.TextXAlignment.Left
+do -- R152: while the Sell window is open the wallet row is hidden, so sale cash flies to this balance line and it flashes as each coin lands
+ local line={TargetPosition=function()return cashLabel.AbsolutePosition+Vector2.new(math.min(60,cashLabel.AbsoluteSize.X*.5),cashLabel.AbsoluteSize.Y*.5)end,
+  Pulse=function()if GuiService.ReducedMotionEnabled then return end;cashLabel.TextColor3=Color3.new(1,1,1);TweenService:Create(cashLabel,TweenInfo.new(.25),{TextColor3=GardenTheme.Colors.Gold}):Play()end}
+ menuBalance=function(currency)if currency=='Cash'and panel.Visible and cashLabel.AbsoluteSize.X>1 then return line end end
+end
 local closeButton = makeButton(
 	panel,
 	"Close",
@@ -340,12 +349,18 @@ local requestBusy = false
 
 local function setStatus(message, isError)
 	local short, color = SimpleText.Format(message)
+	if isError and short ~= "" then InteractionAudio.Play('Denied') end -- R150: a refused market request clicks Denied (can't afford, bag full, no response)
 	statusLabel.Visible = short ~= ""
 	statusLabel.Text = short
 	statusLabel.TextColor3 = isError and SimpleText.Red or color or COLORS.Muted
 end
 
 local function runServerRequest(callback)
+	-- R158k: a press made while another request (the window's state refresh) is on its way waits for it, up to ~15 s; it used to be dropped without a word
+	for _ = 1, 300 do
+		if not requestBusy then break end
+		task.wait(0.05)
+	end
 	if requestBusy then
 		return nil
 	end
@@ -357,7 +372,9 @@ local function runServerRequest(callback)
 		return nil
 	end
 	if type(result) == "table" and result.Success == false then
-		setStatus(result.Message or "REQUEST FAILED", true)
+		-- R158k: the server's "Not enough cash!" (or an older server's words) is the plain notice every store shows (StoreMoney158k), not the status line
+		local money = require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Refusal(result.Message)
+		if money then setStatus("", false); require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Notice(money) else setStatus(result.Message or "REQUEST FAILED", true) end
 		return nil
 	end
 	return result
@@ -373,7 +390,11 @@ local function adoptState(state)
 		return
 	end
 	currentState = state
-	cashLabel.Text = "Cash  $" .. CashNumbers.Compact(state.Cash)
+	-- R158k: the market's Cash is the live Cash stat the HUD shows (a reply's Cash is a snapshot that can be older than a coin that landed meanwhile),
+	-- written rounded DOWN like the HUD (CashNumbers.Balance: never more than the player has)
+	local live = require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Balance(player, "Cash")
+	if live ~= nil then state.Cash = live end
+	cashLabel.Text = "Cash  $" .. CashNumbers.Balance(state.Cash)
 	if panel.Visible and renderCurrentTab then
 		renderCurrentTab()
 	end
@@ -391,13 +412,17 @@ for i,mode in ipairs({'Buy','Sell crops'})do
 end
 local shopMenu=require(ReplicatedStorage:WaitForChild('ShopMenu')).new(panel,function(tab)
  currentTab=tab;renderCurrentTab()
-end,function(id)
- local state=runServerRequest(function()return purchaseShopItem:InvokeServer(id)end)
- if state then InteractionAudio.Transaction('Buy');adoptState(state)end
+end,function(id,price)
+ -- R158k: the shown price goes with the purchase; a refusal that carries the shop's state (the price changed) shows the new prices at once
+ local reply
+ local state=runServerRequest(function()reply=purchaseShopItem:InvokeServer(id,price);return reply end)
+ if state then InteractionAudio.Transaction('Buy');adoptState(state)
+ elseif type(reply)=='table'and type(reply.Products)=='table'then reply.Message=nil;adoptState(reply)end
 end,function(id,equipped)
  local state=runServerRequest(function()return equipShopItem:InvokeServer(id,equipped)end)
  if state then InteractionAudio.Transaction('Equip');adoptState(state)end
 end)
+shopMenu.OnShort=function()setStatus('',false)end -- R158k: a press the cash cannot pay clears the status line (an older "BOUGHT!" must not sit beside "Not enough cash!")
 screenGui.Destroying:Connect(function()shopMenu:Destroy()end)
 renderCurrentTab = function()
  local itemMode=currentTab=='Sell'
@@ -416,7 +441,7 @@ renderCurrentTab = function()
  if itemMode then
   shopMenu:Hide();title.Text='Market'
   if renderHarvests then renderHarvests()end
-  setStatus(currentState and not currentState.CanSell and'Visit the market to sell your crops.'or'',false)
+  setStatus(currentState and not currentState.CanSell and'Go to the market to sell your crops!'or'',false)
  else
   if harvestMenu then harvestMenu:Hide()end
   title.Text='Market';shopMenu:Show(currentState,currentTab);setStatus('',false)
@@ -478,7 +503,7 @@ shade.Activated:Connect(function()
 	setOpen(false)
 end)
 openEconomyUI.OnClientEvent:Connect(function(requestedTab)
- InteractionAudio.Play('Bubble04')
+	-- R150: no click here any more: ButtonFeedback plays MenuClick when SeedMenu becomes Economy (one rule for every menu).
 	setOpen(true, requestedTab)
 end)
 
@@ -492,7 +517,7 @@ do
    local amount=cashValue.Value;if type(amount)~='number'then return end
    wallet:SetValue(amount)
    if currentState then
-    currentState.Cash=amount;cashLabel.Text='Cash  $'..CashNumbers.Compact(amount)
+    currentState.Cash=amount;cashLabel.Text='Cash  $'..CashNumbers.Balance(amount) -- R158k: rounded down, like the HUD
     if panel.Visible and currentTab~='Sell'then shopMenu:Render()end
    end
   end
@@ -556,6 +581,7 @@ local toastTween, toastSerial = nil, 0
 local function gardenToast(message, failed)
 	local short = SimpleText.Format(message)
 	if short == "" then return end
+	if failed then InteractionAudio.Play('Denied') end -- R150: a refused garden action (AIM AT SOIL, BAG FULL, TOO CLOSE...) clicks Denied
 	toastSerial = toastSerial + 1
 	local token = toastSerial
 	if toastTween then toastTween:Cancel() end
@@ -572,13 +598,16 @@ end
 
 local HttpService = game:GetService("HttpService")
 local ContextActionService = game:GetService("ContextActionService")
+local Arrival = require(ReplicatedStorage:WaitForChild("HarvestArrival"))
 local gardenBusy, lastGardenAction = false, -math.huge
+-- R154: a pull reveal's seed is not in the hand (on this screen) until it has flown into the hotbar (SeedCollect154): no aim, no planting before that
+local function collectHeld(tool)local ok,held=pcall(function()return require(ReplicatedStorage.SeedCollect154).Holds(tool)end);return ok and held==true end
 local function equippedGardenSeed()
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	if not humanoid or humanoid.Health <= 0 then return nil end
 	for _, tool in ipairs(character:GetChildren()) do
-		if tool:IsA("Tool") and tool:GetAttribute("GardenSeed") and tool.Enabled then return tool end
+		if tool:IsA("Tool") and tool:GetAttribute("GardenSeed") and tool.Enabled and not collectHeld(tool) then return tool end
 	end
 end
 local function sendGarden(action, payload)
@@ -588,12 +617,14 @@ local function sendGarden(action, payload)
 	payload.RequestId = HttpService:GenerateGUID(false)
 	payload.Character = player.Character
 	gardenBusy = true
+	-- R149: the picked fruit floats to the player (GardenVisuals); the Hotbar shows the new item when it arrives. Cosmetic: the item is in the bag at once.
+	if action == "Harvest" then Arrival.Expect(payload.CropId, payload.FruitIndex) end
 	local ok, result = pcall(function() return gardenInteract:InvokeServer(action, payload) end)
 	gardenBusy = false
+	if action == "Harvest" and not (ok and type(result) == "table" and result.Success == true) then Arrival.Cancel(payload.CropId, payload.FruitIndex) end
 	if payload.Character ~= player.Character then return end
 	if not ok or type(result) ~= "table" then gardenToast("GARDEN DID NOT RESPOND — TRY AGAIN", true); return end
 	gardenToast(result.Message, result.Success ~= true)
- if action=='Harvest'and result.Success==true then InteractionAudio.Play('Bubble06')end
 	queueSellRefresh()
 	return result
 end
@@ -607,9 +638,11 @@ local function registerPlantCollision(item)
 end
 -- Event-driven collection; no full-workspace scans per click.
 local gardenMap=workspace:WaitForChild('ChestChaseMap')
-for _,item in ipairs(gardenMap:GetDescendants())do registerPlantCollision(item)end
-gardenMap.DescendantAdded:Connect(registerPlantCollision)
-gardenMap.DescendantRemoving:Connect(function(item)
+-- (R153 perf, lag audit D10: plants grow only in the bases' gardens: the Bases folder is listened to, not the whole map as it streams in)
+local plantScope=gardenMap:FindFirstChild('Bases')or gardenMap
+for _,item in ipairs(plantScope:GetDescendants())do registerPlantCollision(item)end
+plantScope.DescendantAdded:Connect(registerPlantCollision)
+plantScope.DescendantRemoving:Connect(function(item)
  if item.Name~='SolidPlant'or not item:IsA('Folder')then return end
  local index=table.find(gardenRayExclusions,item);if index then table.remove(gardenRayExclusions,index)end
 end)
@@ -630,10 +663,11 @@ local function rayAt(screenPosition, isViewport)
 	params.IgnoreWater = true
 	return workspace:Raycast(ray.Origin, ray.Direction * 500, params)
 end
+local function revealPress()local ok,taken=pcall(function()return require(game:GetService('ReplicatedStorage').RarePullRules).ClaimPress()end);return ok and taken==true end -- R153: a press that skips / closes a pull reveal's card is not the tool's
 local function placeAt(screenPosition, isViewport)
 	if gardenBusy or playerGui:GetAttribute("SeedMenu") or UserInputService:GetFocusedTextBox() then return end
 	local seed = equippedGardenSeed()
-	if not seed then return end
+	if not seed or revealPress() then return end
 	local hit = rayAt(screenPosition, isViewport)
 	-- R122: clicking another player with a seed is a gift (FruitGiftClient), not a planting miss.
 	local model = hit and hit.Instance:FindFirstAncestorOfClass("Model")
@@ -681,7 +715,9 @@ ProximityPromptService.PromptTriggered:Connect(function(prompt, who)
 	if who and who ~= player then return end
 	if not prompt:GetAttribute("GardenPrompt") or prompt:GetAttribute("GardenStage") ~= 4 or prompt:GetAttribute("GardenOwnerId")~=player.UserId then return end
 	if prompt:GetAttribute('GardenAction')=='PlantTop'then
-        sendGarden('PlantTop',{CropId=prompt:GetAttribute('GardenCropId')})
+        local top=sendGarden('PlantTop',{CropId=prompt:GetAttribute('GardenCropId')})
+        -- R150: GO TO TOP moves you: the same arrival whoosh as BASE / TRACK, only when the server says it worked.
+        if top and top.Success==true then LocalSfx.Play(LocalSfx.WhooshId,nil,.22,1.4,2)end
     elseif holdHarvest:NativeTrigger(prompt) then
         local result=sendGarden("Harvest", {CropId=prompt:GetAttribute("GardenCropId"), FruitIndex=prompt:GetAttribute("GardenFruitIndex")})
         holdHarvest:RecordResult(prompt,result)
@@ -707,8 +743,12 @@ local function bindGardenPrompt(prompt)
 	prompt:GetPropertyChangedSignal("Enabled"):Connect(function() refreshPrompt(prompt) end)
 	refreshPrompt(prompt)
 end
-workspace.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
-for _, item in ipairs(workspace:GetDescendants()) do bindGardenPrompt(item) end
+-- R153 perf (lag audit D10): garden prompts only exist in the bases' gardens (GardenPlots, under the map's Bases): listen there instead of to every
+-- instance added anywhere in the workspace (the map streaming in, packs, effects); a map without a Bases folder is listened to whole, as before.
+local gardenPromptRoot=workspace
+do local map=workspace:FindFirstChild("ChestChaseMap");local bases=map and map:FindFirstChild("Bases");if bases then gardenPromptRoot=bases end end
+gardenPromptRoot.DescendantAdded:Connect(function(item) if item:IsA("ProximityPrompt") then task.defer(bindGardenPrompt, item) end end)
+for _, item in ipairs(gardenPromptRoot:GetDescendants()) do bindGardenPrompt(item) end
 playerGui:GetAttributeChangedSignal('SelectedGardenFruitIndex'):Connect(function()
  for prompt in pairs(boundPrompts)do if prompt.Parent then refreshPrompt(prompt)end end
 end)

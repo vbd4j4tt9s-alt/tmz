@@ -1,0 +1,94 @@
+# R153 full suite run on the release commit 6b68826 (REPO=<detached worktree> LOGDIR=<private> sh tools/tests/run_all_suites.sh): 84 PASS, 5 FAIL.
+# The 5 failures were test-side only: four suites compared Config.Version with the R152 base byte for byte (the release bump), and R151 fruit_fixes tried to compile the 73 retired (deleted) files.
+# Fixed in the tests (release number normalised as R15x, deleted files skipped) and re-run alone on the same source: all 5 PASS (plus run_perf153, whose version check got the same change). Total 89 / 89 PASS.
+PASS R127 1s :: 53 checks, 0 failures 25 checks, 0 failures 
+PASS R128 0s :: 8 checks, 0 failures 22 checks, 0 failures 21 checks, 0 failures 
+PASS R129 1s :: 119 checks, 0 failures 27 checks, 0 failures 
+PASS R130 0s :: 30 checks, 0 failures 11 checks, 0 failures 38 checks, 0 failures 
+PASS R131 3s :: 11 checks, 0 failures 11 checks, 0 failures 
+PASS R132 0s :: 45 checks, 0 failures 14 checks, 0 failures 
+PASS R134 2s :: 69 checks, 0 failures 
+PASS R135 1s :: 61 checks, 0 failures 
+PASS R136 0s :: 24 checks, 0 failures 
+PASS R137 10s :: 43 checks, 0 failures 22 checks, 0 failures 11 checks, 0 failures 14 checks, 0 failures 
+PASS R138 2s :: 18 checks, 0 failures 16 checks, 0 failures 21 checks, 0 failures 3249 checks, 0 failures 
+PASS R139 1s :: 33 checks, 0 failures 21 checks, 0 failures 
+PASS R140 2s :: 181 checks, 0 failures 90 checks, 0 failures 
+PASS R147 3s :: 289 checks, 0 failures 188 checks, 0 failures 
+PASS R152 2s :: R152 silence checks 8, fails 0 R152 chase trim checks 34, fails 0 R152 hold race checks 15, fails 0 R152 suites passed 
+PASS R153 1s :: R153 treadmill roll / open checks 45, fails 0 R153 treadmill suites passed 
+PASS audio_R123 0s :: sync checks 49, fails 0 
+PASS boots_R117 1s :: 374 checks, 0 failures 637 checks, 0 failures 
+PASS borders_R123 0s :: 2137 checks, 0 failures 
+PASS bushes_R124 1s :: 112 checks, 0 failures 
+PASS giving_R122 0s :: 194/194 checks passed 35/35 checks passed 
+PASS holes_R122 3s :: PASS: 196 checks, 0 failures PASS: 88 checks, 0 failures 
+PASS perf_R121 11s :: random toggles: 20000 steps x 12 views, mismatches	0 
+PASS polish_R124 0s :: 61 checks, 0 failures 326 checks, 0 failures 85 checks, 0 failures 11 checks, 0 failures 
+PASS shop_R120 77s :: 15 checks, 0 failures 6422 checks, 0 failures 
+PASS trails_R117 0s :: 241 checks, 0 failed 
+PASS trails_R118 0s :: 174 checks, 0 failed 241 checks, 0 failed 
+PASS treadmill_bonus_R123 2s :: test_server: 109/109 checks passed test_client: 129/129 checks passed test_layout: 718/718 checks passed 
+PASS veiled_R122 1s :: event checks 128, fails 0 art checks 73, fails 0 arrival checks 46, fails 0 
+PASS wall_notifier_R122run_wall 0s :: wall checks 168, fails 0 
+PASS R147run_keyboard 47s :: 687 checks, 0 failures 21 checks, 0 failures 
+PASS R147run_verity 1s :: 185 checks, 0 failures 311 checks, 0 failures 
+PASS R147run_verity_art 2s :: 387 checks, 0 failures 
+PASS R147run_verity_pack 7s :: 173 checks, 0 failures 
+PASS R147run_verity_ui 1s :: 339 checks, 0 failures 
+PASS R148run_index_limited 33s :: ok   Storm: base64 -> zstd frame (content size 36864, no checksum) -> 36864 bytes of RGBA ok   Mech: base64 -> zstd frame (content size 36864, no checksum) -> 36864 bytes of RGBA ok   Limited: base64 -> zst
+PASS R148run_purchase 1s :: 329 checks, 0 failures 71 checks, 0 failures 75 checks, 0 failures 
+PASS R148run_roster 46s :: 257 checks, 0 failures 979 checks, 0 failures 
+PASS R149run_tiger_gear 1s :: == static checks 505 checks, 0 failures 
+PASS R149run_weather 2s :: 192 checks, 0 failures 64 checks, 0 failures PASS: 41 checks, 0 failures 
+PASS R149run_fruit_models 99s :: R149 fruit mesh fallback (content): 12 checks, 0 failures R149 fruit mesh fallback (server): 10 checks, 0 failures R149 fruit mesh fallback (serverok): 6 checks, 0 failures R149 fruit mesh fallback (garden):
+PASS R149run_verity 2s :: 124 checks, 0 failures 185 checks, 0 failures 311 checks, 0 failures all Verity suites passed 
+PASS R149run_verity_pack 5s :: 673 checks, 0 failures 1216 checks, 0 failures all Verity pouch checks passed 
+PASS R149run_keyboard 46s :: 687 checks, 0 failures 21 checks, 0 failures 
+PASS R149run_growth 83s :: growth fx: 148 checks, 0 failures growth client: 53 checks, 0 failures growth hotbar: 36 checks, 0 failures growth unripe: 34 checks, 0 failures 
+PASS R149run_market 1s :: market tops: 6 checks, 0 failures 
+PASS R149run_zfight 28s :: scene before/start: 10341 parts, 17 steps ok, 0 failed scene before/snow: 11272 parts, 17 steps ok, 0 failed scene after/start: 9798 parts, 17 steps ok, 0 failed scene after/snow: 12968 parts, 17 steps ok, 0 faile
+PASS R150run_bonus_ui 13s :: test_bonus_ui: 856/856 checks passed test_bonus_audio: 37/37 checks passed test_bonus_layout: 6479/6479 checks passed test_bonus_image: 77/77 checks passed 
+PASS R150run_pedestal 1s :: 57 checks, 0 failures 156 checks, 0 failures 
+PASS R150run_sfx 4s :: R150 server checks 25, fails 0 == tools/tests/test_fast_travel (R150: arrival whoosh + Denied kinds; R150 review: its stale R114 'phone: centred and fits' check, a failure since R140, now checks the pair + DAILY / INV
+PASS R151run_hub_displays 20s :: 88 checks, 0 failures 92 checks, 0 failures 144 checks, 0 failures 105 checks, 0 failures 
+PASS R151run_announce 1s :: test_client: 92/92 checks passed test_settings: 57/57 checks passed test_settings_client: 41/41 checks passed R151 announcement suites passed 
+PASS R151run_rare_pull 53s :: test_bonus_audio: 37/37 checks passed test_bonus_layout: 6479/6479 checks passed test_bonus_image: 77/77 checks passed R151 pull reveal suites passed 
+PASS R151run_packs 95s :: 4329 checks, 0 failures 103 checks, 0 failures all pack shape checks passed all pack checks passed 
+PASS R151run_base_area 50s :: R151 base area: 110 passed, 0 failed R151 hub trees: 57 passed, 0 failed R151 base area suite passed 
+PASS R151run_perf 25s :: 75 checks, 0 failures 
+PASS R151run_offline 3s :: 61 checks, 0 failures 326 checks, 0 failures 85 checks, 0 failures 11 checks, 0 failures 
+PASS R151run_verity_pouch 4s :: 1216 checks, 0 failures all Verity pouch checks passed 
+PASS R151run_pack_shapes 23s :: 4329 checks, 0 failures 103 checks, 0 failures all pack shape checks passed 
+PASS R151run_cloudy 7s :: 175 checks, 0 failures 79 checks, 0 failures R151 Cloudy lanterns on the owner's place: 30 passed, 0 failed R151 Cloudy suites passed 
+PASS R151run_hub_trees 0s :: R151 hub trees: 57 passed, 0 failed 
+PASS R151run_speed_popups 5s :: == static checks test_speed_popups_style: test_speed_popups_style: 185 checks, 0 failed test_speed_popups_client: test_speed_popups_client: 339 checks, 0 failed R151 speed popups suites passed 
+PASS R151run_treadmills 9s :: R151 treadmills: 245 passed, 0 failed treadmill dress checks: all passed 532 checks, 0 failures R151 treadmill suites passed 
+PASS R151run_badges 4s :: 156 checks, 0 failures 6 checks, 0 failures 43 checks, 0 failures all badge / default pack shape checks passed 
+PASS R152run_void_giveaway 3s :: OK 59 checks OK 59 checks OK 106 checks R152 giveaway suites passed 
+PASS R151static_checks 1s :: 
+PASS R152run_keepers 159s :: R152 keepers (content): 32 checks, 0 failures R152 keepers (nomodule): 8 checks, 0 failures R152 round trip: 527 checks, 0 failures R152 keeper suite: all stages passed 
+PASS R152run_load_guard 1s :: R152 load guard: 4 checks, 0 failures 
+PASS R152run_zfight_sweep 76s :: variant kb4: 12588 parts, 19 steps ok, 0 failed variant kb5: 12620 parts, 19 steps ok, 0 failed variant kb6: 12608 parts, 19 steps ok, 0 failed variant kb7: 12173 parts, 19 steps ok, 0 failed 
+PASS R152run_seed_opening 161s :: R153 choice checks 893, fails 0 R153 press checks 78, fails 0 R153 server checks 240, fails 0 R152 seed opening suites passed 
+PASS R152run_perf152 186s :: ok: perf152 units: 36 checks, 0 failed R152 perf: all checks passed - the look and the sound are identical (allowed differences listed above; base: the patch switched off) 
+PASS R152run_sale_money 1s :: == static checks R152 sale money checks 1023, fails 0 R152 sale claim server checks 77, fails 0 R152 sale money suites passed 
+PASS R153run_gems_column 1s :: == static checks OK 84 checks R153 gems column suite passed 
+PASS R153run_fixes 30s :: test_speed_popups_style: test_speed_popups_style: 185 checks, 0 failed test_speed_popups_client: test_speed_popups_client: 339 checks, 0 failed R151 speed popups suites passed all R153 checks passed 
+PASS R153run_nooks 22s :: R153 hub fixes: 131 checks, 0 failures == static checks R152 load guard: 4 checks, 0 failures R153 hub fixes suite passed 
+PASS R153run_index_gems 0s :: == static checks 18 checks, 0 failures R153 Index gems suites passed 
+PASS R153run_seed_rarity 23s :: ok: the card test fails on the R152 scripts (5 failed checks) ok: the chat test fails on the R152 scripts (2 failed checks) ok: the server test fails on the R152 scripts (19 failed checks) R153 seed rarity: A
+PASS R153run_jitter 5s :: 28 checks, 0 failures 31 checks, 0 failures 47 checks, 0 failures R153 jitter suites passed 
+PASS R153run_clover 28s :: test_clover_r152: R153 clover (old R152 server): 43 checks, 0 failures test_clover_back: R153 clover (back from R152): 8 checks, 0 failures test_clover_icon: R153 clover icon: 94 checks, 0 failures test_clover_sho
+PASS R153run_keeper_label 2s :: R153 keeper label: 77 checks, 0 failures R153 sign clearance: 0 of 14 checks failed (RADIUS 12 studs, LIFT 18) 
+PASS R153run_pack_parts 38s :: pack parts (real pouch): 54 scenes, 0 failures == reproduce on 8208603 (R152): the same checks must find the reported bug FAIL [seam]: Verity held R15 1x: top crimp / tear strips centred (off by 0.0474 in dept
+PASS R153run_mech_pack 19s :: 162 checks, 0 failures 167 checks, 0 failures R153 Mech pack suites passed 
+PASS R153run_fixes_server 1s :: test_fixes_server: R153 server fixes: 74 checks, 0 failures test_fixes_boot: R153 start-up fixes: 51 checks, 0 failures test_fixes_notice: R153 start-up notice: 12 checks, 0 failures test_fixes_r152: R153 ser
+PASS R153run_perf153 234s :: ok: test_live_methods153: 52 checks, 0 failures ok: test_skin_spread153: 33 checks, 0 failures ok: test_quality153: 8 checks, 0 failures R153 perf: all checks passed - the look and the sound are identical (allow
+# re-run after the test fixes:
+PASS R151run_fruit_fixes (re-run)
+PASS R153run_fling_swoosh (re-run)
+PASS R153run_hotbar (re-run)
+PASS R153run_track_walls (re-run)
+PASS R153run_fixes_client (re-run)
+PASS R153run_perf153 (re-run)

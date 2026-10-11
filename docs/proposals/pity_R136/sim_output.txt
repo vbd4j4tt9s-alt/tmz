@@ -1,0 +1,57 @@
+model vs real PackOdds112: worst difference 4.67e-09 %
+
+B. Legendary / Mythic per biome (luck 1)
+Forest      Common    Legendary 1/30     -> 1/60     Mythic 1/200    -> 1/400   
+Forest      Uncommon  Legendary 1/15     -> 1/30     Mythic 1/80     -> 1/160   
+Forest      Rare      Legendary 1/7      -> 1/14     Mythic 1/30     -> 1/60    
+Forest      Epic      Legendary 1/3      -> 1/4.5    Mythic 1/10     -> 1/15    
+Forest      Legendary Legendary 1/2.5    -> 1/3.8    Mythic 1/4      -> 1/6     
+Forest      Mythic    Legendary 1/1.7    -> 1/1.4    Mythic 1/2.5    -> 1/3.8   
+Jungle      Common    Legendary 1/30     -> 1/75     Mythic 1/200    -> 1/500   
+Jungle      Uncommon  Legendary 1/15     -> 1/38     Mythic 1/80     -> 1/200   
+Jungle      Rare      Legendary 1/7      -> 1/18     Mythic 1/30     -> 1/75    
+Jungle      Epic      Legendary 1/3      -> 1/5.2    Mythic 1/10     -> 1/18    
+Jungle      Legendary Legendary 1/2.5    -> 1/4.4    Mythic 1/4      -> 1/7     
+Jungle      Mythic    Legendary 1/1.7    -> 1/1.3    Mythic 1/2.5    -> 1/4.4   
+Desert      Common    Legendary —        -> —        Mythic 1/6.1    -> 1/600   
+Desert      Uncommon  Legendary —        -> —        Mythic 1/3.6    -> 1/240   
+Desert      Rare      Legendary —        -> —        Mythic 1/1.7    -> 1/90    
+Desert      Epic      Legendary —        -> —        Mythic 1/1      -> 1/20    
+Desert      Legendary Legendary —        -> —        Mythic 1/1      -> 1/8     
+Desert      Mythic    Legendary —        -> —        Mythic 1/1      -> 1/5     
+Snow        Common    Legendary 1/30     -> 1/105    Mythic 1/200    -> 1/700   
+Snow        Uncommon  Legendary 1/15     -> 1/52     Mythic 1/80     -> 1/280   
+Snow        Rare      Legendary 1/7      -> 1/25     Mythic 1/30     -> 1/105   
+Snow        Epic      Legendary 1/3      -> 1/6.8    Mythic 1/10     -> 1/22    
+Snow        Legendary Legendary 1/2.5    -> 1/5.6    Mythic 1/4      -> 1/9     
+Snow        Mythic    Legendary 1/1.7    -> 1/1.2    Mythic 1/2.5    -> 1/5.6   
+Lava        Common    Legendary 1/30     -> 1/120    Mythic —        -> —       
+Lava        Uncommon  Legendary 1/15     -> 1/60     Mythic —        -> —       
+Lava        Rare      Legendary 1/7      -> 1/28     Mythic —        -> —       
+Lava        Epic      Legendary 1/3      -> 1/7.5    Mythic —        -> —       
+Lava        Legendary Legendary 1/2.5    -> 1/6.2    Mythic —        -> —       
+Lava        Mythic    Legendary 1/1      -> 1/1      Mythic —        -> —       
+Crystal     Common    Legendary —        -> —        Mythic 1/26     -> 1/1,000 
+Crystal     Uncommon  Legendary —        -> —        Mythic 1/13     -> 1/400   
+Crystal     Rare      Legendary —        -> —        Mythic 1/5.7    -> 1/150   
+Crystal     Epic      Legendary —        -> —        Mythic 1/2.3    -> 1/30    
+Crystal     Legendary Legendary —        -> —        Mythic 1/1.5    -> 1/12    
+Crystal     Mythic    Legendary —        -> —        Mythic 1/1      -> 1/7.5   
+Storm Peaks Common    Legendary 1/30     -> 1/180    Mythic 1/200    -> 1/1,200 
+Storm Peaks Uncommon  Legendary 1/15     -> 1/90     Mythic 1/80     -> 1/480   
+Storm Peaks Rare      Legendary 1/7      -> 1/42     Mythic 1/30     -> 1/180   
+Storm Peaks Epic      Legendary 1/3      -> 1/10     Mythic 1/10     -> 1/35    
+Storm Peaks Legendary Legendary 1/2.5    -> 1/8.8    Mythic 1/4      -> 1/14    
+Storm Peaks Mythic    Legendary 1/1.7    -> 1/1.2    Mythic 1/2.5    -> 1/8.8   
+world packs per server-hour, now: 30.7 Legendary seeds, 37.2 Mythic seeds
+world packs per server-hour, new: 13.5 Legendary seeds, 4.5 Mythic seeds
+
+A. Pack sizes
+now: 5x+ 1/167 (0.600%), 10x+ 1/2,000 (0.050%), 25x 1/100,000, average size 1.188
+new: 5x+ 1/71 (1.409%), 10x+ 1/775 (0.129%), 25x 1/25,000, average size 1.318
+server, now                        5x+ 2.5/h, 10x+ 0.20/h (one every 296 min)
+server, new sizes                  5x+ 6.0/h, 10x+ 0.54/h (one every 110 min)
+server, new sizes + server floors  5x+ 7.5/h, 10x+ 1.57/h (one every 38 min)
+player, now                packs per 5x+: average 166.4, 9 in 10 within 383, worst 1558 | packs per 10x+: average 1954, 9 in 10 within 4592 | average size 1.187
+player, new sizes          packs per 5x+: average 71.7, 9 in 10 within 164, worst 803 | packs per 10x+: average 803, 9 in 10 within 1849 | average size 1.317
+player, new sizes + meter  packs per 5x+: average 23.5, 9 in 10 within 30, worst 30 | packs per 10x+: average 145, 9 in 10 within 200 | average size 1.477

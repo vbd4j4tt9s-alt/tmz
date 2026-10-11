@@ -2,7 +2,11 @@
 local F={};local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Copy=require(script.Parent.NoticeCopy83);local Layout=require(script.Parent.NoticeLayout85);local Queue={};local Showing={};local Seen={}
 local seenOrder={};local started=false;local alive=true;local root,host,pg;local serial=0
-local cueIds={RarePack='rbxassetid://118818986767152',WeatherAdopted='rbxassetid://133449446616894'}
+-- R131: Gift = the reward chime (InteractionAudio GemClaim) for a received gift.
+-- R153 (owner): RarePack = the owner's new rarity notifier sound (it replaces 118818986767152). It plays once per rare-pack notice, when its line appears
+-- (F.Pack merges the same stage + text of one burst into one line; a spawn id is shown once), at the same .34 as the other notice cues, on the Interface
+-- group like them. Its lead-in silence is unmeasured: SoundTiming.Start_80907337289683 (a number attribute on SoundTiming, or SoundTiming.Starts) tunes it.
+local cueIds={RarePack='rbxassetid://80907337289683',WeatherAdopted='rbxassetid://133449446616894',Gift='rbxassetid://82559527540705'}
 local voices={};local nextWarm=0;local cueUntil=0;local currentVoice
 local function warm()
  local now=os.clock();if now<nextWarm then return end;nextWarm=now+10
@@ -54,6 +58,8 @@ local function ensure()
    local stroke=Instance.new('UIStroke');stroke.Color=Color3.new(0,0,0);stroke.Thickness=2.5;stroke.Parent=label
    item.Label=label;item.Stroke=stroke;item.At=now;item.Until=now+item.Duration;table.insert(Showing,item)
    if item.Cue then cue(item.Cue,now)end
+   -- R150: a refusal (red notice, or kind='Denied' from the server) clicks Denied on the frame its line appears.
+   if item.Deny then require(script.Parent.InteractionAudio).Play('Denied')end
   end
   local width,row,y=layout.Width,layout.Row,layout.Y
   local size=Vector2.new(width,(row+4)*#Showing)
@@ -67,17 +73,26 @@ local function ensure()
  script.Destroying:Connect(function()alive=false;tick:Disconnect();if root then root:Destroy()end;table.clear(Queue);table.clear(Showing);for _,voice in pairs(voices)do voice:Destroy()end;table.clear(voices)end)
 end
 function F.Preload()ensure()end
-function F.Push(text,duration,key,priority,sound)
+function F.Push(text,duration,key,priority,sound,deny)
  ensure();if not alive or type(text)~='string'or #text>1600 then return end
  if key and not remember(key)then return end
  if #Queue>=64 then table.remove(Queue,1)end
- serial+=1;local item={Text=text,Duration=math.clamp(duration or 4,.8,7),Serial=serial,QueuedAt=os.clock(),Cue=cueIds[sound]and sound or nil}
+ serial+=1;local item={Text=text,Duration=math.clamp(duration or 4,.8,7),Serial=serial,QueuedAt=os.clock(),Cue=cueIds[sound]and sound or nil,Deny=deny==true}
  if priority then
   table.insert(Queue,1,item)
   if priority==true and #Showing>=3 then Showing[1].Label:Destroy();table.remove(Showing,1)end
  else table.insert(Queue,item)end
 end
-function F.Plain(text,color,duration,key)F.Push(Copy.Color(text,color or Color3.new(1,1,1)),duration,key)end
+-- R131: a received gift, shown first with its chime.
+function F.Gift(text)F.Push(text,5,nil,true,'Gift')end
+-- deny (R150): true for a refusal; see F.IsRefusal for how a server notice is classed.
+function F.Plain(text,color,duration,key,deny)F.Push(Copy.Color(text,color or Color3.new(1,1,1)),duration,key,nil,nil,deny)end
+-- A server notice is a refusal when the server says so (kind 'Denied') or when its colour is the shared red of SimpleGameText.
+function F.IsRefusal(color,kind)
+ if kind=='Denied'then return true end
+ local red=require(script.Parent.SimpleGameText).Red
+ return typeof(color)=='Color3'and math.abs(color.R-red.R)<.01 and math.abs(color.G-red.G)<.01 and math.abs(color.B-red.B)<.01
+end
 local pending={};local scheduled=false
 function F.Pack(m)
  if not alive or type(m)~='table'or type(m.Text)~='string'or #m.Text>200 or type(m.Biome)~='string'or #m.Biome>80 or type(m.SpawnId)~='string'or #m.SpawnId>180 or type(m.Stage)~='number'or m.Stage~=m.Stage or m.Stage<1 or m.Stage>8 then return end
@@ -106,6 +121,11 @@ function F.Weather(m)
  if not old then old={Trait=trait,Scope=scope,Stage=stage,Count=0,Plants=0,Fruits=0,Packs=0};weatherPending[group]=old end
  old.Count+=count
  for _,key in ipairs({'Plants','Fruits','Packs'})do local n=tonumber(m[key]);if n and n==n and n>0 and n<=count then old[key]+=math.floor(n)end end
+ -- R127: owner notices carry which plants/fruits changed, so the text can name them.
+ if scope=='Owned'and type(m.Items)=='table'then
+  local Glow=require(script.Parent.MutationGlow127);old.Items=old.Items or{}
+  for _,item in ipairs(Glow.Items(m.Items,require(script.Parent.PlantCatalog)))do if #old.Items<Glow.MaxItems then table.insert(old.Items,item)end end
+ end
  if weatherScheduled then return end;weatherScheduled=true
  task.delay(.2,function()
   if not alive then return end;weatherScheduled=false

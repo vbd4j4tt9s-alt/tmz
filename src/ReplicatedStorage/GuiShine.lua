@@ -1,6 +1,6 @@
 -- One scheduler; only a small set of visible main buttons/cards can animate.
 local Run=game:GetService('RunService');local Gui=game:GetService('GuiService');local Players=game:GetService('Players')
-local S={};local entries={};local connection;local elapsed=0;local Viewport
+local S={};local entries={};local connection;local Viewport
 local function show(item,value)if item.Visible~=value then item.Visible=value end end
 function S.Attach(root,rays)
  if entries[root]then return end
@@ -15,8 +15,10 @@ function S.Attach(root,rays)
  end
  entries[root]={View=root,Sweep=stripe,Rays=spokes,Phase=0}
  root.Destroying:Connect(function()entries[root]=nil;if not next(entries)and connection then connection:Disconnect();connection=nil end end)
- if not connection then connection=Run.Heartbeat:Connect(function(dt)
-  elapsed+=dt;if elapsed<1/20 then return end;local step=elapsed;elapsed=0
+ -- R153 (owner: "fix all jittery type effects"): the sweep and the rays move every rendered frame in RenderStepped (the sweep crossed a
+ -- button in 20 Hz steps); still at most 16 visible buttons, nothing for hidden ones.
+ if not connection then connection=Run.RenderStepped:Connect(function(dt)
+  local step=dt
   local p=Players.LocalPlayer;local paused=Gui.ReducedMotionEnabled or(p and p:GetAttribute('FastMode'));local count=0;if paused then
   for _,e in pairs(entries)do show(e.Sweep,false)end;return
  end

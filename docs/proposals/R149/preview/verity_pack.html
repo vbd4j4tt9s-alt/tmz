@@ -1,0 +1,87 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Verity pack preview</title>
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Approximate render of a dump_verity_pack.luau scene: Roblox parts as boxes / cylinders, the approved pouch MeshPart as a rounded pouch of
+// its size (the asset is not available offline). A part with "vertex":"storm" gets a SIMULATED print in its vertex colours (pale crimps, dark
+// navy panel, an inner black window, orange sticks - read off the live screenshots) which is MULTIPLIED by the part colour, as Roblox does:
+// yellow 255,255,0 x navy = black, x orange = brown, x the pale crimps = yellow. No Roblox textures or Future lighting: a design preview.
+import * as THREE from 'three';
+import {RoomEnvironment} from 'three/addons/environments/RoomEnvironment.js';
+import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.0;document.body.appendChild(renderer.domElement);
+const col=c=>new THREE.Color().setRGB(c[0]/255,c[1]/255,c[2]/255,THREE.SRGBColorSpace);
+const envTex=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;
+const geoBox=new THREE.BoxGeometry(1,1,1);
+// A Roblox Cylinder part runs along X (Size.X = length, Y / Z = diameter).
+const geoCyl=new THREE.CylinderGeometry(.5,.5,1,64);geoCyl.rotateZ(Math.PI/2);
+const geoPouch=new RoundedBoxGeometry(1,1,1,6,.16);
+// The simulated print of the approved pouch (vertex colours): the same on both faces.
+function printTexture(){
+  const cv=document.createElement('canvas');cv.width=256;cv.height=256;const g=cv.getContext('2d');
+  g.fillStyle='#16182e';g.fillRect(0,0,256,256);                       // dark navy body
+  g.fillStyle='#ece8da';g.fillRect(0,0,256,30);g.fillRect(0,226,256,30); // pale crimps top / bottom
+  g.fillStyle='#07070d';g.fillRect(66,64,126,120);                        // an inner dark window
+  g.strokeStyle='#d98534';g.lineWidth=5;g.lineCap='round';
+  g.beginPath();g.moveTo(64,70);g.lineTo(64,176);g.moveTo(192,70);g.lineTo(192,176);g.stroke();
+  g.lineWidth=8;g.beginPath();g.moveTo(34,190);g.lineTo(62,208);g.lineTo(100,204);g.moveTo(222,190);g.lineTo(194,208);g.lineTo(156,204);g.stroke();
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;return t;
+}
+// A STAND-IN for Verity's picture (three.js cannot fetch the Roblox image): the real one is a thin black smiley line drawing (two dots and
+// a smile) on a transparent background.
+function standIn(){
+  const cv=document.createElement('canvas');cv.width=cv.height=512;const g=cv.getContext('2d');
+  g.clearRect(0,0,512,512);g.strokeStyle='#111';g.fillStyle='#111';g.lineCap='round';
+  g.beginPath();g.ellipse(176,200,22,34,0,0,Math.PI*2);g.fill();g.beginPath();g.ellipse(336,200,22,34,0,0,Math.PI*2);g.fill();
+  g.lineWidth=20;g.beginPath();g.arc(256,236,150,.2*Math.PI,.8*Math.PI);g.stroke();
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;return t;
+}
+const printTex=printTexture(),faceTex=standIn();
+window.shoot=function(scene,W,H,opts){
+  opts=opts||{};
+  renderer.setSize(W,H);
+  const s=new THREE.Scene();s.background=new THREE.Color(opts.bg||0xa9d8f5);
+  s.add(new THREE.HemisphereLight(0xeaf6ff,0x5f8f55,1.25));
+  const v=scene.view;const T=new THREE.Vector3(...v.target);
+  const sun=new THREE.DirectionalLight(0xfff2dd,2.3);sun.position.set(T.x-30,T.y+60,T.z-45);sun.target.position.copy(T);
+  sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);const ex=v.dist*.5;Object.assign(sun.shadow.camera,{left:-ex,right:ex,top:ex,bottom:-ex,near:1,far:300});sun.shadow.bias=-.0006;
+  s.add(sun,sun.target);
+  // a fill light from the other side, so the back reads like the front (the preview has no sky / bounce light)
+  const fill=new THREE.DirectionalLight(0xfff2dd,1.4);fill.position.set(T.x+30,T.y+40,T.z+45);fill.target.position.copy(T);s.add(fill,fill.target);
+  for(const p of scene.parts){
+    if(p.t>=.995)continue;
+    const m=new THREE.Matrix4().set(p.r[0],p.r[1],p.r[2],p.p[0],p.r[3],p.r[4],p.r[5],p.p[1],p.r[6],p.r[7],p.r[8],p.p[2],0,0,0,1);
+    const geo=p.shape==='Cylinder'?geoCyl:p.shape==='Pouch'?geoPouch:geoBox;
+    let mat;
+    if(p.material==='Glass')mat=new THREE.MeshPhysicalMaterial({color:col(p.color),roughness:.06,metalness:0,transparent:true,opacity:Math.max(.25,1-p.t),depthWrite:false,clearcoat:1,envMap:envTex,envMapIntensity:.6});
+    else{
+      const metal=p.material==='Metal';
+      mat=new THREE.MeshStandardMaterial({color:col(p.color),roughness:metal?.3:Math.max(.3,.7-p.refl*1.8),metalness:metal?.85:Math.min(.25,p.refl),transparent:p.t>0,opacity:1-p.t});
+      if(metal){mat.envMap=envTex;mat.envMapIntensity=.9}
+      if(p.vertex==='storm')mat.map=printTex;
+    }
+    const mesh=new THREE.Mesh(geo,mat);mesh.matrixAutoUpdate=false;
+    mesh.matrix.copy(m).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],p.size[2]));
+    mesh.castShadow=false;mesh.receiveShadow=true;s.add(mesh);
+    // Decals: a plane on the face (Front = -Z, Back = +Z), tinted by the Decal's Color3, as large as the face; a hair off the surface so the
+    // preview draws it (Roblox draws a Decal ON the surface).
+    for(const d of (p.decals||[])){
+      const front=d.face==='Front';
+      const dm=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:faceTex,color:col(d.color),transparent:true,toneMapped:false,side:THREE.FrontSide,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}));
+      dm.matrixAutoUpdate=false;
+      const place=new THREE.Matrix4().makeTranslation(0,0,(front?-1:1)*(p.size[2]/2+.0015)).multiply(new THREE.Matrix4().makeRotationY(front?Math.PI:0)).multiply(new THREE.Matrix4().makeScale(p.size[0],p.size[1],1));
+      dm.matrix.copy(m).multiply(place);s.add(dm);
+    }
+  }
+  const az=v.az*Math.PI/180,el=v.el*Math.PI/180;
+  const cam=new THREE.PerspectiveCamera(v.fov,W/H,.05,500);
+  // Roblox front is -Z: the camera stands in front (negative Z) and a little to the side.
+  cam.position.set(T.x+Math.sin(az)*Math.cos(el)*v.dist,T.y+Math.sin(el)*v.dist,T.z-Math.cos(az)*Math.cos(el)*v.dist);cam.lookAt(T);
+  renderer.render(s,cam);return renderer.domElement.toDataURL('image/png');
+};
+window.ready=true;
+</script></body></html>

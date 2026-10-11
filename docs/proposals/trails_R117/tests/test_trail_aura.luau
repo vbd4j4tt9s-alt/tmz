@@ -124,7 +124,7 @@ local clientScript=new('LocalScript');clientScript.Name='RunnerTrailAura'
 -- Capture the manager the script builds.
 local fx;local realNew=Fx.new;Fx.new=function()fx=realNew();return fx end
 load('RunnerTrailAura',clientScript)
-local function frames(n,dt)dt=dt or 1/20;for _=1,n do R.advance(dt);Run.Heartbeat:Fire(dt)end end
+local function frames(n,dt)dt=dt or 1/20;for _=1,n do R.advance(dt);Run.RenderStepped:Fire(dt);Run.Heartbeat:Fire(dt)end end -- (R153: the aura steps in RenderStepped)
 local function children(root)local n=0;for _,c in ipairs(root:GetChildren())do if c.Name:sub(1,10)=='TrailAura_'then n+=1 end end;return n end
 local function layer(rec,name)for _,L in ipairs(rec.Rig.Layers)do if L.Spec.Name==name then return L end end end
 local function setSpeed(root,s)root.AssemblyLinearVelocity=V3(0,0,-s)end
@@ -232,7 +232,7 @@ for _,o in ipairs(R.created)do if o._props.Name:sub(1,10)=='TrailAura_'and not r
 if alive>0 then for k,n in pairs(kinds)do print('  left:',k,n)end end
 check(alive==0,'script removal destroys every aura instance ('..alive..' left)')
 check(next(fx.Records)==nil and fx.Pool==0,'manager empty after removal')
-local hb=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hb+=1 end end;check(hb==0,'heartbeat disconnected')
+local hb=0;for _,c in ipairs(Run.Heartbeat._c)do if c.Connected then hb+=1 end end;for _,c in ipairs(Run.RenderStepped._c)do if c.Connected then hb+=1 end end;check(hb==0,'per-frame connection disconnected (R153: RenderStepped)')
 local pr=0;for _,c in ipairs(Players.PlayerRemoving._c)do if c.Connected then pr+=1 end end;check(pr==0,'PlayerRemoving disconnected')
 -- 4. Shop preview ------------------------------------------------------------------------------------------------------
 local Shop=req(RS.ShopProductArt);local lastCount=0

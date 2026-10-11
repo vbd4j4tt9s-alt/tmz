@@ -13,6 +13,18 @@ local camera=new('Camera');camera.ViewportSize=R.Vector2.new(1280,720);camera.CF
 function workspace.GetServerTimeNow()return R.clock end
 function workspace.BulkMoveTo()end
 local Run=service('RunService');Run.RenderStepped=R.signal();Run.Heartbeat=R.signal();Run.Stepped=R.signal();Run.PreSimulation=R.signal();Run.PostSimulation=R.signal()
+-- R149: RunService:BindToRenderStep / UnbindFromRenderStep. Bound functions run every W.frames() frame in priority order (low first) before RenderStepped
+-- (a bound name twice is an error, as on Roblox); W.rsBound[name] = {Prio, Fn} lets a test see what is bound.
+W.rsBound={};W.rsOrder={}
+function Run.BindToRenderStep(_,name,prio,fn)
+ if W.rsBound[name]then error('Name "'..tostring(name)..'" is already bound to RenderStep',2)end
+ if type(fn)~='function'then error('BindToRenderStep: function expected',2)end
+ W.rsBound[name]={Prio=prio,Fn=fn};W.rsOrder[#W.rsOrder+1]=name
+end
+function Run.UnbindFromRenderStep(_,name)
+ if not W.rsBound[name]then error('Can\'t unbind "'..tostring(name)..'" from RenderStep because it was not bound',2)end
+ W.rsBound[name]=nil;table.remove(W.rsOrder,table.find(W.rsOrder,name))
+end
 Run.IsStudio=function()return false end;Run.IsClient=function()return true end;Run.IsServer=function()return false end;Run.IsRunning=function()return true end
 local UIS=service('UserInputService');UIS.TouchEnabled=false;UIS.MouseEnabled=true;UIS.KeyboardEnabled=true;UIS.LastInputTypeChanged=R.signal()
 UIS.InputBegan=R.signal();UIS.InputEnded=R.signal();UIS.InputChanged=R.signal();UIS.WindowFocusReleased=R.signal()
@@ -40,6 +52,7 @@ do
   if k=='Rotation'then return setmetatable({Position=V3(0,0,0),R=c.R,__type='CFrame'},mt)end
   return base(c,k)
  end
+ rawset(mt,'__add',function(c,v)return setmetatable({Position=c.Position+v,R=c.R,__type='CFrame'},mt)end) -- CFrame + Vector3 (translation only)
  rawset(mt,'ToObjectSpace',function(a,b)return a:Inverse()*b end)
  rawset(mt,'PointToObjectSpace',function(a,v)return a:Inverse()*v end)
  rawset(mt,'VectorToWorldSpace',function(a,v)return (a*v)-a.Position end)
@@ -119,6 +132,15 @@ do local base=R.new;R.new=function(...)local o=base(...);o._props.SelectionGaine
  local inew=R.Instance.new;rawNew=function(class,parent)local o=R.new(class);if parent then o.Parent=parent end;return o end end
 R.Instance.new=function(class,parent)local o=rawNew(class,parent);if class=='ScreenGui'then o.AbsoluteSize=R.Vector2.new(1280,720);o.AbsolutePosition=R.Vector2.new(0,0)end;return o end
 env.Instance=R.Instance
-function W.frames(n,dt)for _=1,n do R.advance(dt or 1/60);Run.RenderStepped:Fire(dt or 1/60);Run.Heartbeat:Fire(dt or 1/60);Run.PreSimulation:Fire(dt or 1/60)end end
+function W.frames(n,dt)
+ for _=1,n do
+  R.advance(dt or 1/60)
+  if #W.rsOrder>0 then -- bound render steps, lowest priority number first (ties in binding order)
+   local list=table.clone(W.rsOrder);table.sort(list,function(a,b)local pa,pb=W.rsBound[a].Prio,W.rsBound[b].Prio;if pa~=pb then return pa<pb end;return table.find(W.rsOrder,a)<table.find(W.rsOrder,b)end)
+   for _,name in ipairs(list)do local b=W.rsBound[name];if b then b.Fn(dt or 1/60)end end
+  end
+  Run.RenderStepped:Fire(dt or 1/60);Run.Heartbeat:Fire(dt or 1/60);Run.PreSimulation:Fire(dt or 1/60)
+ end
+end
 W.Run=Run;W.UIS=UIS;W.Gui=Gui;W.CS=CS
 return W

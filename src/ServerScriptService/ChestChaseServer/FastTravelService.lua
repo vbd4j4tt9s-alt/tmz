@@ -64,10 +64,10 @@ function FastTravelService:_refusal(player, destination)
 	end
 	if player:GetAttribute("GuardianRagdollActive") or player:GetAttribute("GuardianFlingActive")
 		or humanoid.PlatformStand then
-		return "WAIT UNTIL YOU CAN MOVE!"
+		return "WAIT TILL YOU CAN MOVE!"
 	end
 	if self.Bases.TrainingSessions and self.Bases.TrainingSessions[player] then
-		return "STEP OFF THE TREADMILL FIRST!"
+		return "GET OFF THE TREADMILL FIRST!"
 	end
 	if root.Anchored then
 		return "FINISH YOUR CURRENT ACTION FIRST"
@@ -132,7 +132,7 @@ function FastTravelService:_travel(player, destination)
 	local refusal = self:_refusal(player, destination)
 	if refusal then
 		if refusal ~= "" then
-			self.Notifications:Show(player, refusal, WARN, 2)
+			self.Notifications:Show(player, refusal, WARN, 2, "Denied")
 		end
 		return false
 	end
@@ -141,7 +141,7 @@ function FastTravelService:_travel(player, destination)
 	if destination == "Base" then
 		record = self.Bases:GetPlayerBase(player)
 		if not record then
-			self.Notifications:Show(player, "YOU DO NOT HAVE AN ASSIGNED BASE", Color3.fromRGB(255, 125, 125), 2.5)
+			self.Notifications:Show(player, "YOU DO NOT HAVE AN ASSIGNED BASE", Color3.fromRGB(255, 125, 125), 2.5, "Denied")
 			return false
 		end
 		target = record.Spawn.CFrame * CFrame.new(0, 4, 0)
