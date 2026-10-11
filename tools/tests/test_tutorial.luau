@@ -49,12 +49,11 @@ local HOME_CF,HOME_SIZE=CF(0,0,-20),V3(100,1,100)
 -- Remote: returns what the server points at for the current step and records commands.
 local remotes=new('Folder');remotes.Name='ChestChaseRemotes';remotes.Parent=RS
 local request=new('RemoteFunction');request.Name='PremiumRequest';request.Parent=remotes
-local commands={};local serverStep={Kind='Pack',Target=V3(40,3,90)};local mockGrant=false -- (R158h: mockGrant = the server gives the free bonus roll at the 'BonusGift' ask)
+local commands={};local serverStep={Kind='Pack',Target=V3(40,3,90)}
 function request.InvokeServer(_,action,value)
  check(action=='Tutorial','remote action')
  commands[#commands+1]=value
  local step=player:GetAttribute('TutorialStep')or 0
- if value=='BonusGift'and mockGrant then player:SetAttribute('TreadmillBonusReady',1)end
  if value=='Skip'or value=='TreadmillInfo'then player:SetAttribute('TutorialDone',true);player:SetAttribute('TutorialStep',0);step=0 end
  return {Success=true,Step=step,Kind=serverStep.Kind,Target=serverStep.Target,WaitingForPack=serverStep.Waiting,HomeCFrame=HOME_CF,HomeSize=HOME_SIZE,
   ReadyAt=serverStep.ReadyAt,ReadyIn=serverStep.ReadyIn,Ripe=serverStep.Ripe}
@@ -388,22 +387,26 @@ player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialStep',10)
 pointers('no treadmill: the BONUS ROLL arrow',{button=bonusB,press=false})
 frames(60*(Guide.BonusSeconds+1))
 check(sentSince(cut)and player:GetAttribute('TutorialDone')==true,'no treadmill: step 10 finishes by itself');frames(60*2)
--- R158h (owner: "give players a free bonus roll once they are done"): the client asks the server ONCE when the BONUS ROLL arrow starts; with the roll ready the arrow waits until it is used
--- (the ready count drops) or BonusRollSeconds pass.
+-- R158i (owner: "players are still not granted that free roll"): the SERVER gives the free roll when step 10 begins (TutorialProgress; the client never asks: no 'BonusGift' request is ever sent), so
+-- the roll is ALREADY ready on the BONUS ROLL button; the arrow waits until a roll is used (the ready count drops, or TreadmillBonusRolled grows when a waiting roll takes its place) or
+-- BonusRollSeconds pass.
 do
  local function count(n)local c=0;for i=n+1,#commands do if commands[i]=='BonusGift'then c+=1 end end;return c end
- mockGrant=true
- player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialStep',10);serverStep={Kind='Treadmill',Target=nil};cut=#commands;frames(90)
- check(count(cut)==1,'the free roll: asked exactly once when the BONUS ROLL arrow starts ('..count(cut)..')')
- pointers('the free roll is ready: the BONUS ROLL arrow',{button=bonusB,press=false})
+ local function begin(ready,rolled)player:SetAttribute('TutorialDone',false);player:SetAttribute('TreadmillBonusReady',ready);player:SetAttribute('TreadmillBonusRolled',rolled);player:SetAttribute('TutorialStep',10);serverStep={Kind='Treadmill',Target=nil};cut=#commands;frames(90)end
+ begin(1,nil)
+ pointers('the free roll is ready (given by the server): the BONUS ROLL arrow',{button=bonusB,press=false})
  frames(60*(Guide.BonusSeconds+4));check(not sentSince(cut)and tapUi.Visible,'with the roll ready the arrow stays past the usual '..Guide.BonusSeconds..' s, waiting for the press')
  player:SetAttribute('TreadmillBonusReady',0);frames(60*2)
- check(sentSince(cut)and player:GetAttribute('TutorialDone')==true and count(cut)==1,'the roll used: the tutorial finishes (and no second ask)');frames(60*2)
- player:SetAttribute('TutorialDone',false);player:SetAttribute('TreadmillBonusReady',nil);player:SetAttribute('TutorialStep',10);cut=#commands;frames(90)
- check(count(cut)==1 and not sentSince(cut),'again: asked once')
+ check(sentSince(cut)and player:GetAttribute('TutorialDone')==true and count(cut)==0,'the roll used (the ready count dropped): the tutorial finishes, and no free roll was ever asked for');frames(60*2)
+ -- already holding 2 ready: the free roll waits and takes the used roll's place, so the ready count does not drop: the server's spent counter says it was used
+ begin(2,3)
+ frames(60*(Guide.BonusSeconds+4));check(not sentSince(cut)and tapUi.Visible,'2 ready (a waiting free roll): the arrow waits for the press')
+ player:SetAttribute('TreadmillBonusRolled',4);frames(60*2)
+ check(sentSince(cut)and player:GetAttribute('TutorialDone')==true and count(cut)==0,'... a roll spent (the counter grew while 2 stay ready): the tutorial finishes');frames(60*2)
+ begin(1,nil)
  frames(60*(Guide.BonusRollSeconds-3));check(not sentSince(cut)and tapUi.Visible,'the roll never pressed: still showing just before '..Guide.BonusRollSeconds..' s')
- frames(60*5);check(sentSince(cut)and player:GetAttribute('TutorialDone')==true,'... and it finishes by itself after '..Guide.BonusRollSeconds..' s')
- mockGrant=false;player:SetAttribute('TreadmillBonusReady',nil);frames(60*2)
+ frames(60*5);check(sentSince(cut)and player:GetAttribute('TutorialDone')==true and count(cut)==0,'... and it finishes by itself after '..Guide.BonusRollSeconds..' s')
+ player:SetAttribute('TreadmillBonusReady',nil);player:SetAttribute('TreadmillBonusRolled',nil);frames(60*2)
 end
 -- Resuming an old save (an R152 player who had planted: the server publishes 7): straight to the grow / harvest step.
 root.CFrame=CF(-10,3,5);heading=V3(0,0,1);player:SetAttribute('TutorialDone',false);player:SetAttribute('TutorialMask',23);serverStep={Kind='Crop',Target=V3(-20,5,10),ReadyAt=1000099,ReadyIn=0,Ripe=true};player:SetAttribute('TutorialStep',7);frames(60)

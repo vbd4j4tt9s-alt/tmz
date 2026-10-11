@@ -40,7 +40,10 @@ Config.ChaseSuccessFlashDuration = 1.1
 -- Speed is saved training progress. R80 maps it to a physical ceiling up to 5,000.
 -- RunnerController owns acceleration/braking within this server-published ceiling.
 Config.SpeedSystemVersion = 2
-Config.DefaultSpeed = 0
+-- R158i (owner: "increase the base speed of new players to 20k in-game speed but ... displayed as 1 speed on their screen"): nobody has fewer than SpeedFloor speed POINTS. A new profile starts
+-- there (DefaultSpeed) and an older profile below it is raised to it on load (PlayerDataService); the screens show points - 19,999, never below 1 (ReplicatedStorage.SpeedDisplay, Floor 20000).
+Config.SpeedFloor = 20000
+Config.DefaultSpeed = Config.SpeedFloor
 -- Uniform in-game size multiplier, applied once after the avatar appearance loads.
 Config.PlayerScaleMultiplier = 1.25
 Config.MaxTrainedSpeed = 1000000000
@@ -357,7 +360,8 @@ function Config.Validate()
 	assert(Config.MaxTrainedSpeed==nil, "R81 has no designed point cap")
 	assert(Config.BaseWalkSpeed > 0, "BaseWalkSpeed must be positive")
 	assert(Config.MaxWalkSpeed==nil, "R81 has no designed movement cap")
-    assert(Config.SpeedMilestones[1][1]==Config.DefaultSpeed and Config.SpeedMilestones[1][2]==Config.BaseWalkSpeed,"Speed curve must start at the default")
+    assert(Config.DefaultSpeed >= Config.SpeedFloor, "DefaultSpeed cannot be below the speed floor")
+    assert(Config.SpeedMilestones[1][1]==0 and Config.SpeedMilestones[1][2]==Config.BaseWalkSpeed,"Speed curve must start at 0 points (R158i: the default is the speed floor, 20,000)")
     for i=2,#Config.SpeedMilestones do
         local a,b=Config.SpeedMilestones[i-1],Config.SpeedMilestones[i]
         assert(b[1]>a[1] and b[2]>a[2],"Speed milestones must increase")
@@ -749,7 +753,7 @@ end
 local balance=require(game:GetService('ReplicatedStorage').BalanceRules)
 -- R148: ProfileVersion 22 (the roster change: pack OddsVersion 149 is unknown to an older server, which would re-save such a pack as
 -- a legacy-odds pack for good); a version-22 save is refused by an older server, which leaves it unchanged.
-Config.Version='V150 R158h';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
+Config.Version='V150 R158i';Config.ProfileVersion=22;Config.SpeedMilestones=balance.SpeedMilestones
 Config.MaxTrainedSpeed=nil;Config.MaxWalkSpeed=nil;Config.TrainingPointsPerSecond=100
 for i,tier in ipairs(Config.TreadmillTiers)do tier.Multiplier=balance.TrainingTiers[i]end
 for _,product in ipairs(Config.ShopCatalog.Trails)do product.SpeedMultiplier=balance.TrailMultipliers[product.Id]or product.SpeedMultiplier;product.Description=''end

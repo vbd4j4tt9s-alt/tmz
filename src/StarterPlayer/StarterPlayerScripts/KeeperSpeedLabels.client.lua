@@ -28,16 +28,16 @@ local RANGE=250 -- MaxDistance: the sign is high up and the run-up sees it from 
 local DEBOUNCE=.5 -- seconds: body parts that arrive together are measured once, and never more than twice a second
 local QUIET=5 -- seconds without a body change after which the model stops being watched (a swap to the baked model re-arms it: KeeperMeshVariant)
 local DARKENED_TOP=13.5 -- The Darkened's standing head top over its root (VeiledKeeper81's awake pose reaches 13.06; asleep it lies at 4.3): its pieces follow group frames, so no rest frame says it
-local Progress=require(RS:WaitForChild('Progression81'));local Points=require(RS:WaitForChild('SpeedPoints'))
+local Progress=require(RS:WaitForChild('Progression81'));local Display=require(RS:WaitForChild('SpeedDisplay'))
 local RGB=Color3.fromRGB
 local GREEN,RED=RGB(110,236,96),RGB(255,86,86)
 local labels={}
 -- Speed points needed to be faster than a keeper running at `speed`, as the sign's number. You must be strictly faster,
 -- so the need is PointsFor + 1 (exact decimal text: PointsFor is a double, and The Darkened's 600 takes 10^1011 points),
--- rounded up to 2 significant figures. Nothing is needed below the new-runner speed: "0".
+-- rounded up to 2 significant figures. R158i (owner: every player starts with 20,000 points but reads speed 1): the number is in the SHOWN speed (points - 19,999, never below 1), so what the
+-- sign asks for is what the HUD reads; a keeper every player already outruns asks "1". The one rule is SpeedDisplay.NeedForWalkSpeed (the hub gate's keys use it too); the ✓ still compares real walk speeds.
 local function needText(speed)
- if speed<Progress.Speed(0)then return'0'end
- return Points.NeedText(Points.Add(Progress.PointsText(speed),'1'))
+ return Display.NeedForWalkSpeed(speed)
 end
 local function build(model)
  local gui=Instance.new('BillboardGui');gui.Name='SpeedReq';gui.Size=UDim2.fromOffset(104,36);gui.LightInfluence=0;gui.MaxDistance=RANGE

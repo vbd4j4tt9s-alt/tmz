@@ -59,11 +59,12 @@ function Wallet.new(parent)
  local function bindSpeed()
   if speedConnection then speedConnection:Disconnect();speedConnection=nil end
   local value=leader and leader:FindFirstChild('Speed')
+  -- R158i: the HUD reads the SHOWN speed (points - 19,999, never below 1: SpeedDisplay); the jump below still compares the real points.
   -- R112: the speed number jumps every time it goes up.
   local shown=value and value.Value or 0
   -- Speed is a big-number string, so compare with SpeedPoints rather than as text.
   local function gained(now,before)local ok,diff=pcall(function()local P=require(RS.SpeedPoints);return P.Compare(P.Normalize(now),P.Normalize(before))end);return ok and diff>0 end
-  local function update()if dead then return end;local now=value and value.Value or 0;self.Speed:SetValue(now);if gained(now,shown)then self.Speed:Jump()end;shown=now end
+  local function update()if dead then return end;local now=value and value.Value or 0;self.Speed:SetValue(require(RS.SpeedDisplay).Shown(now));if gained(now,shown)then self.Speed:Jump()end;shown=now end
   if value then speedConnection=value:GetPropertyChangedSignal('Value'):Connect(update)end;update()
  end
  local function bindLeader()

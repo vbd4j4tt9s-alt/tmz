@@ -141,7 +141,7 @@ executeFor=function(ctx,player,text,requester)
  elseif action=='stats'then
   local records=ctx.Data:GetChestRecords(player);local packs=0
   for _,r in ipairs(records)do if r.Kind=='Pack'then packs+=1 end end
-  return true,string.format('Seeds %d | Packs %d | Plants %d | Harvests %d | Cash %.0f | Speed %s',#records-packs,packs,#crops(ctx.Data,player),#ctx.Data.Gardens[player].Harvests,ctx.Data:GetCash(player),ctx.Data:GetOrCreateSpeedValue(player).Value)
+  return true,string.format('Seeds %d | Packs %d | Plants %d | Harvests %d | Cash %.0f | Speed %s',#records-packs,packs,#crops(ctx.Data,player),#ctx.Data.Gardens[player].Harvests,ctx.Data:GetCash(player),require(RS.SpeedDisplay).Both(ctx.Data:GetOrCreateSpeedValue(player).Value))
  elseif action=='unfly'or action=='clip'then
   player:SetAttribute(action=='unfly'and'StudioTestFlying'or'StudioTestNoclip',false)
   if not player:GetAttribute('StudioTestFlying')and not player:GetAttribute('StudioTestNoclip')then TestState.ClearMovement(player)end
@@ -295,7 +295,7 @@ executeFor=function(ctx,player,text,requester)
   local value=a[1];if not exact(1)or not require(game:GetService('ReplicatedStorage').SpeedPoints).Valid(value)then return false,'Use /test speed <nonnegative whole points>.'end
   local speed=data:GetOrCreateSpeedValue(player);speed.Value=config.NormalizeSpeedStat(value)
   local _,h=character(player);if h then ctx.Bases:_applyPhysicalSpeed(player,h,speed.Value)end
-  data:MarkDirty(player);data:QueueGardenSave(player);return true,'Trained speed: '..speed.Value
+  data:MarkDirty(player);data:QueueGardenSave(player);return true,'Trained speed: '..require(RS.SpeedDisplay).Both(speed.Value)..(require(RS.SpeedPoints).Compare(speed.Value,config.DefaultSpeed or 0)<0 and' (below the 20,000 start: raised to it when the player next joins)'or'')
  elseif action=='treadmill'then
   local tier=number(a[1],nil,1,#config.TreadmillTiers,true);if not exact(1)or not tier then return false,'Use /test treadmill <1–7>.'end
   local t=data:GetTreadmillData(player);t.Tier=tier;t.Skin=tier

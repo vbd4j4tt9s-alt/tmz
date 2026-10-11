@@ -9,7 +9,9 @@
 # R158f release: Config.Version 'V150 R158f' (nothing else changed)
 # R158g release: Config.Version 'V150 R158g' (nothing else changed)
 # R158h release: Config.Version 'V150 R158h' (nothing else changed)
-449b8d56a0eb57828cce3222efa64fad5f081f2635d40ede119f1b9e2ca40f7e  src/ServerScriptService/ChestChaseServer/Config.lua
+# R158i release: Config.Version 'V150 R158i' (and Config.SpeedFloor / DefaultSpeed, see the R158i line)
+# R158i (on purpose): Config.lua: Config.SpeedFloor = 20000 and Config.DefaultSpeed = SpeedFloor (was 0): every speed starts at 20,000 points, the screens show points - 19,999 (never below 1); Validate checks the curve starts at 0 points (not at the default); no other value changed
+9601d4de38398be9823f7b0f374769464176f3fb0ecaf6c2a2c1255faa1df01b  src/ServerScriptService/ChestChaseServer/Config.lua
 052c0df01f4e131396996df31a2e3a64d2be1aa3dafa3172e2dc59b66eeab696  src/ReplicatedStorage/EconomyBalance90.lua
 e0056ebd12983a74ddd20e3393286862f3da4faeb8f0bba0e3d5cd9d28ff6afb  src/ReplicatedStorage/EconomyScaling91.lua
 b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/ReplicatedStorage/ItemWeight.lua

@@ -21,6 +21,19 @@ function P.Add(a,b)
  end
  return #out>0 and table.concat(out):reverse()or'0'
 end
+-- R158i: a-b for exact whole points, never below 0 (the shown speed is the points minus the 19,999 every player starts with: SpeedDisplay).
+function P.Sub(a,b)
+ a=P.Normalize(a);b=P.Normalize(b)
+ if P.Compare(a,b)<=0 then return '0'end
+ local out={};local i,j,borrow=#a,#b,0
+ while i>0 do
+  local n=a:byte(i)-48-borrow-(j>0 and b:byte(j)-48 or 0)
+  if n<0 then n+=10;borrow=1 else borrow=0 end
+  out[#out+1]=string.char(48+n);i-=1;j-=1
+ end
+ local text=table.concat(out):reverse():gsub('^0+','')
+ return text~=''and text or'0'
+end
 function P.Log10(v)
  v=P.Normalize(v);if v=='0'then return 0 end
  local n=math.min(14,#v)

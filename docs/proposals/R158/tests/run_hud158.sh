@@ -34,7 +34,7 @@ if git -C "$REPO" cat-file -e "$BASE:src/StarterPlayer/StarterPlayerScripts/Hotb
   [ "$(head -1 "$REPO/$f")" = "$(git -C "$REPO" show "$BASE:$f" | head -1)" ] || fail "$f: line 1 (the load guard) changed"
  done
  echo "ok: line 1 of the $n changed client scripts is unchanged (the load guard)"
- cfgnorm(){ sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/"; } # (every release bumps the Version line; nothing else in Config may change)
+ cfgnorm(){ sed "s/Config.Version='V150 R1[0-9a-z]*'/Config.Version='V150 R1xx'/" | sh "$P/R158i/tests/cfg_r158i_undo.sh"; } # (every release bumps the Version line; nothing else in Config may change; R158i's speed floor lines are put back first)
  git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | cfgnorm > "$OUT/cfg_base.txt"
  cfgnorm < "$REPO/src/ServerScriptService/ChestChaseServer/Config.lua" | cmp -s - "$OUT/cfg_base.txt" && echo "ok: Config.lua is untouched (apart from the release's Version line)" || fail "Config.lua changed since $BASE (beyond the Version line)"
  git -C "$REPO" diff --quiet "$BASE" -- src/ReplicatedStorage/TreadmillBonusRules.lua && echo "ok: TreadmillBonusRules (frozen by R150) is untouched" || fail "TreadmillBonusRules changed since $BASE"

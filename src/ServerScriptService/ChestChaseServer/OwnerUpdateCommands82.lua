@@ -202,7 +202,7 @@ function X.Execute(ctx,p,action,a,requester)
  elseif action=='training'then
   if #a~=0 then return false,'Use training [@username].'end
   local points=data:GetOrCreateSpeedValue(p).Value
-  return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..string.format('%g',math.floor(ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..' | total '..string.format('%g',math.floor(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points
+  return true,'Treadmill only | base '..ctx.Config.TrainingPointsPerSecond..'/s | multiplier '..ctx.Bases:GetTreadmillMultiplier(p)..' | friends x'..string.format('%g',math.floor(ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..' | total '..string.format('%g',math.floor(ctx.Config.TrainingPointsPerSecond*ctx.Bases:GetTreadmillMultiplier(p)*ctx.Bases:GetFriendGainMultiplier(p)*100+.5)/100)..'/s | training '..tostring(p:GetAttribute('TreadmillTraining')==true)..' | physical '..string.format('%.2f',ctx.Config.GetPlayerWalkSpeed(p,points))..' | points '..points..' | shown speed '..require(RS.SpeedDisplay).Shown(points)
  elseif action=='odds'then
   local st,key,luck,word
   -- R155: a last word "lucky" = the pack pity's lucky 10th (x1.5 on the luck / the clover, and the x1.5 cap for that roll: up to x75M)

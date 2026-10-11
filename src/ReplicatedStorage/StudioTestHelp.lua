@@ -26,7 +26,7 @@ return {
  {'/test stats @username','Seeds, packs, plants, harvests, cash and speed points.'},
  {'/test cash set 1000000 @username','Set cash. cash add <amount> adds instead.'},
  {'/test gems add 100 @username','Add Gems (gems set also works).'},
- {'/test speed 100000000000 @username','Set saved speed points (points, not studs per second).'},
+ {'/test speed 100000000000 @username','Set saved speed points (points, not studs per second). R158i: everyone has at least 20,000 points and the screen shows points - 19,999 (never below 1), so 20,060 reads 61; the reply shows both.'},
  {'/test treadmill 7 @username','Set treadmill tier 1–7 (Forest … Storm).'},
  {'/test boots 5 @username','Unlock and equip luck boots 1–5.'},
  {'/test trail 6 @username','Unlock and equip training trail 1–6.'},

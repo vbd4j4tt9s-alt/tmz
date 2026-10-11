@@ -9,8 +9,12 @@
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Run=game:GetService('RunService')
 local Rules=require(RS:WaitForChild('TreadmillBonusRules'));local PackRules=require(RS:WaitForChild('SeedPackRules'));local Starter=require(RS:WaitForChild('StarterVerityRules158d')) -- R158d: the new-player gift's 2 rolls
 local S={};S.__index=S
+-- R158i: the free roll of the tutorial (GrantGift) that did not fit because the player already held the most READY rolls waits here (session) and in Premium.BonusGiftPending158i (saved,
+-- optional field: ProfileVersion stays 22) until a roll is spent: it then becomes ready at once. TreadmillBonusRolled counts the rolls this player spent this session (the tutorial's arrow
+-- waits for it to grow: with a waiting roll the ready count does not drop when one is used).
+local PENDING_FIELD='BonusGiftPending158i';local ROLLED_ATTR='TreadmillBonusRolled'
 function S.new(config,data,base,chests,notes)
- local self=setmetatable({Config=config,Data=data,Base=base,Chests=chests,Notes=notes,State={},Ready={},LastRoll={},Random=Random.new()},S)
+ local self=setmetatable({Config=config,Data=data,Base=base,Chests=chests,Notes=notes,State={},Ready={},Pending={},LastRoll={},Random=Random.new()},S)
  local folder=RS:FindFirstChild('ChestChaseRemotes')
  if not folder then folder=Instance.new('Folder');folder.Name='ChestChaseRemotes';folder.Parent=RS end
  local remote=folder:FindFirstChild(Rules.RemoteName)
@@ -53,10 +57,37 @@ function S:Setup(player)
  -- R158d: the new-player gift's bonus rolls that were not used yet (Premium.StarterRolls158d, 0 - 2) are ready again after a rejoin (ready rolls themselves live in the session only).
  local okOwed,owed=pcall(function()return Starter.CleanRolls(self.Data:GetPremium(player)[Starter.RollsField])end)
  if okOwed and owed>0 and self:GetReady(player)<owed then self.Ready[player]=Rules.ReadyCount(owed)end
+ do local okWait,waiting=pcall(function()return self.Data:GetPremium(player)[PENDING_FIELD]==true end) -- R158i: a gift roll that was still waiting for room
+  if okWait and waiting then self.Pending[player]=true;self:_promote(player)end
+ end
  self:_state(player);self:_publish(player)
 end
 function S:Cleanup(player)
- self.State[player]=nil;self.Ready[player]=nil;self.LastRoll[player]=nil
+ self.State[player]=nil;self.Ready[player]=nil;self.Pending[player]=nil;self.LastRoll[player]=nil
+end
+-- R158i: a gift roll counts as a starter roll once it is READY (Premium.StarterRolls158d, 0 - 2), so a rejoin before it is used brings it back (ready rolls themselves live in the session only).
+function S:_keepOwed(player)
+ local premium=self.Data:GetPremium(player)
+ premium[Starter.RollsField]=math.min(Starter.Rolls,Starter.CleanRolls(premium[Starter.RollsField])+1)
+end
+-- R158i: the waiting gift roll becomes ready the moment there is room (never yields; the caller publishes). Returns true when it did.
+function S:_promote(player)
+ if not self.Pending[player]or self:GetReady(player)>=Rules.MaxReady then return false end
+ self.Pending[player]=nil;self.Data:GetPremium(player)[PENDING_FIELD]=nil
+ self.Ready[player]=self:GetReady(player)+1;self:_keepOwed(player);self.Data:MarkDirty(player)
+ return true
+end
+-- R158i (owner: the tutorial's free bonus roll "still" did not reach players): ONE gift roll, given by the SERVER (TutorialProgress, when the tutorial reaches its last step; nothing a client
+-- sends). Room for it: a READY roll at once. Already holding the most ready rolls (new players hold the 2 of the starter gift): it waits (Pending, saved) and is ready as soon as one roll is
+-- spent, so the player always gets one roll more than they could hold. Returns true and 'ready' / 'pending'; false when the profile is not loaded.
+function S:GrantGift(player)
+ if not self.Data:IsLoaded(player)then return false end
+ if self:GetReady(player)<Rules.MaxReady then
+  self.Ready[player]=self:GetReady(player)+1;self:_keepOwed(player);self.Data:MarkDirty(player);self:_publish(player)
+  return true,'ready'
+ end
+ self.Pending[player]=true;self.Data:GetPremium(player)[PENDING_FIELD]=true;self.Data:MarkDirty(player);self:_publish(player)
+ return true,'pending'
 end
 -- Public API (owner/test commands). All clamp to the normal rules and republish the attributes.
 -- :GrantReady(player,n) adds n READY rolls (cap 2, session only); :SetProgress(player,seconds) sets saved progress
@@ -114,10 +145,12 @@ function S:Roll(player)
  if not record then return {Error=reason or'PACK COULD NOT BE ADDED',Ready=ready}end
  pcall(function()require(script.Parent.OwnerTestPacks).Claim(player,'Bonus',record)end) -- R151: a roll that an owner "bonus" command made ready is a TEST pack (never announced)
  self.Ready[player]=ready-1
+ player:SetAttribute(ROLLED_ATTR,(tonumber(player:GetAttribute(ROLLED_ATTR))or 0)+1) -- R158i: a roll was spent (the tutorial's arrow)
  do -- R158d: a roll spent takes a starter roll first (the saved count goes down with it: it never comes back after a rejoin)
   local premium=self.Data:GetPremium(player);local owed=Starter.CleanRolls(premium[Starter.RollsField])
   if owed>0 then premium[Starter.RollsField]=owed-1>0 and owed-1 or nil;self.Data:MarkDirty(player)end
  end
+ self:_promote(player) -- R158i: a gift roll that was waiting for room is ready now (the ready count may stay the same)
  if self.Data.QueueGardenSave then self.Data:QueueGardenSave(player)end
  self:_publish(player)
  if self.Chests then
@@ -126,6 +159,6 @@ function S:Roll(player)
  end
  local rarity=Rules.Tier(pick.Variant)
  return {Ok=true,Stage=pick.Stage,Variant=pick.Variant,Rarity=rarity,Biome=pick.Variant==Rules.Void.Variant and Rules.Void.Label or PackRules.DesignBiomes[pick.Stage],
-  Label=PackRules.PackLabel(pick.Stage,pick.Variant,record.PackSize,'None'),Size=record.PackSize,Id=record.Id,Pool=Rules.EncodePool(stages),Ready=ready-1}
+  Label=PackRules.PackLabel(pick.Stage,pick.Variant,record.PackSize,'None'),Size=record.PackSize,Id=record.Id,Pool=Rules.EncodePool(stages),Ready=self:GetReady(player)}
 end
 return S

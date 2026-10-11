@@ -71,12 +71,11 @@ end
 -- Track gate ------------------------------------------------------------------------------------------------------------------------------
 local GREEN=RGB(110,236,96)
 function M.SpeedNeed(stage)
- -- the number the keeper's sign shows (KeeperSpeedLabels: points needed to be strictly faster, rounded up to 2 significant figures)
+ -- the number the keeper's sign shows (KeeperSpeedLabels: the shown speed needed to be strictly faster, rounded up to 2 significant figures)
  local ok,escape,txt=pcall(function()
-  local Pursuit=require(RS:WaitForChild('KeeperPursuit'));local Progress=require(RS:WaitForChild('Progression81'));local Points=require(RS:WaitForChild('SpeedPoints'))
+  local Pursuit=require(RS:WaitForChild('KeeperPursuit'));local Display=require(RS:WaitForChild('SpeedDisplay'))
   local speed=Pursuit.EscapeSpeed(stage)
-  if speed<Progress.Speed(0)then return speed,'0'end
-  return speed,Points.NeedText(Points.Add(Progress.PointsText(speed),'1'))
+  return speed,Display.NeedForWalkSpeed(speed) -- (R158i: the SHOWN speed, points - 19,999, never below 1: the same number as the keeper's sign)
  end)
  if ok then return txt,escape end
  return'?',math.huge

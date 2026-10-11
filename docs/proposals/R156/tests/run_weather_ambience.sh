@@ -20,7 +20,7 @@ echo "== 0. static"
 git -C "$REPO" rev-parse --verify -q "$BASE^{commit}" >/dev/null || fail "the base commit $BASE is not in this repository (set R156_BASE)"
 sh "$T/check_compile_O0.sh" "$REPO" > "$OUT/compile.log" 2>&1 && echo "ok: $(tail -2 "$OUT/compile.log" | head -1)" || { fail "check_compile_O0.sh";tail -8 "$OUT/compile.log"; }
 git -C "$REPO" diff --quiet "$BASE" -- src/StarterPlayer/StarterPlayerScripts/BackgroundMusic.client.lua || sh "$T/bgm_frozen.sh" "$REPO" || fail "BackgroundMusic.client.lua changed since $BASE (the music stays as it is)" # R156 (on purpose): but for the owner's music change, accepted by its frozen hash
-norm(){ sed "s/Config\.Version='[^']*'/Config.Version=V/"; }
+norm(){ sed "s/Config\.Version='[^']*'/Config.Version=V/" | sh "$P/R158i/tests/cfg_r158i_undo.sh"; } # (R158i's speed floor lines are put back first)
 [ "$(git -C "$REPO" show "$BASE:src/ServerScriptService/ChestChaseServer/Config.lua" | norm)" = "$(norm < "$SS/Config.lua")" ] || fail "Config.lua changed beyond Config.Version since $BASE"
 echo "ok: BackgroundMusic.client.lua (or the R156 music script frozen in frozen.sha256) and Config.lua (all but its Version) are untouched since $BASE"
 sh "$P/R152/tests/run_load_guard.sh" "$OUT/guard" > "$OUT/guard.log" 2>&1 && echo "ok: $(tail -2 "$OUT/guard.log" | head -1)" || { fail "the R152 load guard test fails";tail -5 "$OUT/guard.log"; }

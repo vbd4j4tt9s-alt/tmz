@@ -14,7 +14,7 @@
 #  test_tutorial158e   - the server on the real player data: the ten steps, only a stolen pack ticks the steal step (any pack opens), the first fruit in 10 s once, the Skip request
 #                        refused (nothing changes), old saves;
 #  teeth               - mutants of the real scripts that each of the checks above must catch (a skip button back, a word on the clicking hand, two arrows for one goal, no hovering
-#                        arrow, a look with two purposes, any pack ticking the steal step, the quick fruit twice, the Skip request accepted, all fruit quick, the other fruit jumping at 10 s).
+#                        arrow, a look with two purposes, any pack ticking the steal step, the quick fruit twice, the Skip request accepted, all fruit quick, the other fruit jumping at 10 s; R158i: the free roll not given at step 10, lost at the 2-ready cap, never promoted, the flag spent on a throw).
 #                        Skip them with TEETH=0.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
@@ -33,8 +33,11 @@ if sed 's/--.*$//' "$RSD/BeginnerGuide.lua" | grep -nE "Title *=|Chip *=|Equippe
 grep -q "if action=='Skip'then return false end" "$SRV/TutorialProgress.lua" || fail "TutorialAction must refuse the Skip request"
 if sed 's/--.*$//' "$SRV/PremiumService.lua" | grep -n "'Skip'";then fail "PremiumService has a Skip path";fi
 grep -q "playerData.TreadmillBonus = treadmillBonus" "$S/ServerScriptService/ChestChaseServerMain.server.lua" || fail "ChestChaseServerMain must hand the bonus service to the player data (the tutorial's free roll)"
-sed 's/--.*$//' "$C/BeginnerTutorial.client.lua" | grep -q "fetch('BonusGift')" || fail "the client must ask for the free bonus roll"
-echo "ok: no card, no skip (the server refuses it), no sound, no bonus clock in the tutorial; the free bonus roll is wired"
+if sed 's/--.*$//' "$C/BeginnerTutorial.client.lua" | grep -n "BonusGift";then fail "R158i: the client must not ask for the free bonus roll (the server gives it at step 10)";fi
+sed 's/--.*$//' "$SRV/TutorialProgress.lua" | grep -q "if not state.Done and not state.Bonus and G.Step(state)==10 then self:TutorialBonusGift(player)end" || fail "R158i: PublishTutorial must give the free roll at step 10"
+sed 's/--.*$//' "$SRV/TutorialProgress.lua" | grep -q "bonus.GrantGift" || fail "R158i: the free roll must go through TreadmillBonusService:GrantGift"
+if sed 's/--.*$//' "$SRV/PremiumService.lua" | grep -n "BonusGift";then fail "R158i: PremiumService must not know the free roll (no request is needed)";fi
+echo "ok: no card, no skip (the server refuses it), no sound, no bonus clock in the tutorial; the free bonus roll is the server's (step 10), no client ask"
 prep_client() { # $1 = a src tree, $2 = the run dir
  mkdir -p "$2";cp "$T/roblox.luau" "$T/test_tutorial.luau" "$T/test_guide_flow.luau" "$2/"
  cp "$1/ReplicatedStorage/BeginnerGuide.lua" "$2/new_Guide.luau";cp "$1/ReplicatedStorage/HudLayout.lua" "$2/Hud.luau"
@@ -54,7 +57,7 @@ echo "== test_tutorial158e"
 run_server "$OUT/server" || { grep -v '^WARN' "$OUT/server/server.log" | tail -25;fail "server test"; }
 grep '^INFO' "$OUT/server/server.log" || true
 grep -v '^WARN' "$OUT/server/server.log" | tail -1
-[ "${TEETH:-1}" = 0 ] && { echo "R158g tutorial suite passed (teeth skipped)";exit 0; }
+[ "${TEETH:-1}" = 0 ] && { echo "R158i tutorial suite passed (teeth skipped)";exit 0; }
 echo "== teeth"
 mutant() { # $1 name, $2 file (relative to src), $3 from (fixed string), $4 to, $5 client|server
  M=$OUT/mut_$1;rm -rf "$M";mkdir -p "$M";cp -r "$S" "$M/src"
@@ -75,9 +78,14 @@ mutant never_over StarterPlayer/StarterPlayerScripts/BeginnerTutorial.client.lua
 mutant two_purposes ReplicatedStorage/BeginnerGuide.lua "Track={Step=2,Button='TrackButton'}," "Track={Step=2,Button='TrackButton',World='Pack'}," client
 mutant bonus_twice ServerScriptService/ChestChaseServer/TutorialProgress.lua "state.Done or state.Bonus or G.Step(state)~=10" "state.Done or G.Step(state)~=10" server
 mutant bonus_any_step ServerScriptService/ChestChaseServer/TutorialProgress.lua "state.Done or state.Bonus or G.Step(state)~=10" "state.Done or state.Bonus" server
+mutant bonus_not_on_step10 ServerScriptService/ChestChaseServer/TutorialProgress.lua "if not state.Done and not state.Bonus and G.Step(state)==10 then self:TutorialBonusGift(player)end" "" server
+mutant bonus_lost_at_cap ServerScriptService/ChestChaseServer/TreadmillBonusService.lua " self.Pending[player]=true;self.Data:GetPremium(player)[PENDING_FIELD]=true;self.Data:MarkDirty(player);self:_publish(player)
+ return true,'pending'" " return true,'full'" server
+mutant bonus_never_promoted ServerScriptService/ChestChaseServer/TreadmillBonusService.lua " self:_promote(player) -- R158i: a gift roll that was waiting for room" " -- (mutant)" server
+mutant bonus_flag_spent_on_throw ServerScriptService/ChestChaseServer/TutorialProgress.lua "if not ok or not granted then state.Bonus=nil;return false end" "if not ok or not granted then return false end" server
 mutant skip_accepted ServerScriptService/ChestChaseServer/TutorialProgress.lua "if action=='Skip'then return false end" "if action=='Skip'then local pr=self:GetPremium(player);pr.Tutorial=pr.Tutorial or G.Read();pr.Tutorial.Done=true;changed(self,player);return true end" server
 mutant gift_ticks_steal ServerScriptService/ChestChaseServer/PlayerDataService.lua "if type(options) == \"table\" and options.Banked == true then self:TutorialEvent(player,'Pack') end" "self:TutorialEvent(player,'Pack')" server
 mutant fast_twice ServerScriptService/ChestChaseServer/TutorialProgress.lua "if not state or state.Done or state.Fast or G.Step(state)~=6 then return false end" "if not state or state.Done or G.Step(state)~=6 then return false end" server
 mutant early_fruit_jump ReplicatedStorage/PlantGrowth.lua "local early=own and own.Duration and readyAt-own.Duration<=start" "local early=false" server
 mutant fast_all_fruit ReplicatedStorage/BeginnerGuide.lua "if count>1 and def.Mode~='whole'and def.Regrows~=false then" "if false then" client
-echo "R158g tutorial suite passed"
+echo "R158i tutorial suite passed"

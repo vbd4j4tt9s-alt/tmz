@@ -452,11 +452,11 @@ check(near(gui.StudsOffsetWorldSpace.Y,23,1e-9)and gui.Size.X.Scale==0 and gui.S
 local cap=gui.Pill.Caption
 check(near(cap.Size.Y.Scale,.3,1e-9)and near(gui.Pill.Value.Size.Y.Scale,.6,1e-9)and cap.Size.Y.Scale*36<12 and gui.Pill.Value.Size.Y.Scale*36>=20,'[size] the caption takes about 30% of the height (under 12 px), the number about 60% (over 20 px)')
 -- No PhysicalWalkSpeed yet: the player is a new runner (24).
-check(value.Text=='⚡ 0  ✓'and GREEN(value.TextColor3)and GREEN(edge.Color),'The Forest keeper (20): nothing is needed and a new runner (24) is faster: green "⚡ 0  ✓" ('..value.Text..')')
+check(value.Text=='⚡ 1  ✓'and GREEN(value.TextColor3)and GREEN(edge.Color),'The Forest keeper (20): nothing is needed and a new runner (24) is faster: green "⚡ 1  ✓" (R158i: the shown speed never reads below 1) ('..value.Text..')')
 -- The real keepers (RouteBalance83.KeeperSpeeds: three per biome) and the owner's numbers, exactly.
 local Route=W.module('RouteBalance83')
 local expected={
- {'Forest',1,{20,23,26},{'0','0','510'}},{'Jungle',6,{32,37,42},{'3,800','18K','46K'}},{'Desert',2,{50,57,65},{'92K','210K','540K'}},
+ {'Forest',1,{20,23,26},{'1','1','1'}},{'Jungle',6,{32,37,42},{'1','1','26K'}},{'Desert',2,{50,57,65},{'72K','190K','520K'}},
  {'Snow',3,{80,92,104},{'1.2M','2.9M','7.1M'}},{'Lava',4,{128,147,166},{'16M','25M','45M'}},{'Crystal',5,{205,236,266},{'160M','370M','690M'}},
  {'Storm',7,{330,379,429},{'2.6B','7.1B','22B'}}}
 local realOk=true
@@ -473,17 +473,17 @@ for _,row in ipairs(expected)do for i,e in ipairs(row[3])do
  local t=vtext(bySpeed[e]);local want='⚡ '..row[4][i]..(e<24 and'  ✓'or'')
  if t~=want then textsOk=false;diag[#diag+1]=row[1]..' '..e..' '..t..' (want '..want..')'end
 end end
-check(textsOk,'at walk speed 24, all 21 keepers: Forest 0 / 0 / 510, Jungle 3,800 / 18K / 46K, Desert 92K / 210K / 540K, Snow 1.2M / 2.9M / 7.1M, Lava 16M / 25M / 45M, Crystal 160M / 370M / 690M, Storm 2.6B / 7.1B / 22B'..(#diag>0 and(': '..table.concat(diag,'; '))or''))
+check(textsOk,'at walk speed 24, all 21 keepers (R158i: the shown speed, points - 19,999, never below 1): Forest 1 / 1 / 1, Jungle 1 / 1 / 26K, Desert 72K / 190K / 520K, Snow 1.2M / 2.9M / 7.1M, Lava 16M / 25M / 45M, Crystal 160M / 370M / 690M, Storm 2.6B / 7.1B / 22B'..(#diag>0 and(': '..table.concat(diag,'; '))or''))
 check(RED(vcolor(bySpeed[32]))and RED(vcolor(bySpeed[330]))and GREEN(vcolor(bySpeed[20]))and GREEN(vcolor(bySpeed[23])),'red when the keeper is faster than me, green when I am faster')
 local _,_,edgeJ=pill(bySpeed[32]);check(RED(edgeJ.Color),'(the outline follows)')
 check(not vtext(bySpeed[32]):find('✓',1,true),'no ✓ while the keeper is faster')
 -- My walk speed changes.
-player:SetAttribute('PhysicalWalkSpeed',31);check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 3,800','31: still slower than the 32 keeper')
+player:SetAttribute('PhysicalWalkSpeed',31);check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 1','31: still slower than the 32 keeper')
 player:SetAttribute('PhysicalWalkSpeed',32);check(RED(vcolor(bySpeed[32]))and not vtext(bySpeed[32]):find('✓',1,true),'exactly 32: not faster (it takes MORE than the keeper)')
-player:SetAttribute('PhysicalWalkSpeed',32.01);check(GREEN(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 3,800  ✓','32.01: green with ✓ (the number stays the points needed)')
-player:SetAttribute('PhysicalWalkSpeed',51);check(GREEN(vcolor(bySpeed[50]))and vtext(bySpeed[50])=='⚡ 92K  ✓'and RED(vcolor(bySpeed[80])),'51 beats the Desert keeper (50), not the Snow one (80)')
+player:SetAttribute('PhysicalWalkSpeed',32.01);check(GREEN(vcolor(bySpeed[32]))and vtext(bySpeed[32])=='⚡ 1  ✓','32.01: green with ✓ (the number stays the speed needed)')
+player:SetAttribute('PhysicalWalkSpeed',51);check(GREEN(vcolor(bySpeed[50]))and vtext(bySpeed[50])=='⚡ 72K  ✓'and RED(vcolor(bySpeed[80])),'51 beats the Desert keeper (50), not the Snow one (80)')
 player:SetAttribute('PhysicalWalkSpeed',331);check(GREEN(vcolor(bySpeed[330]))and vtext(bySpeed[330])=='⚡ 2.6B  ✓','331 beats the Storm keeper')
-player:SetAttribute('PhysicalWalkSpeed',nil);check(vtext(bySpeed[32])=='⚡ 3,800'and RED(vcolor(bySpeed[32]))and GREEN(vcolor(bySpeed[20])),'no PhysicalWalkSpeed attribute: treated as a new runner (24)')
+player:SetAttribute('PhysicalWalkSpeed',nil);check(vtext(bySpeed[32])=='⚡ 1'and RED(vcolor(bySpeed[32]))and GREEN(vcolor(bySpeed[20])),'no PhysicalWalkSpeed attribute: treated as a new runner (24)')
 player:SetAttribute('PhysicalWalkSpeed','fast');check(GREEN(vcolor(bySpeed[20]))and RED(vcolor(bySpeed[32])),'(a text value too)')
 player:SetAttribute('PhysicalWalkSpeed',24)
 -- Independent reference (plain arithmetic, for needs under 10^15): the points needed rounded up to 2 significant figures.
@@ -500,6 +500,10 @@ local function refText(v)
   if v>=s[1]then local q=string.format('%.1f',v/s[1]);return(q:gsub('%.0$',''))..s[2]end
  end
 end
+-- R158i (owner: every player has at least 20,000 points but reads speed 1): a sign shows the SHOWN speed it asks for, points - 19,999 (never below 1), rounded up to 2 significant figures;
+-- anything up to the starting 20,000 points reads "1". `n` = the real points needed.
+local function shownNeed(n)return math.max(1,n-19999)end
+local function expectText(n)local m=shownNeed(n);if m==1 then return'1'end;return refText(refRound(m))end
 -- Reading a sign's text back: the number of points it shows, or nil when the text is not in the allowed shape: whole under a
 -- million (commas only below 10,000, otherwise 1-3 digits and K), from a million up 1-3 digits with at most one non-zero
 -- decimal and M / B / T / Qa ... (never "1,200K", never ".0", never e-notation).
@@ -528,8 +532,8 @@ local function texts(b)
 end
 local function core(list)local pick={};for _,i in ipairs({1,4,7,10,13,16,19})do pick[#pick+1]=plain(list[i])end;return table.concat(pick,' | ')end
 local base=texts(nil)
-check(core(base)=='⚡ 0 | ⚡ 3,800 | ⚡ 92K | ⚡ 1.2M | ⚡ 16M | ⚡ 160M | ⚡ 2.6B','no friends (the first keeper of each biome): 0, 3,800, 92K, 1.2M, 16M, 160M, 2.6B')
-check(core(texts(1))==core(base)and core(texts(1.1))==core(base)and core(texts(1.2))==core(base)and core(texts(1.3))==core(base),'friends do not change a single number: +10% / +20% / +30% give the same 0, 3,800, 92K, 1.2M, 16M, 160M, 2.6B ('..core(texts(1.3))..')')
+check(core(base)=='⚡ 1 | ⚡ 1 | ⚡ 72K | ⚡ 1.2M | ⚡ 16M | ⚡ 160M | ⚡ 2.6B','no friends (the first keeper of each biome): 1, 1, 72K, 1.2M, 16M, 160M, 2.6B')
+check(core(texts(1))==core(base)and core(texts(1.1))==core(base)and core(texts(1.2))==core(base)and core(texts(1.3))==core(base),'friends do not change a single number: +10% / +20% / +30% give the same 1, 1, 72K, 1.2M, 16M, 160M, 2.6B ('..core(texts(1.3))..')')
 -- Every sign is a whole number, a multiple of 5, never below the true need (strictly faster) and at most about 10% above it,
 -- equal to the independent reference, and that many points really do beat the keeper (the plain speed curve, no boost).
 local formulaOk,pointsOk,shapeOk,tightOk,sameOk=true,true,true,true,true;local fd={}
@@ -540,29 +544,29 @@ for _,boost in ipairs({1,1.05,1.1,1.15,1.2,1.25,1.3,5,.5})do
   if row[i]~=base[i]then sameOk=false;fd[#fd+1]='changed '..e..'/'..boost..' '..row[i]..' vs '..base[i]end
   local t=plain(row[i]);checked+=1
   local v,body,decimals=shownValue(row[i])
-  if not v or v~=v or v%5~=0 or v~=math.floor(v)or t:find('e')or(v<1e6 and decimals~=0)or decimals>1 or t:find('ANY',1,true)or t:find('TOO FAST',1,true)then shapeOk=false;fd[#fd+1]='shape '..e..'/'..boost..' '..row[i]end
-  if e<24 then if t~='⚡ 0'then formulaOk=false;fd[#fd+1]='0 '..e..'/'..boost..' '..row[i]end
+  if not v or v~=v or(v%5~=0 and v~=1)or v~=math.floor(v)or t:find('e')or(v<1e6 and decimals~=0)or decimals>1 or t:find('ANY',1,true)or t:find('TOO FAST',1,true)then shapeOk=false;fd[#fd+1]='shape '..e..'/'..boost..' '..row[i]end
+  if e<24 then if t~='⚡ 1'then formulaOk=false;fd[#fd+1]='1 '..e..'/'..boost..' '..row[i]end
   else
-   local n=Progress.PointsFor(e)+1
+   local n=shownNeed(Progress.PointsFor(e)+1)
    if v and v<n then pointsOk=false;fd[#fd+1]='below need '..e..'/'..boost..' '..row[i]..' < '..n end
    if v and(n>=100 and v>n*1.1 or n<100 and v>n+4)then tightOk=false;fd[#fd+1]='too far above '..e..'/'..boost..' '..row[i]..' vs '..n end
-   if t~='⚡ '..refText(refRound(n))then formulaOk=false;fd[#fd+1]=e..'/'..boost..' '..row[i]..' (want '..refText(refRound(n))..')'end
-   if v and not(Progress.Speed(v)>e-1e-9)then pointsOk=false;fd[#fd+1]='does not beat '..e..'/'..boost..' '..row[i]end
+   if t~='⚡ '..expectText(Progress.PointsFor(e)+1)then formulaOk=false;fd[#fd+1]=e..'/'..boost..' '..row[i]..' (want '..expectText(Progress.PointsFor(e)+1)..')'end
+   if v and not(Progress.Speed(v+19999)>e-1e-9)then pointsOk=false;fd[#fd+1]='does not beat '..e..'/'..boost..' '..row[i]end
   end
  end
 end
 check(sameOk,'every sign is identical with FriendSpeedBoost at 1 / 1.05 / 1.1 / 1.15 / 1.2 / 1.25 / 1.3 / 5 / 0.5 ('..checked..' keeper / attribute combinations)'..(#fd>0 and(': '..table.concat(fd,'; '))or''))
 check(shapeOk,'all '..checked..' keeper / attribute signs read a whole multiple of 5 points: whole under a million, at most one decimal from a million up (1.2M is 1,200,000), never e-notation, never "ANY" / "TOO FAST"'..(#fd>0 and(': '..table.concat(fd,'; '))or''))
-check(formulaOk,'and each equals the reference (PointsFor(escape) + 1 rounded up to 2 significant figures, written as above), "0" below 24 ('..checked..' combinations)')
+check(formulaOk,'and each equals the reference (PointsFor(escape) + 1 - 19,999, never below 1, rounded up to 2 significant figures, written as above), "1" below 24 ('..checked..' combinations)')
 check(pointsOk,'and each is never below the true need, and that many points really beat the keeper (no boost counted)')
 check(tightOk,'and at most 10% above the true need (+4 under 100)')
-check(plain(texts(1.2)[7])=='⚡ 92K'and plain(texts(1.2)[7])=='⚡ '..refText(refRound(Progress.PointsFor(50)+1)),'(+20% friends, Desert keeper 50: still 91,501 points, rounded up to 92K)')
+check(plain(texts(1.2)[7])=='⚡ 72K'and plain(texts(1.2)[7])=='⚡ '..expectText(Progress.PointsFor(50)+1),'(+20% friends, Desert keeper 50: still 91,501 points = speed 71,502 shown, rounded up to 72K)')
 check(table.concat(texts(5),'|')==table.concat(base,'|')and table.concat(texts(.5),'|')==table.concat(base,'|')and table.concat(texts(0/0),'|')==table.concat(base,'|')and table.concat(texts('x'),'|')==table.concat(base,'|'),'(a boost above +30%, below 1, NaN or text changes nothing either)')
 check(W.B.KeeperSpeedLabels:find('FriendSpeedBoost',1,true)==nil and W.B.KeeperSpeedLabels:find('DailyRewards',1,true)==nil,'the script does not read or listen to the friend boost at all')
 -- Changing the boost while a sign is showing does not touch it.
 do
  player:SetAttribute('FriendSpeedBoost',nil);local before=vtext(bySpeed[50]);player:SetAttribute('FriendSpeedBoost',1.3);adv(.5)
- check(vtext(bySpeed[50])==before and vtext(bySpeed[50])=='⚡ 92K','a friend arriving or leaving does not move the number on a sign (92K stays 92K)')
+ check(vtext(bySpeed[50])==before and vtext(bySpeed[50])=='⚡ 72K','a friend arriving or leaving does not move the number on a sign (72K stays 72K)')
  player:SetAttribute('PhysicalWalkSpeed',51);player:SetAttribute('FriendSpeedBoost',1.3);adv(.5)
  check(GREEN(vcolor(bySpeed[50]))and RED(vcolor(bySpeed[57])),'with friends the check still compares your PhysicalWalkSpeed (51) with the keeper: green for 50, red for 57')
  player:SetAttribute('PhysicalWalkSpeed',40);player:SetAttribute('FriendSpeedBoost',1.3);adv(.5)
@@ -574,8 +578,8 @@ do
  math.randomseed(148);local bad={};local n0=0
  for _=1,400 do
   local e=24+math.random()*476;local k=keeper('Rnd',e,10,6);local t=vtext(k);local v,_,decimals=shownValue(t)
-  local n=Progress.PointsFor(e)+1;n0+=1
-  local ok=v and v==math.floor(v)and v%5==0 and v>=n and(n>=100 and v<=n*1.1 or n<100 and v<=n+4)and not t:find('e')and(v>=1e6 or decimals==0)and plain(t)=='⚡ '..refText(refRound(n))
+  local n=shownNeed(Progress.PointsFor(e)+1);n0+=1
+  local ok=v and v==math.floor(v)and(v%5==0 or v==1)and v>=n and(n>=100 and v<=n*1.1 or n<100 and v<=n+4)and not t:find('e')and(v>=1e6 or decimals==0)and plain(t)=='⚡ '..expectText(Progress.PointsFor(e)+1)
   if not ok and #bad<5 then bad[#bad+1]=string.format('%.4f -> %s (need %.0f)',e,t,n)end
   CS:RemoveTag(k,'BiomeKeeper');k:Destroy()
  end
@@ -583,11 +587,11 @@ do
 end
 -- The new-runner threshold: below 24 nothing is needed ("0"); exactly 24 needs a single point, shown as 5.
 local e23,e24,e2401=keeper('Edge23',23.9,10,6),keeper('Edge24',24,10,6),keeper('Edge2401',24.01,10,6)
-check(plain(vtext(e23))=='⚡ 0'and vtext(e24)=='⚡ 5'and vtext(e2401)=='⚡ 5','below 24: "0"; exactly 24: 1 point (you need more than 24), shown as 5; 24.01: also 5 ('..vtext(e24)..' / '..vtext(e2401)..')')
+check(plain(vtext(e23))=='⚡ 1'and vtext(e24)=='⚡ 1'and vtext(e2401)=='⚡ 1','R158i: below 24 and just above it: "1" (everyone starts with 20,000 points and reads 1); ('..vtext(e24)..' / '..vtext(e2401)..')')
 player:SetAttribute('FriendSpeedBoost',1.3)
-check(vtext(e24)=='⚡ 5'and vtext(e2401)=='⚡ 5','with +30% friends 24 and 24.01 still need a point (the number is not divided by the boost): 5')
+check(vtext(e24)=='⚡ 1'and vtext(e2401)=='⚡ 1','with +30% friends 24 and 24.01 still read 1 (the number is not divided by the boost)')
 local k31=keeper('Edge31',31,10,6)
-check(plain(vtext(k31))=='⚡ '..refText(refRound(Progress.PointsFor(31)+1))and vtext(k31)~='⚡ 0','with +30% friends a 31 keeper needs the same points as without (PointsFor(31) + 1 = 3,001, rounded up: '..vtext(k31)..')')
+check(plain(vtext(k31))=='⚡ '..expectText(Progress.PointsFor(31)+1)and vtext(k31)~='⚡ 0','with +30% friends a 31 keeper reads the same as without (PointsFor(31) + 1 = 3,001 points, under the 20,000 start: '..vtext(k31)..')')
 player:SetAttribute('PhysicalWalkSpeed',31.2);check(GREEN(vcolor(k31))and RED(vcolor(bySpeed[32])),'(31.2 beats 31, not 32)')
 player:SetAttribute('FriendSpeedBoost',nil);player:SetAttribute('PhysicalWalkSpeed',24)
 -- The Darkened: a fixed 600 needs about 10^1011 points: "∞" (never "TOO FAST", "ANY" or a huge number).
@@ -614,7 +618,7 @@ local huge=keeper('Huge',500.45)
 local ht=vtext(huge)
 check(ht~='⚡ 0'and shownValue(ht)>=1e15 and not ht:find('e'),'a 500.45 keeper needs thousands of trillions of points: a number with a big name (at most one decimal), not 0 ('..ht..')')
 do
- local exact=Points.Add(Progress.PointsText(500.45),'1');local want=Points.NeedText(exact);local v=shownValue(ht)
+ local exact=Points.Sub(Points.Add(Progress.PointsText(500.45),'1'),'19999');local want=Points.NeedText(exact);local v=shownValue(ht)
  check(ht=='⚡ '..want and v>=tonumber(exact)*(1-1e-12)and v<=tonumber(exact)*1.1 and v%5==0,'(from the exact decimal text, not tostring: '..ht..')')
 end
 -- Edge: from the first keeper on to the biggest number the names reach.
@@ -630,8 +634,8 @@ end
 -- A keeper without the attribute gets no label until it has one.
 local plainK=keeper('Plain',nil);local gp=pill(plainK)
 check(gp~=nil and gp.Enabled==false,'a keeper without KeeperEscapeSpeed: the label stays off')
-plainK:SetAttribute('KeeperEscapeSpeed',50);check(gp.Enabled==true and select(2,pill(plainK)).Text=='⚡ 92K','and appears when the server stamps it')
-plainK:SetAttribute('KeeperEscapeSpeed',20);check(select(2,pill(plainK)).Text=='⚡ 0  ✓','(and follows changes)')
+plainK:SetAttribute('KeeperEscapeSpeed',50);check(gp.Enabled==true and select(2,pill(plainK)).Text=='⚡ 72K','and appears when the server stamps it')
+plainK:SetAttribute('KeeperEscapeSpeed',20);check(select(2,pill(plainK)).Text=='⚡ 1  ✓','(and follows changes)')
 -- A keeper that is tagged before it has parts: the label finds its root when it arrives.
 local late2=R.new('Model');late2.Name='LateKeeper';late2:SetAttribute('KeeperEscapeSpeed',80);late2.Parent=workspace;CS:AddTag(late2,'BiomeKeeper')
 local gl=pill(late2)

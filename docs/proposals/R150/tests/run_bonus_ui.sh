@@ -5,6 +5,7 @@
 #                    and every server error string TreadmillBonusStyle.Flash shortens still exists in the service.
 #                    (R151 changed ONE line of TreadmillBonusService, after AddChest in Roll: OwnerTestPacks.Claim marks the pack of a roll that an owner "bonus"
 #                    command made ready as a TEST pack; frozen.sha256 holds the hash with that line. Nothing about rolls, odds or timing changed.)
+#                    R158i changed the service again, on purpose (the tutorial's free roll: GrantGift / a waiting roll; see the comment line in frozen.sha256); the rolls, odds and timing are still as they were.)
 #  * test_bonus_style  - copy / state / timeline functions and the shape builders (gift fill, bow, rays, stripes, bursts, candy buttons).
 #  * test_bonus_ui     - button states (charging / almost / ready / count), press, refusals, gift timer states (normal / almost / ready pop /
 #                        full), roll flow for all seven rarities (spin, status line, reveal word, rays, confetti, close caption, again), ReducedMotion,
@@ -23,7 +24,7 @@ set -e
 HERE=$(cd "$(dirname "$0")" && pwd);REPO=$(cd "$HERE/../../../.." && pwd)
 OUT=${1:-$(mktemp -d)};mkdir -p "$OUT"
 cd "$REPO"
-sha256sum -c "$HERE/frozen.sha256" > "$OUT/frozen.log" 2>&1 || { cat "$OUT/frozen.log";echo "frozen FAILED";exit 1; }
+grep -v '^#' "$HERE/frozen.sha256" | sha256sum -c > "$OUT/frozen.log" 2>&1 || { cat "$OUT/frozen.log";echo "frozen FAILED";exit 1; }
 echo "frozen: $(grep -c ': OK' "$OUT/frozen.log") gameplay files unchanged"
 # R153: the rule tables the server rolls with (and the reel is drawn from) are the same lines as in R124: the odds, their order, the Void pack, the specials, the strip size
 RULES=$REPO/src/ReplicatedStorage/TreadmillBonusRules.lua

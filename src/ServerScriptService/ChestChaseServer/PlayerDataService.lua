@@ -112,7 +112,9 @@ local function rawStat(self,player,name,class,default,priority)
   local link={Raw=value,Display=display,Connections={}};links.Values[name]=link
   local function update()
    if self.StatLinks[player]~=links or links.Values[name]~=link then return end
-   local text=require(game:GetService('ReplicatedStorage').CashNumbers).PlayerList(value.Value)
+   -- R158i: the player list shows the SHOWN speed (points - 19,999, never below 1: SpeedDisplay), never the points; the raw stat above stays the real points
+   local RS=game:GetService('ReplicatedStorage')
+   local text=name=='Speed'and require(RS.SpeedDisplay).PlayerList(value.Value)or require(RS.CashNumbers).PlayerList(value.Value)
    if display.Value~=text then display.Value=text end
   end
   local function unbind()
@@ -1085,6 +1087,8 @@ function PlayerDataService:Load(player)
 		end
 	end
 
+	-- R158i (owner: base speed 20k): nobody has fewer than the speed floor points. A new profile already starts there (DefaultSpeed); an older profile below it is raised to it, and saved (Dirty below).
+	do local floor = Points.Normalize(self.Config.SpeedFloor or self.Config.DefaultSpeed);if Points.Compare(loadedSpeed, floor) < 0 then loadedSpeed = floor;speedMigrationNeeded = true end end
 	speedValue.Value = loadedSpeed
 	cashValue.Value = loadedCash
 	local loadedItemCount = 0

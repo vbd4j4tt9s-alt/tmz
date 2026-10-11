@@ -7,6 +7,10 @@ function T.Attach(Data)
   player:SetAttribute('TutorialMask',state.Mask);player:SetAttribute('TutorialDone',state.Done)
   player:SetAttribute('TutorialStep',G.Step(state))
   player:SetAttribute('StarterPackClaimed',self:GetPremium(player).StarterPack==true) -- R138: the finish card's promise
+  -- R158i (owner: "players are still not granted that free roll"): the free bonus roll is given HERE, by the server, the moment the published step is 10 (the step after the sale; also for a
+  -- player who loads at step 10), once per player (state.Bonus, saved). No client request: R158h waited for the client's 'BonusGift' ask, which the Tutorial throttle (1 per 0.2 s) or the
+  -- request gate could refuse for good, and which gave nothing to a player already holding the 2 ready rolls of the starter gift.
+  if not state.Done and not state.Bonus and G.Step(state)==10 then self:TutorialBonusGift(player)end
  end
  local function changed(self,player)self:PublishTutorial(player);self:MarkDirty(player);self:QueueGardenSave(player)end
  -- R158e: 'Pack' comes ONLY from a pack stolen on the track and banked (PlayerDataService:AddChest with Banked: ChestService:Bank), never from a gift, a bonus roll or any other
@@ -25,7 +29,7 @@ function T.Attach(Data)
   -- /test tutorial done / step / reset and newplayer set the saved state directly (OwnerCreative158f) and never come through here.
   if action=='Skip'then return false end
   if not self:IsLoaded(player)then return false end
-  if action=='BonusGift'then return self:TutorialBonusGift(player)end
+  if action=='BonusGift'then return self:TutorialBonusGift(player)end -- (R158i: the server gives the roll by itself at step 10; this old ask stays harmless: once per player, step 10 only)
   local premium=self:GetPremium(player);premium.Tutorial=premium.Tutorial or G.Read()
   if not G.Action(premium.Tutorial,action)then return false end
   changed(self,player);return true
@@ -39,21 +43,17 @@ function T.Attach(Data)
   state.Fast=true;state.FastCrop=G.CleanId(crop.Id)
   return true
  end
- -- R158h (owner: "for this last part give players a free bonus roll once they are done"): the client asks ('BonusGift') when its BONUS ROLL arrow starts. Only the SERVER grants, and only at step 10 of
- -- an unfinished tutorial, once per player ever (state.Bonus, saved): 1 ready roll through TreadmillBonusService:GrantReady (the game's max of 2 ready holds). A roll that is gained is also kept
- -- as an unused starter roll (R158d StarterRolls158d) so a rejoin before pressing it does not lose it. Any other ask is refused (false, nothing changes). Never yields.
+ -- R158h (owner: "for this last part give players a free bonus roll once they are done"), R158i (owner: "players are still not granted that free roll at the start"): ONE free bonus roll when the tutorial
+ -- reaches step 10 (PublishTutorial calls this), once per player ever (state.Bonus, saved; the owner's tutorial reset / step / newplayer write a fresh state, so it clears). TreadmillBonusService:GrantGift
+ -- gives it: a READY roll, or, when the player already holds the most ready rolls (the 2 of the starter gift), a waiting roll that is ready the moment one is spent. It is also kept as an unused
+ -- starter roll (R158d StarterRolls158d) so a rejoin before pressing it does not lose it. The flag is only set when the roll was given: a service that is not wired yet or a throw is tried again on
+ -- the next publish. Any ask outside step 10 / of a finished or already-given tutorial is refused (false, nothing changes). Never yields.
  function Data:TutorialBonusGift(player)
   if not self:IsLoaded(player)then return false end
   local premium=self:GetPremium(player);local state=premium.Tutorial;local bonus=self.TreadmillBonus
-  if not state or state.Done or state.Bonus or G.Step(state)~=10 or type(bonus)~='table'or type(bonus.GrantReady)~='function'then return false end
+  if not state or state.Done or state.Bonus or G.Step(state)~=10 or type(bonus)~='table'or type(bonus.GrantGift)~='function'then return false end
   state.Bonus=true
-  local ok,granted=pcall(function()
-   local before=bonus:GetReady(player);local done,after=bonus:GrantReady(player,G.BonusGiftRolls)
-   if not done then return false end
-   local gain=(tonumber(after)or before)-before
-   if gain>0 then local Starter=require(game:GetService('ReplicatedStorage').StarterVerityRules158d);premium[Starter.RollsField]=math.min(2,Starter.CleanRolls(premium[Starter.RollsField])+gain)end
-   return true
-  end)
+  local ok,granted=pcall(bonus.GrantGift,bonus,player)
   if not ok or not granted then state.Bonus=nil;return false end
   changed(self,player);return true
  end
