@@ -1,6 +1,7 @@
 -- Explicit server-owned administration of online players; no client-supplied authority.
 local Players=game:GetService('Players');local RS=game:GetService('ReplicatedStorage');local Http=game:GetService('HttpService')
 local Access=require(script.Parent:WaitForChild('OwnerCommandAccess'))
+local function isOwner(p)local f=Access.IsOwner;return type(f)=='function'and f(p)==true end -- R158f: the game owner (a test's stand-in access module without IsOwner has no owner: the limits stay)
 local Packs=require(RS:WaitForChild('SeedPackRules'))
 local Names=require(RS:WaitForChild('GardenDisplayNames'))
 local Admin={}
@@ -69,6 +70,7 @@ local function sync(ctx,p,inventory)
 end
 function Admin.Execute(ctx,requester,command)
  if not Access.IsAllowed(requester)then return false,'These commands are for the experience owner.'end
+ local owner=isOwner(requester) -- R158f: the game owner's commands are absolute (admins keep the Bag cap and the chase / opening wait)
  local targets,why=Admin.Resolve(requester,command.Target);if not targets then return false,why end
  local selected,size,coat,many
  if command.Operation~='clear'then
@@ -78,12 +80,12 @@ function Admin.Execute(ctx,requester,command)
  for _,p in ipairs(targets)do
   local data=ctx.Data;local garden=data.Gardens[p];local reason
   if p.Parent~=Players or not data:IsLoaded(p)or not garden then reason='data is not ready'
-  elseif ctx.Chests:IsOpening(p)or ctx.Chase:IsPlayerBusy(p)or p:GetAttribute('ChestChaseRunActive')or p:GetAttribute('ChestChaseSeedCarrying')then reason='finish the chase or pack opening first'end
+  elseif not owner and(ctx.Chests:IsOpening(p)or ctx.Chase:IsPlayerBusy(p)or p:GetAttribute('ChestChaseRunActive')or p:GetAttribute('ChestChaseSeedCarrying'))then reason='finish the chase or pack opening first'end -- (R158f: never for the game owner)
   if reason then table.insert(reports,'@'..p.Name..': skipped — '..reason)
   else
    local records=data:GetChestRecords(p);local count=0;local inventory=command.Item~='garden'
    if command.Operation=='give'then
-    if #records+#selected>ctx.Config.MaxSavedChests or not data:RoomFor(p,#selected)then reason='inventory is full (200 items max)' -- R155: the cap
+    if #records+#selected>ctx.Config.MaxSavedChests or not data:RoomFor(p,#selected,{Owner=owner})then reason='inventory is full ('..(owner and ctx.Config.MaxSavedChests or 200)..' items max)' -- R155: the cap (R158f: not for the game owner; the storage ceiling stays)
     else
      local pending={};local serial=p:GetAttribute('ChestInventorySerial')or 0
      for _,spec in ipairs(selected)do

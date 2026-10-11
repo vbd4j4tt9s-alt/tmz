@@ -40,7 +40,7 @@ echo "ok: TEST packs, seed grants, gifts, the mystery pedestal, bonus rolls and 
 # 4. every owner-command path that makes a pack marks it (TestGrant), and the services behind the indirect commands claim the arm
 grep -q "PackMutation=coat,TestGrant=true," "$SS/StudioTestCommands.lua" || fail "/test pack and /test seed(s) must set TestGrant on the record (R152: seeds too)"
 grep -q "TestGrant=true" "$SS/RarePackTests.lua" || fail "/test rarepacks must set TestGrant on every pack record"
-[ "$(grep -c "{TestGrant=true})" "$SS/OwnerUpdateCommands82.lua")" = 1 ] || fail "packset / eclipse (void) / verity must call AddChest with {TestGrant=true} (one AddChest line serves all three)"
+[ "$(grep -c "{TestGrant=true,Owner=owner})" "$SS/OwnerUpdateCommands82.lua")" = 1 ] || fail "packset / eclipse (void) / verity must call AddChest with {TestGrant=true,Owner=owner} (one AddChest line serves all three; R158f: Owner = the game owner's grant, past the Bag cap)"
 for source in Mystery Daily DailyQuest Bonus; do # R153: the login pack ('Daily') and a quest pack ('DailyQuest') have their own arms
  grep -q "TestPacks.Arm(p,'$source'" "$SS/OwnerUpdateCommands82.lua" || fail "the $source owner commands must arm OwnerTestPacks"
 done

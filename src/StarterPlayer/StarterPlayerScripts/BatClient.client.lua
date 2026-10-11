@@ -106,7 +106,7 @@ local function swing(tool)
  local hum=character and character:FindFirstChildOfClass('Humanoid')
  if not character or tool.Parent~=character or not tool.Enabled or not handle or not hum or hum.Health<=0 or character:GetAttribute('ChestChaseRagdollActive')then return end
  local start=workspace:GetServerTimeNow()
- if start<lastStart+C.Cooldown then return end -- (the server's cooldown, counted the same way: between the swings' starts)
+ if start<lastStart+C.Cooldown and player:GetAttribute('CreativeMode158f')~=true then return end -- (the server's cooldown, counted the same way: between the swings' starts; R158f: none in the owner's creative mode)
  lastStart=start;sentId+=1
  remote:FireServer({Kind='Swing',Start=start,Id=sentId})
  local motion=RS:FindFirstChild('RunnerMotion');local map=workspace:FindFirstChild('ChestChaseMap')

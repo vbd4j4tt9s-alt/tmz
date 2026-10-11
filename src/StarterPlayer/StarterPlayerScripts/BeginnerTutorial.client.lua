@@ -765,6 +765,11 @@ connections[#connections+1]=player:GetAttributeChangedSignal('TutorialDone'):Con
  S.wasActive=false;S.skipped=false;render()
 end)
 connections[#connections+1]=player:GetAttributeChangedSignal('RarePullCinematic'):Connect(render)
+-- R158f: the owner's /test tutorial reset / step / newplayer (the server counts TutorialRestart158f): start from the first look at once, as on a brand-new player's screen (a normal player never sees this change)
+connections[#connections+1]=player:GetAttributeChangedSignal('TutorialRestart158f'):Connect(function()
+ S.intro=0;S.info={};S.readyFor,S.readyAt=nil,nil;S.finishedUntil=0;S.niceUntil=0;S.skipped=false;S.lastKey=nil;S.lastStep=0;S.stepSeconds=0;S.finishRetry=0
+ render();task.delay(.25,function()if not S.dead then fetch()end end)
+end)
 for _,name in ipairs({'SeedMenu','TitleActive','GardenMenuExpanded'})do connections[#connections+1]=pg:GetAttributeChangedSignal(name):Connect(render)end
 connections[#connections+1]=Input.LastInputTypeChanged:Connect(function()local now=device();if now~=S.lastDevice then S.lastDevice=now;if S.step>0 then S.placedFor=nil;render()end end end)
 local unwatch=Layout.Watch(gui,function(m)local was=S.metrics and S.metrics.Phone;S.metrics=m;if was~=m.Phone then S.placedFor=nil;render()end;place();if card.Visible then pg:SetAttribute('TutorialCardBottom',S.cardBottom)end end)

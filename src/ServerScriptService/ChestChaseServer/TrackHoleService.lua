@@ -212,8 +212,14 @@ function S:OwnedCount(player)
 end
 
 -- Remote entry. aim: optional Vector3 the player clicked/tapped. Returns ok, reason (tests and logs only).
-function S:Request(player,aim)
- if not Gate.Allow(player,C.RemoteRoute,aim)then return false,'Rate'end
+-- R158f: creative (the owner's /test creative: OwnerTestState82) digs without the cooldown; force = the owner's own /test dig, which also skips the carrying and hole-count limits.
+local testState
+local function creative(player)
+ if testState==nil then local ok,state=pcall(require,script.Parent.OwnerTestState82);testState=ok and type(state)=='table'and state or false end
+ return testState~=false and type(testState.Creative)=='function'and testState.Creative(player)==true
+end
+function S:Request(player,aim,force)
+ if force~=true and not Gate.Allow(player,C.RemoteRoute,aim)then return false,'Rate'end
  if aim~=nil and(typeof(aim)~='Vector3'or not finite(aim.X)or not finite(aim.Y)or not finite(aim.Z))then return false,'Args'end
  local character,humanoid,root=self:_character(player)
  if not character or root.Anchored or humanoid.PlatformStand then return false,'Character'end
@@ -223,7 +229,7 @@ function S:Request(player,aim)
  if not self:_onTrack(root.Position)then return false,'OffTrack'end
  if self.Map.Refreshing then self:_tell(player,'Refreshing');return false,'Refreshing'end
  if self:_downed(player)then return false,'Downed'end
- if self:_carrying(player)then self:_tell(player,'Carrying');return false,'Carrying'end
+ if force~=true and self:_carrying(player)then self:_tell(player,'Carrying');return false,'Carrying'end
  local point=aim or root.Position
  if flat(point-root.Position).Magnitude>C.DigRange or math.abs(point.Y-root.Position.Y)>C.DigRange then
   point=root.Position -- a far/forged aim digs at your feet instead
@@ -232,13 +238,13 @@ function S:Request(player,aim)
  if own then self:_remove(own,'Covered');self:_tell(player,'Covered');return true,'Covered'end
  local now=self:Now()
  local ready=self.NextDig[player]or 0
- if now<ready then self:_tell(player,'Cooldown',math.ceil(ready-now));return false,'Cooldown'end
+ if now<ready and force~=true and not creative(player)then self:_tell(player,'Cooldown',math.ceil(ready-now));return false,'Cooldown'end
  local ground=self:_groundAt(point)
  if not ground then self:_tell(player,'Ground');return false,'Ground'end
  local problem=self:_spotProblem(ground)
  if problem then self:_tell(player,problem);return false,problem end
- if self:OwnedCount(player)>=C.MaxPerPlayer then self:_tell(player,'PlayerCap',C.MaxPerPlayer);return false,'PlayerCap'end
- if self.Count>=C.MaxPerServer then self:_tell(player,'ServerCap');return false,'ServerCap'end
+ if force~=true and self:OwnedCount(player)>=C.MaxPerPlayer then self:_tell(player,'PlayerCap',C.MaxPerPlayer);return false,'PlayerCap'end
+ if force~=true and self.Count>=C.MaxPerServer then self:_tell(player,'ServerCap');return false,'ServerCap'end
  self.Serial+=1
  local hole={Id=self.Serial,Owner=player,Position=ground,DugAt=now,ArmedAt=now+C.ArmSeconds,ExpiresAt=now+C.LifetimeSeconds}
  hole.Model=self:_build(hole)

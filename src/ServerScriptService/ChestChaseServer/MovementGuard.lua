@@ -104,7 +104,9 @@ function M.Check(player)
     local now=os.clock()
     local exempt=r.Anchored or M.Bases.TrainingSessions[player]or player:GetAttribute('GuardianRagdollActive')or player:GetAttribute('GuardianFlingActive')
     local admin=Run:IsStudio()or require(script.Parent.OwnerTestState82).MovementGranted(player)or require(script.Parent.OwnerCommandAccess).IsAllowed(player)
-    if exempt or(admin and(player:GetAttribute('StudioTestFlying')or player:GetAttribute('StudioTestNoclip')))then
+    -- R158f: creative mode (the owner's /test creative) is never corrected: its walk speed, flying and teleports are the owner's own doing
+    local testState=require(script.Parent.OwnerTestState82)
+    if exempt or(type(testState.Creative)=='function'and testState.Creative(player))or(admin and(player:GetAttribute('StudioTestFlying')or player:GetAttribute('StudioTestNoclip')))then
         state.At=now;state.Frame=r.CFrame;state.Grace=now+.65;state.Budget=Motion.Burst(speed(player));return true
     end
     if now<(state.Grace or 0)then state.At=now;state.Frame=r.CFrame;return true end

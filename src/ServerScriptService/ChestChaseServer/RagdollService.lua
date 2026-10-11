@@ -45,8 +45,15 @@ function Ragdoll:IsActive(player)
     local record=self.Records[player]
     return record~=nil and record.Active
 end
-function Ragdoll:CanHit(player)
-    return player~=nil and player.Parent~=nil and self.Records[player]==nil
+-- R158f: a player in creative mode (the owner's /test creative) cannot be hit: keepers, The Darkened, bats, lightning and holes all ask this first. force = the owner's own
+-- /test fling and /test ragdoll test commands, which still work on them.
+local testState
+local function creative(player)
+    if testState==nil then local ok,state=pcall(require,script.Parent.OwnerTestState82);testState=ok and type(state)=='table'and state or false end
+    return testState~=false and type(testState.Creative)=='function'and testState.Creative(player)==true
+end
+function Ragdoll:CanHit(player,force)
+    return player~=nil and player.Parent~=nil and self.Records[player]==nil and(force==true or not creative(player))
 end
 function Ragdoll:_recover(player,record)
     if not record.Active then return end
@@ -130,8 +137,8 @@ function Ragdoll.KeepOnTrack(position,velocity)
     if target==landing then return velocity end
     return Vector3.new((target-position.X)/flight,velocity.Y,velocity.Z)
 end
-function Ragdoll:Apply(player,velocity,cause,stunSeconds)
-    if not self:CanHit(player)then return nil end
+function Ragdoll:Apply(player,velocity,cause,stunSeconds,force)
+    if not self:CanHit(player,force)then return nil end
     local character=player.Character
     local humanoid=character and character:FindFirstChildOfClass('Humanoid')
     local root=character and character:FindFirstChild('HumanoidRootPart')

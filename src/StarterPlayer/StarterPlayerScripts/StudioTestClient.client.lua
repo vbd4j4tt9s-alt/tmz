@@ -6,14 +6,19 @@ local UIS=game:GetService('UserInputService');local player=Players.LocalPlayer
 local Layout=require(RS.NoticeLayout85);local TextService=game:GetService('TextService')
 local function allowed()return RunService:IsStudio()or player:GetAttribute('ChestChaseCommandsAllowed')==true end
 local function movementAllowed()return allowed()or player:GetAttribute('OwnerMovementGranted82')==true end
+-- R158f: creative mode (the owner's /test creative). The server decides all of it; this attribute only tells this screen to show the CREATIVE badge, keep flying during a chase and hold E for no time.
+local function creative()return player:GetAttribute('CreativeMode158f')==true end
 local help=require(RS:WaitForChild('StudioTestHelp'))
 local folder=RS:WaitForChild('ChestChaseStudioTests');if not folder then return end
 local request=folder:WaitForChild('Execute');local feedback=folder:WaitForChild('Feedback')
 local pg=player:WaitForChild('PlayerGui')
-local gui=Instance.new('ScreenGui');gui.Name='ChestChaseStudioTools';gui.ResetOnSpawn=false;gui.DisplayOrder=120;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.Enabled=allowed();gui.Parent=pg
+local gui=Instance.new('ScreenGui');gui.Name='ChestChaseStudioTools';gui.ResetOnSpawn=false;gui.DisplayOrder=120;gui.ScreenInsets=Enum.ScreenInsets.CoreUISafeInsets;gui.Enabled=allowed()or creative();gui.Parent=pg
 local toggle=require(RS.ButtonStyle).Create(gui,'OwnerToolsButton','Gear',UDim2.new(1,-62,.5,-24),UDim2.fromOffset(48,48),Color3.fromRGB(75,118,106),false)
 local caption=Instance.new('TextLabel');caption.Name='OwnerCaption';caption.Text='TOOLS';caption.Font=Enum.Font.FredokaOne;caption.TextSize=9;caption.TextColor3=Color3.new(1,1,1);caption.BackgroundTransparency=1;caption.Size=UDim2.new(1,0,0,12);caption.Position=UDim2.new(0,0,1,-12);caption.Parent=toggle
 -- Hide the owner-only shortcut on touch devices, including Studio phone emulation.
+local badge=Instance.new('TextLabel');badge.Name='CreativeBadge';badge.Text='CREATIVE';badge.Font=Enum.Font.FredokaOne;badge.TextSize=13;badge.TextColor3=Color3.fromRGB(60,38,0)
+badge.BackgroundColor3=Color3.fromRGB(255,205,84);badge.BackgroundTransparency=.08;badge.AnchorPoint=Vector2.new(.5,0);badge.Position=UDim2.new(.5,0,0,6);badge.Size=UDim2.fromOffset(92,22);badge.Visible=creative();badge.Parent=gui
+do local c=Instance.new('UICorner');c.CornerRadius=UDim.new(0,11);c.Parent=badge end
 local mobileTools=false
 local function syncToolsVisibility()
  toggle.Visible=not mobileTools and allowed()and pg:GetAttribute('GardenMenuExpanded')~=true and pg:GetAttribute('SeedMenu')==nil
@@ -92,6 +97,15 @@ UIS.InputBegan:Connect(function(inputObject)
  end
 end)
 local perf=label(gui,'',UDim2.fromOffset(16,110),UDim2.fromOffset(520,84),14);perf.TextColor3=Color3.fromRGB(235,255,243);perf.TextStrokeTransparency=.3;perf.Visible=false;perf.TextWrapped=true;perf.TextScaled=true;local perfFit=Instance.new('UITextSizeConstraint');perfFit.MinTextSize=10;perfFit.MaxTextSize=14;perfFit.Parent=perf
+-- R158f: a prompt shown to a creative player holds for no time on this screen (the server's own HoldDuration is not touched); it comes back when creative ends.
+local holds=setmetatable({},{__mode='k'})
+game:GetService('ProximityPromptService').PromptShown:Connect(function(prompt)
+ if creative()then if holds[prompt]==nil then holds[prompt]=prompt.HoldDuration end;if prompt.HoldDuration~=0 then prompt.HoldDuration=0 end end
+end)
+player:GetAttributeChangedSignal('CreativeMode158f'):Connect(function()
+ badge.Visible=creative();gui.Enabled=allowed()or creative()or player:GetAttribute('StudioTestPerf')==true
+ if not creative()then for prompt,was in pairs(holds)do if prompt.Parent then prompt.HoldDuration=was end;holds[prompt]=nil end end
+end)
 local flight=nil;local noClipParts={}
 local function restoreCollisions()
  for part,original in pairs(noClipParts)do if part.Parent then part.CanCollide=original end end;table.clear(noClipParts)
@@ -121,7 +135,7 @@ local frames,elapsed=0,0
 local worstFrame,hitches,measuring=0,0,false
 local connection=RunService.RenderStepped:Connect(function(dt)
  local char=player.Character;local hum=char and char:FindFirstChildOfClass('Humanoid');local root=char and char:FindFirstChild('HumanoidRootPart')
- local flying=movementAllowed()and player:GetAttribute('StudioTestFlying')and hum and hum.Health>0 and root and not player:GetAttribute('GuardianRagdollActive')and not player:GetAttribute('ChestChaseRunActive')
+ local flying=movementAllowed()and player:GetAttribute('StudioTestFlying')and hum and hum.Health>0 and root and not player:GetAttribute('GuardianRagdollActive')and(creative()or not player:GetAttribute('ChestChaseRunActive'))
  if flight and(not flying or flight.Character~=char)then stopFlight()end
  if flying and not flight then startFlight(char,hum,root)end
  if flight then
@@ -147,7 +161,7 @@ local connection=RunService.RenderStepped:Connect(function(dt)
    local size=UDim2.fromOffset(layout.Width,layout.Height);if panel.Size~=size then panel.Size=size end
    perf.Size=UDim2.fromOffset(math.max(1,math.min(520,camera.ViewportSize.X-32)),84)
   end
-  gui.Enabled=allowed()or player:GetAttribute('StudioTestPerf')==true;syncToolsVisibility();if not allowed()then panel.Visible=false end;perf.Visible=player:GetAttribute('StudioTestPerf')==true
+  gui.Enabled=allowed()or creative()or player:GetAttribute('StudioTestPerf')==true;syncToolsVisibility();if not allowed()then panel.Visible=false end;perf.Visible=player:GetAttribute('StudioTestPerf')==true
   if perf.Visible then
    perf.Text=string.format('FPS %.0f | Worst %.0f ms | Hitches (100ms+) %d\nPlants %d | Parts %d/1400 | Effects %d/4 | Builds %d | Fruit updates %d',frames/elapsed,worstFrame*1000,hitches,player:GetAttribute('PlantDetailModels')or 0,player:GetAttribute('PlantDetailBudget')or 0,player:GetAttribute('PlantEffectModels')or 0,player:GetAttribute('PlantArtBuilds')or 0,player:GetAttribute('PlantFruitUpdates')or 0)
   end

@@ -41,6 +41,11 @@ function M.Attach(Data)
   if not self:IsLoaded(player)then return false,'YOUR DATA IS STILL LOADING'end
   opts=type(opts)=='table'and opts or{}
   if opts.Receipt or opts.Banked then return true end
+  -- R158f (owner: "my cmds are absolute"): the 200 cap never refuses the owner's own grants (opts.Owner: the command was made by the GAME OWNER; admins keep the cap) nor a player in
+  -- creative mode (OwnerTestState82). Only the old storage ceilings (MaxSavedChests 1000 packs / seeds, MaxSavedHarvests 500 fruit: the save format) still apply.
+  if opts.Owner==true then return true end
+  local okState,state=pcall(require,script.Parent.OwnerTestState82)
+  if okState and type(state)=='table'and type(state.Creative)=='function'and state.Creative(player)then return true end
   local held=self:HeldItemCount(player)
   if player:GetAttribute('ChestChaseSeedCarrying')==true then held+=1 end -- (the pack being carried home has its place kept)
   if held+count>self:HeldItemCap()then return false,M.FullText end

@@ -1,5 +1,65 @@
 # Test commands and tools (R147)
 
+## Creative mode and testing everything (R158f)
+
+You are the game owner, so **your commands have no limits**: no "Studio only", no cooldown, no 200 Bag cap, no "finish your chase first", no "wait for the pack to open". They work the same in Studio and on a live server. Counts can be any sane number (up to 500 packs in one go; the save itself holds 1000 packs and seeds and 500 fruit, so nothing goes past that). Packs your commands make stay **TEST packs** (never announced in chat, never on BEST PULL).
+**Admins** (people in `AdminUserIds`) keep the limits they always had: the 200 Bag cap, the chase and opening waits, the Studio-only tools, a 20-pack limit for `void`/`verity`, and the short wait between commands. Admins **cannot** use `creative`, `tutorial`, `newplayer` or `verityevent`. Normal players can use nothing.
+
+### Creative mode
+| Command | What it does |
+|---|---|
+| `creative on` / `creative off` | Creative mode for you (just `creative` flips it). Session only: never saved, gone when you leave the game. Add `@name` to do it for someone else. |
+| `creative status` | Shows if it is on. |
+| `creative speed 300` / `creative speed off` | Walk speed in creative (24 to 500; 200 by default). `off` = your own earned speed. `movespeed 400` still works too. |
+| `fly` | Fly on and off (WASD, Space or E up, Ctrl or Q down). `fly 100` sets the speed. Works during a chase while creative is on. |
+
+While creative is **on** you get:
+- **No cooldowns:** the bat swings as fast as you click, the shovel digs without waiting, the treadmill bonus roll has no wait, and the steal hold (hold E) is instant.
+- **Nothing can hit you:** keepers, The Darkened, bats, lightning and shovel holes do nothing to you. Keepers still chase you, they just cannot catch you.
+- **No Bag cap:** you can hold more than 200 things (the save still stops at 1000 packs and seeds / 500 fruit).
+- **Plants ripen at once** (every plant you have now, every new plant, and every regrowth).
+- **Fast and free movement:** walk speed 200, fly, and the anti-cheat (MovementGuard, the rate limits, the bat checks) leaves you alone: no rubber-banding.
+- A small **CREATIVE** badge at the top of your screen.
+- Every pack **you open** is a TEST open: no chat announcement, no BEST PULL.
+- Robux purchases stay real. Nothing fakes a payment.
+
+### Commands to test the new things
+| Command | What it does |
+|---|---|
+| `droppack` | Drops a TEST pack at your feet as a *dropped pack* (so you can see the outline, marker and beam). `droppack storm 6 120`: biome, tier 1-6, seconds it stays (60 by default). Hold E to take it back. |
+| `tutorial reset` | Starts the new no-words tutorial again at **step 1** right now, also on a live server. Clears TutorialDone, the steps and the saved 10-second-fruit flags (so step 7 gives the 10 s fruit again). The red arrow shows at once. `@name` for another player. |
+| `tutorial step 7` | Jumps to step 1 to 10 (the tutorial needs what the step needs: step 4 a pack, step 6 a seed, steps 7-8 a planted crop; if you do not have it, it moves on by itself). |
+| `tutorial done` | Finishes the tutorial (the free Forest pack comes the first time, like after a real finish). |
+| `newplayer` | The whole new-player experience again in one go: tutorial reset + the starter Verity gift owed again + the free Forest starter pack flag cleared + the Void pedestal claim cleared. **It resets those flags on that profile (saved).** `@name` for another player. Normal players still cannot replay the tutorial (the Settings button stays gone): only these owner commands do. |
+| `fastfruit` | Your crops ripen now (same as `growall`). |
+| `verityevent on` / `off` / `auto` / `status` (server) | Starts or stops the limited event in this server (Verity, the new-player Verity gift, the Mech pack sale). `auto` goes back to the real end date. Needed to test the gift while the real event is over. |
+| `bonusrolls 2` | Makes 0-2 bonus rolls ready (the game keeps at most 2). Same as `bonus ready 2`. |
+| `holo` | Adds the Holo Melon seed and the Holo Apple Tree seed. (Any other seed: `seed <SeedId>`; `catalog all` lists them.) |
+| `reveal king` | Previews a pull reveal with a demo seed (nothing granted). Same as `rarepull`. `rarepacks` gives real TEST packs that reveal Legendary to King. |
+| `starterverity` / `starterverity reset` | Checks / resets the new-player Verity gift. Reset now works on a live server for you. |
+| `walls` (server) | The R158 walls and outer track: which parts and models loaded and from where, the volcano, and that no lava streams are left. |
+| `batstats` (server) | The bat hit counters (BatSwing `Claims_*`): hits and why other claims were refused. |
+| `cash 5000000`, `gems 500` | Shortcuts for `cash set` and `gems set`. |
+
+### Checklist: test everything new (R157 to R158e), in about 15 minutes
+Start with `creative on` (nothing can catch you, no waiting). Use `heal` or `respawn` if you need a clean start. For anything that needs a second person, use an alt account.
+1. **Bats (R158)**: your bat is in your hotbar. `tp forest`, swing it: the swing starts the moment you click, a white trail, **no swing sound** (R158b). With creative there is no cooldown. Hit a friend: the slap sound, they fall, a pack they carry drops. `batstats` shows how the hit claims were judged.
+2. **Walls and outer track (R158)**: `walls` prints what loaded. Then `tp forest`, `tp desert` ... `tp storm` and `fly` along the wall: each biome has its own wall style, and ground, mountains, the pyramid and trees stand outside the walls. The hub's wall has stone caps.
+3. **Lava gone (R158)**: `tp lava`: no lava streams, no pool, and the owner's volcano. `walls` says "Lava streams and pools left: 0".
+4. **Speed popups (R158)**: `base`, `treadmill 7`, stand on your belt: the "+speed" popups are bigger. `bundle SpeedSmall` also shows a gain.
+5. **Bunting (R158)**: walk or `fly` around the hub (the plaza you spawn in): the flags hang on their string.
+6. **Dropped pack highlight (R158b)**: `droppack` (or `droppack storm 6 120`). Outline, gold diamond "DROPPED PACK" with the distance, and a beam. Walk away: the distance counts. Hold E: it all goes away.
+7. **No swing sound / dig dirt sound (R158b)**: swing the bat at nothing: silent. `tp forest`, equip the shovel, click the ground: the dirt sound of planting.
+8. **Free Void Pack needs only the tutorial (R158c)**: `newplayer` (clears your Void claim and your tutorial). The pedestal says to finish the tutorial. `tutorial done`: Hold E works at once. Claim it: "CLAIMED". A second try is refused. (`voidgift` prints the state.)
+9. **No tutorial replay for players (R158c)**: open Settings: no "Replay tutorial" button. Only `tutorial reset` and `newplayer` (yours) can restart it.
+10. **Starter Verity gift (R158d/e)**: `verityevent on`, then `newplayer` (it gives the gift at once; for the real thing: `starterverity reset`, then `respawn` for a first spawn). The notice says "Thanks for playing! Here's a gift". `starterverity` shows the state. Open the gift pack: Mythic or better, and no chat announcement. `verityevent off` and `starterverity reset`: the gift is owed but not given (the event is over). `verityevent auto` when done.
+11. **Pack reveal without spoilers (R158d)**: `rarepacks mech`, `rarepacks king`, `rarepacks verity`, `verity 1`, `void 1`. Hold a closed pack: no seed sparkles or scanner around it. They appear only when the seed shows.
+12. **Holo plants (R158d)**: `holo`, plant both in your base (creative: they are ripe at once). The Holo Melon shows your real melon / cantaloupe / pumpkin, the Holo Apple Tree real apples, spinning holograms that change form every harvest.
+13. **Wordless tutorial (R158e)**: `tutorial reset`. No words anywhere: a red arrow to the pack, the TRACK button, steal, the clicking hand, the BASE button, plant, grow, harvest, sell, treadmill. `tutorial step 6` and so on to jump. (Turn creative off for the real timing and the real keepers, or leave it on: the tutorial works the same.)
+14. **10-second first fruit (R158e)**: `tutorial reset` (this clears the 10 s flags), `tutorial step 6`, hold a seed (`seeds forest`), plant it: step 7 shows a 10 s ring timer and the fruit is ripe in 10 s. Plant a second one: normal timing (once per player; `tutorial reset` gives it again).
+
+When you are done: `creative off`, `verityevent auto`.
+
 ## Who can use them
 - **You (the game owner)** can use them everywhere: Studio, and live public servers.
 - **Other people**: add their user IDs to the `AdminUserIds` attribute on
@@ -16,7 +76,7 @@
   - `@all` for everyone in the server.
   - Example: `/test cash add 1000000 @Bob`.
 - Commands marked **server** below change the whole server once. They take no `@name`.
-- If a player is in a chase or opening a pack, the command skips them and tells you why.
+- If a player is in a chase or opening a pack, the command skips them and tells you why. **Not you (R158f): the game owner's commands never wait.** Admins still do.
 - **What stays and what doesn't:** cash, gems, speed, treadmill, boots, trails, fence and inventory changes are **saved**. Fly, noclip, movespeed and animrate are temporary.
 
 ## Player
@@ -157,16 +217,16 @@ Pull announcements are chat lines only: no banner, no sound, no picture. In this
 | Command | What it does |
 |---|---|
 | `starterverity @name` | R158d: the new-player gift: one Verity Pack guaranteed Mythic or better + 2 treadmill bonus rolls, given ONCE to a brand-new player at their first spawn (R158e; it was the end of the tutorial in R158d), and only while the Verity event runs. Shows whether it is owed / given (saved as `Premium.StarterVerity158d`), whether the event is running, whether the player has spawned, how many gift packs are in the Bag (the pack's record has `Floor = Mythic`) and how many starter rolls are not used yet (`Premium.StarterRolls158d`) |
-| `starterverity @name reset` (**Studio only**) | Marks that player as owed the gift again and gives it at once if they have spawned and the event runs. The pack and rolls they already got stay. `starterverity reset @name` works too. A live server refuses |
+| `starterverity @name reset` (you: Studio and live; admins: **Studio only**) | Marks that player as owed the gift again and gives it at once if they have spawned and the event runs. The pack and rolls they already got stay. `starterverity reset @name` works too. `verityevent on` starts the event first if it is over. On a live server only you can do it (admins are refused) |
 
 ## Free Void Pack pedestal
 | Command | What it does |
 |---|---|
 | `voidgift` (server) | R152: the giveaway pedestal in the middle of the plaza: how many of the 500 are claimed and left, whether YOU have claimed (profile flag, the shared list, your state), whether your tutorial is finished (R158c: the claim needs it), which store this server uses (`DataStore` live, the Studio test store, or the in-memory counter when Studio has no API access), messages sent / received, and the pedestal (state, prompt). No @name |
-| `voidgift reset me` (server, **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). A live server refuses: it never changes the shared count |
-| `voidgift left 3` (server, **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. Studio only; a live server refuses |
+| `voidgift reset me` (server; you: Studio and live; admins: **Studio only**) | Clears YOUR claim and your profile flag (the shared list loses you, the count goes down by one) so you can claim again. The pack you already got stays in your Bag (`clear packs` removes it). **On a live server this edits the LIVE shared count** (only you can; other running servers keep the number they have seen until they restart) |
+| `voidgift left 3` (server; you: Studio and live; admins: **Studio only**) | Sets how many the pedestal shows as left (0 = ALL CLAIMED, 487 = a fresh start). Players already in the list keep their places, so the number cannot go above 500 minus them. On a live server this edits the LIVE count (only you can) |
 | `playtime @name` | R157: how long that player has played in total (saved with the profile as `Premium.PlaySeconds157`, counted up to 3 hours) (only a counter now: since R158c the free Void Pack needs a finished tutorial, not play time). `voidgift` shows yours too |
-| `playtime @name 12` (**Studio only** to set) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. It does not change the free Void Pack claim any more. To test the R158c rule (the claim needs a finished or skipped tutorial), use a new account or a new profile (claim refused, the sign says "finish the tutorial to claim"), then finish or skip the tutorial (the claim opens). The tutorial cannot be replayed any more. A live server refuses |
+| `playtime @name 12` (to set: you in Studio and live; admins **Studio only**) | Sets that player's play time to 12 minutes (0 to 180), saved the usual way; `playtime 12 @name` works too. It does not change the free Void Pack claim any more. To test the R158c rule (the claim needs a finished or skipped tutorial), use a new account or a new profile (claim refused, the sign says "finish the tutorial to claim"), then finish or skip the tutorial (the claim opens). Players cannot replay the tutorial any more; you can (`tutorial reset`, `newplayer`). On a live server only you can set it |
 | `pyramid @name` | R157: the secret pyramid in the Desert: does that player have its pack (saved as `Premium.Secrets156.Pyramid`), are they carrying it now, the pyramid's spot, size and Hold-E reach |
 | `pyramid @name reset` | Clears that player's pyramid claim (saved), so the pack floats in the pyramid for them again; packs already in their Bag stay. `pyramid reset @name` works too |
 

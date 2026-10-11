@@ -60,14 +60,14 @@ wiring() { # $1 = the src tree to check (this checkout's, or a mutated copy)
  M=$S/ServerScriptService/ChestChaseServerMain.server.lua
  [ "$(grep -c "VoidGiveaway152" "$M")" = 1 ] || { echo "the main script must mention VoidGiveaway152 on exactly one line";return 1; }
  grep -q "pcall(function()require(modules.VoidGiveaway152).new(Config,playerData,chestService,notifications,mapService):Start()end)" "$M" || { echo "the main script does not start the giveaway (guarded: a failure must never stop the server)";return 1; }
- grep -q "X.Actions.voidgift=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "VoidGiveaway152).Command(ctx,p,a)" "$SRV/OwnerUpdateCommands82.lua" || { echo "voidgift is not wired into OwnerUpdateCommands82";return 1; }
+ grep -q "X.Actions.voidgift=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "VoidGiveaway152).Command(ctx,p,a,requester)" "$SRV/OwnerUpdateCommands82.lua" || { echo "voidgift is not wired into OwnerUpdateCommands82";return 1; }
  grep -q "voidgift" "$SRV/OwnerCommandTargets82.lua" || { echo "voidgift is not a server-wide command";return 1; }
  grep -q "voidgift" "$RSD/StudioTestHelp.lua" && grep -q "voidgift" "$REPO/docs/COMMANDS.md" || { echo "voidgift is not in the F4 help / docs/COMMANDS.md";return 1; }
  # the numbers the owner asked for
  grep -q "R.Cap=500" "$RSD/VoidGiveawayRules152.lua" && grep -q "R.StoreName='VoidGiveaway152'" "$RSD/VoidGiveawayRules152.lua" && grep -q "R.Key='Claims'" "$RSD/VoidGiveawayRules152.lua" || { echo "cap / store / key are not 500 / VoidGiveaway152 / Claims";return 1; }
  grep -q "UpdateAsync" "$SRV/VoidGiveawayStore152.lua" || { echo "the reservation must be an UpdateAsync";return 1; }
  # the live key is never written by a command or by Studio: edits are Studio-only and the Studio store has its own name
- grep -q "if not self.Studio then return false,'Studio only'end" "$SRV/VoidGiveawayStore152.lua" || { echo "Store:Edit must refuse outside Studio";return 1; }
+ grep -q "if not self.Studio and force~=true then return false,'Studio only'end" "$SRV/VoidGiveawayStore152.lua" || { echo "Store:Edit must refuse outside Studio (R158f: unless the game owner forces it)";return 1; }
  grep -q "studio and Rules.StudioStoreName or Rules.StoreName" "$SRV/VoidGiveawayStore152.lua" || { echo "Studio must use its own store";return 1; }
  for f in VoidGiveawayStore152 VoidGiveaway152;do if sed 's/--.*$//' "$SRV/$f.lua" | grep -n "SetAsync\|RemoveAsync\|IncrementAsync";then echo "the giveaway must only ever UpdateAsync / GetAsync the shared key ($f)";return 1;fi;done
  # no per-frame loop on the server
@@ -98,9 +98,9 @@ wiring() { # $1 = the src tree to check (this checkout's, or a mutated copy)
  a=$(grep -n "if action=='Replay'then return false end" "$SRV/TutorialProgress.lua" | head -1 | cut -d: -f1);b=$(grep -n "if not self:IsLoaded(player)then return false end" "$SRV/TutorialProgress.lua" | sed -n 2p | cut -d: -f1);c=$(grep -n "function Data:TutorialAction" "$SRV/TutorialProgress.lua" | head -1 | cut -d: -f1)
  [ -n "$a" ] && [ -n "$b" ] && [ -n "$c" ] && [ "$c" -lt "$a" ] && [ "$a" -lt "$b" ] || { echo "TutorialAction must refuse Replay first, before it reads or changes anything";return 1; }
  grep -q "if not data:TutorialAction(p,value)then return {Success=false}end\|and not data:TutorialAction(p,value)then return {Success=false}end" "$SRV/PremiumService.lua" || { echo "PremiumService's Tutorial request must answer a refused action with a plain failure";return 1; }
- grep -q "X.Actions.playtime=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "VoidGiveaway152).PlaytimeCommand(ctx,p,a)" "$SRV/OwnerUpdateCommands82.lua" || { echo "playtime is not wired into OwnerUpdateCommands82";return 1; }
+ grep -q "X.Actions.playtime=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "VoidGiveaway152).PlaytimeCommand(ctx,p,a,requester)" "$SRV/OwnerUpdateCommands82.lua" || { echo "playtime is not wired into OwnerUpdateCommands82";return 1; }
  if sed -n '/^function T.IsGlobal/,/^end/p' "$SRV/OwnerCommandTargets82.lua" | grep -q playtime;then echo "playtime takes an @name: it must not be a server-wide command";return 1;fi
- grep -q "if not self.Studio then return false,'playtime <minutes> works in Studio only" "$SRV/VoidGiveaway152.lua" || { echo "playtime <minutes> must refuse outside Studio";return 1; }
+ grep -q "if not self.Studio and owner~=true then return false,'playtime <minutes> works in Studio only" "$SRV/VoidGiveaway152.lua" || { echo "playtime <minutes> must refuse outside Studio (R158f: unless the game owner typed it)";return 1; }
  grep -q "/test playtime" "$RSD/StudioTestHelp.lua" && grep -q "playtime" "$REPO/docs/COMMANDS.md" || { echo "playtime is not in the F4 help / docs/COMMANDS.md";return 1; }
  # the play time is counted by the giveaway's existing 2 s loop (Step), never by a new loop: plain arithmetic, no task / event / Instance in the counting
  if sed -n '/^function S:_tickPlay/,/^end/p' "$SRV/VoidGiveaway152.lua" | grep -n -E "task\.|Connect|Heartbeat|RenderStepped|Stepped|while |Instance.new";then echo "the play time counting must be plain arithmetic inside the existing loop";return 1;fi
@@ -195,8 +195,8 @@ mutate "claims are not retried" $ST "S.Attempts=4;" "S.Attempts=1;" server
 mutate "retries do not wait" $ST "if attempt<S.Attempts then self.Wait((S.Waits[attempt]or 3)*(1+self.Random:NextNumber()*.25))end" "" server
 mutate "a live server falls back to memory" $ST " if self.Mode=='Memory'or not self.Studio then return self.Mode end" " if self.Mode=='Memory'then return self.Mode end" server
 mutate "Studio uses the live key" $ST "Name=opts.Name or(studio and Rules.StudioStoreName or Rules.StoreName)" "Name=opts.Name or Rules.StoreName" server
-mutate "a live store can be edited" $ST " if not self.Studio then return false,'Studio only'end" "" server
-mutate "a live server can reset a claim" $SV " if not self.Studio then return false,'voidgift '..sub..' works in Studio only" " if false then return false,'voidgift '..sub..' works in Studio only" server
+mutate "a live store can be edited" $ST " if not self.Studio and force~=true then return false,'Studio only'end" "" server
+mutate "a live server can reset a claim" $SV " if not self.Studio and owner~=true then return false,'voidgift '..sub..' works in Studio only" " if false then return false,'voidgift '..sub..' works in Studio only" server
 mutate "the fallback warns more than once" $ST " if self.Mode=='Memory'then return false end
  self.Mode='Memory'" " self.Mode='Memory'" server
 mutate "a player who cannot save is served (live)" $SV "if not data.CanSave[player]and not self.Studio then" "if false then" server
@@ -268,7 +268,7 @@ mutate "R158c: the counter stops at 20 minutes" $SV "local total=math.min(Rules.
 mutate "R158c: a player whose data is not loaded is counted" $SV "  if self.Data:IsLoaded(player)then
    if not self.Ready[player]then" "  if true then
    if not self.Ready[player]then" server
-mutate "R158c: playtime works on a live server" $SV "if not self.Studio then return false,'playtime <minutes> works in Studio only" "if false then return false,'playtime <minutes> works in Studio only" server
+mutate "R158c: playtime works on a live server" $SV "if not self.Studio and owner~=true then return false,'playtime <minutes> works in Studio only" "if false then return false,'playtime <minutes> works in Studio only" server
 mutate "R158c: the tutorial line of voidgift is gone" $SV "lines[#lines+1]=self:TutorialText(player);" "" server
 mutate "R158c: playtime @name 12 does not parse" $OT " local head,name,rest=text:match('^(.-)%s+@([%w_]+)%s+(%S+)\$')" " local head,name,rest=nil,nil,nil" server
 mutate "R158c: playtime is a server-wide command" $OT "or s:match('^voidgift')~=nil or" "or s:match('^voidgift')~=nil or s:match('^playtime')~=nil or" server

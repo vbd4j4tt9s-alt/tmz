@@ -7,7 +7,7 @@
 # require of SettingsConfig with WaitForChild (the title can load the audio modules before SettingsConfig has replicated), and (R158, on purpose) the
 # owner's "no SMACK anywhere": ConcurrentKeeperService's pack-drop notice line (a bat hit shows none; ZAP / CAUGHT as before) and PyramidRules156's
 # Text.Bat ('THE PACK WENT BACK IN THE PYRAMID'), and (R158 review) the AttackerUserId field in HitByBat's KeeperHit packet: each exact new line is
-# put back to its old text before comparing. Anything else counts.
+# put back to its old text before comparing (R158f, on purpose: the creative mode lines of ConcurrentKeeperService, RagdollService and MovementGuard, below). Anything else counts.
 # Usage: sh r152_real_diff.sh <repo> <base> <path>...  -> prints each path that differs beyond those; exit 1 when one does.
 REPO=$1;BASE=$2;shift 2
 exec python3 - "$REPO" "$BASE" "$@" <<'EOF'
@@ -31,6 +31,12 @@ def norm(text):
     # (R158) the exact new lines back to the old ones: the pack-drop notice without SMACK, Text.Bat without SMACK, the bat packet's AttackerUserId
     for new_line, old_line in R158:
         out = out.replace(new_line, old_line)
+    # (R158f, on purpose) creative mode (the owner's /test creative): ConcurrentKeeperService's TestDropPack method, RagdollService's creative check in CanHit / Apply (the force argument of the
+    # owner's /test fling and /test ragdoll), and MovementGuard's one exemption line are put back to the old text before comparing
+    out = re.sub(r"    -- R158f: the owner's /test droppack\..*?(?=    function Service:Finish\()", "", out, flags=re.S)
+    out = re.sub(r"-- R158f: a player in creative mode.*?\nfunction Ragdoll:CanHit\(player,force\)\n    return player~=nil and player\.Parent~=nil and self\.Records\[player\]==nil and\(force==true or not creative\(player\)\)\nend", "function Ragdoll:CanHit(player)\n    return player~=nil and player.Parent~=nil and self.Records[player]==nil\nend", out, flags=re.S)
+    out = out.replace("function Ragdoll:Apply(player,velocity,cause,stunSeconds,force)\n    if not self:CanHit(player,force)then return nil end", "function Ragdoll:Apply(player,velocity,cause,stunSeconds)\n    if not self:CanHit(player)then return nil end")
+    out = re.sub(r"    -- R158f: creative mode \(the owner's /test creative\) is never corrected[^\n]*\n    local testState=require\(script\.Parent\.OwnerTestState82\)\n    if exempt or\(type\(testState\.Creative\)=='function'and testState\.Creative\(player\)\)or", "    if exempt or", out)
     return re.sub(r"Config\.Version='V150 R15[0-9a-z]*'", "Config.Version='V150 R15x'", out)
 rc = 0
 for p in paths:

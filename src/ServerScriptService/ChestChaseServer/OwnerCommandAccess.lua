@@ -18,6 +18,19 @@ local function ownerOfGroup(id)
  expires=now+(ownerId and 300 or 30)
  return ownerId
 end
+-- R158f: the GAME OWNER (the place's creator: a user, or the owner of the group that owns the place; every player in Studio). Owner commands are absolute: no Studio-only gate,
+-- no cooldown, no cap that refuses them. Admins (AdminUserIds) are NOT owners: they keep the limits they always had. The same check IsAllowed makes for "owner".
+function Access.IsOwner(player)
+ if not player or player.Parent~=Players then return false end
+ if RunService:IsStudio()then return true end
+ if type(player.UserId)~='number'or player.UserId<=0 then return false end
+ if game.CreatorType==Enum.CreatorType.User then
+  return game.CreatorId>0 and player.UserId==game.CreatorId
+ elseif game.CreatorType==Enum.CreatorType.Group and game.CreatorId>0 then
+  return player.UserId==ownerOfGroup(game.CreatorId)
+ end
+ return false
+end
 function Access.IsAllowed(player)
  if not player or player.Parent~=Players then return false end
  if RunService:IsStudio()then return true end
@@ -25,12 +38,7 @@ function Access.IsAllowed(player)
  -- Optional server-authored comma-separated user IDs, never replicated player authority.
  local ids=script:GetAttribute('AdminUserIds')
  for id in tostring(ids or''):gmatch('%d+')do if tonumber(id)==player.UserId then return true end end
- if game.CreatorType==Enum.CreatorType.User then
-  return game.CreatorId>0 and player.UserId==game.CreatorId
- elseif game.CreatorType==Enum.CreatorType.Group and game.CreatorId>0 then
-  return player.UserId==ownerOfGroup(game.CreatorId)
- end
- return false
+ return Access.IsOwner(player)
 end
 function Access.Publish(player)
  local allowed=Access.IsAllowed(player)

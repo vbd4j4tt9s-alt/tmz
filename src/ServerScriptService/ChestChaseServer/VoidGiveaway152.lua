@@ -355,18 +355,19 @@ function S:StatusText(player)
  if player then lines[#lines+1]=self:TutorialText(player);lines[#lines+1]=self:PlayText(player)end
  local prompt=self.Pedestal and self.Pedestal.Prompt
  lines[#lines+1]='Pedestal: '..(self.Model and tostring(self.Model:GetAttribute(Rules.Attr.State))or'not built')..'; prompt '..(prompt and prompt.Enabled and'on'or'off')..'.'
- lines[#lines+1]=self.Studio and'Studio tools: voidgift reset me (clears your claim and flag), voidgift left <0-'..Rules.Cap..'> (sets how many are left).'or'A live server never resets or edits the shared count (the Studio-only tools are off here).'
+ lines[#lines+1]=self.Studio and'Studio tools: voidgift reset me (clears your claim and flag), voidgift left <0-'..Rules.Cap..'> (sets how many are left).'or'On a live server voidgift reset me / voidgift left <0-'..Rules.Cap..'> work for the GAME OWNER only (they change the LIVE shared count; other running servers keep the number they have seen until they restart). Admins cannot.'
  return table.concat(lines,'\n')
 end
-function S:_command(player,a)
+-- owner = true: the command was made by the GAME OWNER (R158f: no Studio-only gate for the owner; an admin or a plain call on a live server is still refused)
+function S:_command(player,a,owner)
  local sub=a[1]and tostring(a[1]):lower()
  if sub==nil or sub=='status'then return true,self:StatusText(player)end
  if sub~='reset'and sub~='left'then return false,'Use voidgift, voidgift reset me, or voidgift left <0-'..Rules.Cap..'>.'end
- if not self.Studio then return false,'voidgift '..sub..' works in Studio only: a live server never changes the shared count. Test it in Studio (its own store, or an in-memory counter).'end
+ if not self.Studio and owner~=true then return false,'voidgift '..sub..' works in Studio only: a live server never changes the shared count. Test it in Studio (its own store, or an in-memory counter).'end
  if sub=='reset'then
   if #a~=2 or tostring(a[2]):lower()~='me'then return false,'Use voidgift reset me (it clears YOUR claim and flag; the pack you got stays in your Bag).'end
   local uid=player.UserId;local key=tostring(uid)
-  local ok,value=self.Store:Edit(function(v)if v.Users[key]~=nil then v.Users[key]=nil;v.Count=math.max(0,v.Count-1)end;return v end)
+  local ok,value=self.Store:Edit(function(v)if v.Users[key]~=nil then v.Users[key]=nil;v.Count=math.max(0,v.Count-1)end;return v end,owner)
   if not ok then return false,'The store could not be edited: '..tostring(value)end
   self.Reserved[uid]=nil;self.Told[player]=nil;self.Data:GetPremium(player)[Rules.Flag]=nil
   self.Data:MarkDirty(player);self:_force(value.Count,value.Users);self:_state(player,'Open')
@@ -374,7 +375,7 @@ function S:_command(player,a)
  end
  local n=tonumber(a[2])
  if #a~=2 or not n or n~=n or n%1~=0 or n<0 or n>Rules.Cap then return false,'Use voidgift left <0-'..Rules.Cap..'> (how many packs the pedestal shows as left).'end
- local ok,value=self.Store:Edit(function(v)v.Count=Rules.Cap-n;return v end)
+ local ok,value=self.Store:Edit(function(v)v.Count=Rules.Cap-n;return v end,owner)
  if not ok then return false,'The store could not be edited: '..tostring(value)end
  self:_force(value.Count,value.Users)
  local left=Rules.Left(value.Count)
@@ -383,11 +384,11 @@ end
 function S:_userList()local out={};for k in pairs(self.Users)do out[#out+1]=k end;return out end
 -- R157 counter: playtime [<minutes>] (per player: /test playtime @name <minutes>). No number = shows the player's play time. A number sets it (Studio only, like the voidgift edits: a live server never
 -- changes a player's play time): the profile field, saved the usual way, the half second not counted yet forgotten. It is a counter only: no claim waits for it (R158c).
-function S:_playtime(player,a)
+function S:_playtime(player,a,owner)
  local played=self:_played(player)
  if played==nil then return false,'Wait for the player data to load.'end
  if #a==0 then return true,self:PlayText(player)end
- if not self.Studio then return false,'playtime <minutes> works in Studio only: a live server never changes play time. Test it in Studio.'end
+ if not self.Studio and owner~=true then return false,'playtime <minutes> works in Studio only: a live server never changes play time. Test it in Studio.'end
  local minutes=#a==1 and tonumber(a[1])
  if not minutes or minutes~=minutes or minutes<0 or minutes*60>Rules.PlayCap then return false,'Use playtime <minutes> @username (0 to '..Rules.PlayCap//60 ..' minutes), or playtime @username to see it.'end
  local seconds=Rules.CleanPlayed(math.floor(minutes*60+.5))
@@ -396,15 +397,20 @@ function S:_playtime(player,a)
  self.Data:MarkDirty(player);self.Data:QueueGardenSave(player)
  return true,'Play time set. '..self:PlayText(player)
 end
-function S.PlaytimeCommand(_,player,a)
+-- (4th argument, R158f: the player who typed the command; the GAME OWNER may set play time and edit the shared count on a live server too)
+local function ownerOf(requester)
+ local ok,Access=pcall(function()return require(script.Parent.OwnerCommandAccess)end)
+ return requester~=nil and ok and type(Access.IsOwner)=='function'and Access.IsOwner(requester)==true
+end
+function S.PlaytimeCommand(_,player,a,requester)
  local self=S.Current
  if not self then return false,'The Void giveaway is not running in this server.'end
- return self:_playtime(player,a or{})
+ return self:_playtime(player,a or{},ownerOf(requester))
 end
 -- OwnerUpdateCommands82 -> here (`voidgift`): the service running in this server.
-function S.Command(_,player,a)
+function S.Command(_,player,a,requester)
  local self=S.Current
  if not self then return false,'The Void giveaway is not running in this server.'end
- return self:_command(player,a or{})
+ return self:_command(player,a or{},ownerOf(requester))
 end
 return S

@@ -757,7 +757,13 @@ end
 
 -- R152: the luck in use comes from boots an owner command gave (/test boots): no bought boots reach it. A pull made with that luck is a TEST pull (never announced, never on the hub's boards).
 function PlayerDataService:HasTestLuck(player)
-	return self.TestLuck[player] == true
+	-- R158f: a player in creative mode (the owner's /test creative) opens TEST packs only: never announced, never counted for the pity or the hub boards
+	return self.TestLuck[player] == true or self:IsCreative(player)
+end
+-- R158f: creative mode is the game owner's /test creative (OwnerTestState82, memory only); a test's stand-in module without it means "not creative"
+function PlayerDataService:IsCreative(player)
+	local ok, state = pcall(require, script.Parent.OwnerTestState82)
+	return ok and type(state) == "table" and type(state.Creative) == "function" and state.Creative(player) == true
 end
 -- R153: the product of the luck passes the player owns (a pass counts when its Owned attribute is on, which the Robux check, a game-pass purchase, a Gem purchase and a gift all set, or when the saved Gem / gift entitlement is there).
 function PlayerDataService:PassLuck(player)
@@ -1672,6 +1678,8 @@ function PlayerDataService:PlantSeed(player, slot, seedInventoryId, placement, n
 
 	-- R158e: the plant planted in the tutorial's plant step (once per player) has its first fruit in 10 s (TutorialProgress.TutorialFastCrop; never yields).
 	do local okFast,fastError=pcall(self.TutorialFastCrop,self,player,seed,crop,growing,now);if not okFast then warn("[R158e] Tutorial first fruit skipped: "..tostring(fastError)) end end
+	-- R158f: creative mode (the owner's /test creative, OwnerTestState82): the plant is ripe at once (a normal player's timing is not touched).
+	if self:IsCreative(player) then crop.PlantedAt = now - 1000; crop.MatureAt = now; crop.ReadyAt = now; crop.FruitStates = nil end
 	-- Both tables commit before revision signals or optional presentation work.
 	table.insert(crops, crop)
 	garden.Plots[tostring(slot)] = crops
@@ -1730,6 +1738,11 @@ function PlayerDataService:HarvestPlant(player, slot, expectedCropId, now, fruit
      marks[crop.Id]={Index=fruitIndex,By=player.UserId,At=os.clock()}
      for id,mark in pairs(marks)do if os.clock()-mark.At>30 then marks[id]=nil end end
     end
+	-- R158f: creative mode: every fruit of the plant that regrows is ripe again at once.
+	if crop.FruitStates and self:IsCreative(player) then
+		for _, fruit in pairs(crop.FruitStates) do if type(fruit) == "table" then fruit.ReadyAt = now end end
+		crop.ReadyAt = now
+	end
 	self:_gardenChanged(player)
 	self:TutorialEvent(player,'Harvest')
 	self:QuestEvent(player,'Harvest',1) -- R140 daily quest

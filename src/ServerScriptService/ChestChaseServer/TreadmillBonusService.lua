@@ -27,6 +27,7 @@ function S:Start()
  if self.Connection then return end
  self.Connection=Run.Heartbeat:Connect(function(dt)self:Step(dt)end)
 end
+function S:_creative(player)local ok,state=pcall(require,script.Parent.OwnerTestState82);return ok and type(state)=='table'and type(state.Creative)=='function'and state.Creative(player)==true end -- R158f: the owner's creative mode has no roll wait
 function S:GetReady(player)return Rules.ReadyCount(self.Ready[player])end
 function S:GetProgress(player)return Rules.Progress(self.Data:GetPremium(player).TreadmillBonusProgress)end
 function S:_setProgress(player,seconds)self.Data:GetPremium(player).TreadmillBonusProgress=Rules.Progress(seconds)end
@@ -97,7 +98,7 @@ end
 function S:Roll(player)
  if not self.Data:IsLoaded(player)then return {Error='YOUR DATA IS STILL LOADING'}end
  local now=os.clock()
- if now-(self.LastRoll[player]or -math.huge)<Rules.RollCooldown then return {Error='Please wait a moment.'}end
+ if now-(self.LastRoll[player]or -math.huge)<Rules.RollCooldown and not self:_creative(player)then return {Error='Please wait a moment.'}end -- (R158f: no wait in the owner's creative mode)
  self.LastRoll[player]=now
  local ready=self:GetReady(player)
  if ready<1 then return {Error='No bonus roll ready yet.',Ready=0}end

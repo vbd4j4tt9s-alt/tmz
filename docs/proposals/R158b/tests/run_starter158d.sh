@@ -20,7 +20,7 @@ wiring() {
  M=$S/ServerScriptService/ChestChaseServerMain.server.lua
  [ "$(grep -c "StarterVerity158d" "$M")" = 1 ] || { echo "the main script must mention StarterVerity158d on exactly one line";return 1; }
  grep -q "pcall(function()require(modules.StarterVerity158d).new(Config,playerData,chestService,notifications,treadmillBonus):Start()end)" "$M" || { echo "the main script does not start the gift (guarded: a failure must never stop the server)";return 1; }
- grep -q "X.Actions.starterverity=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "StarterVerity158d).Command(ctx,p,a)" "$SRV/OwnerUpdateCommands82.lua" || { echo "starterverity is not wired into OwnerUpdateCommands82";return 1; }
+ grep -q "X.Actions.starterverity=true" "$SRV/OwnerUpdateCommands82.lua" && grep -q "StarterVerity158d).Command(ctx,p,a,requester)" "$SRV/OwnerUpdateCommands82.lua" || { echo "starterverity is not wired into OwnerUpdateCommands82";return 1; }
  if sed -n '/^function T.IsGlobal/,/^end/p' "$SRV/OwnerCommandTargets82.lua" | grep -q starterverity;then echo "starterverity takes an @name: it must not be a server-wide command";return 1;fi
  grep -q "/test starterverity" "$RSD/StudioTestHelp.lua" && grep -q "starterverity" "$REPO/docs/COMMANDS.md" || { echo "starterverity is not in the F4 help / docs/COMMANDS.md";return 1; }
  [ -f "$REPO/docs/proposals/R158b/starter_verity158d.md" ] || { echo "docs/proposals/R158b/starter_verity158d.md is missing";return 1; }
@@ -29,7 +29,7 @@ wiring() {
  for f in "$SRV/PlayerDataService.lua" "$SRV/PremiumProgress.lua" "$SRV/Config.lua";do if grep -n "StarterRolls158d\|RollsField" "$f";then echo "$f must not know the optional Premium fields";return 1;fi;done
  # the floor is set by server code only: only these files know the gift
  for f in $(grep -rl "StarterVerity158d\|StarterVerityRules158d" "$S" --include=*.lua | sed "s#^$S/##" | sort);do
-  case "$f" in ReplicatedStorage/StarterVerityRules158d.lua|ServerScriptService/ChestChaseServer/StarterVerity158d.lua|ServerScriptService/ChestChaseServer/PlayerDataService.lua|ServerScriptService/ChestChaseServer/ChestService.lua|ServerScriptService/ChestChaseServer/TreadmillBonusService.lua|ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua|ServerScriptService/ChestChaseServerMain.server.lua|ReplicatedStorage/StudioTestHelp.lua|ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua) ;; *) echo "unexpected file knows the gift: $f";return 1;; esac
+  case "$f" in ReplicatedStorage/StarterVerityRules158d.lua|ServerScriptService/ChestChaseServer/StarterVerity158d.lua|ServerScriptService/ChestChaseServer/PlayerDataService.lua|ServerScriptService/ChestChaseServer/ChestService.lua|ServerScriptService/ChestChaseServer/TreadmillBonusService.lua|ServerScriptService/ChestChaseServer/OwnerUpdateCommands82.lua|ServerScriptService/ChestChaseServerMain.server.lua|ReplicatedStorage/StudioTestHelp.lua|ServerScriptService/ChestChaseServer/OwnerCommandTargets82.lua|ServerScriptService/ChestChaseServer/OwnerCreative158f.lua) ;; *) echo "unexpected file knows the gift: $f";return 1;; esac
  done
  if sed 's/--.*$//' "$SRV/StarterVerity158d.lua" | grep -n "TestGrant\|RemoteEvent\|RemoteFunction\|OnServerEvent\|OnServerInvoke\|FireClient\|Heartbeat\|RenderStepped";then echo "the gift service must have no TestGrant, no remote and no per-frame loop";return 1;fi
  for f in OwnerTestPacks RarePackTests StudioTestCommands PremiumService FruitGiftService;do if sed 's/--.*$//' "$SRV/$f.lua" | grep -n "Floor";then echo "$f must not touch a pack's Floor";return 1;fi;done

@@ -83,9 +83,10 @@ function S:Reserve(userId)
  end
  return false,last
 end
--- Studio only (live data is never edited from a server): fn(clean value) -> new value, written through the same key. Returns true, value or false, reason.
-function S:Edit(fn)
- if not self.Studio then return false,'Studio only'end
+-- Studio only (live data is never edited from a server by a plain call): fn(clean value) -> new value, written through the same key. Returns true, value or false, reason.
+-- R158f: force = true is the GAME OWNER's own /test voidgift reset me / left <n> (VoidGiveaway152 passes it only for the owner): it edits the LIVE key too.
+function S:Edit(fn,force)
+ if not self.Studio and force~=true then return false,'Studio only'end
  if self.Mode=='Memory'then self.Mem=Rules.Clean(fn(Rules.Clean(self.Mem)));return true,Rules.Clean(self.Mem)end
  local store,why=self:_store();if not store then return false,why end
  local result

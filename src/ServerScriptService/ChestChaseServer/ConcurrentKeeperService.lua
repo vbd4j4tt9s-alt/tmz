@@ -258,6 +258,28 @@ return function(Legacy)
         end
     end
 
+    -- R158f: the owner's /test droppack. A TEST pack lying where the player stands, built exactly like a pack that a caught carrier drops (so the R158b outline, marker and beam show,
+    -- and holding E takes it like any drop). It lasts `seconds` (default 60; a real drop lasts Config.DroppedChestDuration). Copies a pack spot of the biome for the keeper's home.
+    -- Returns ok, text.
+    function Service:TestDropPack(player,stage,tier,seconds)
+        local character,_,root=self:_validCharacter(player)
+        if not character then return false,'Wait for the character.'end
+        stage=math.clamp(math.floor(tonumber(stage)or 1),1,7);tier=math.clamp(math.floor(tonumber(tier)or 3),1,6)
+        seconds=math.clamp(tonumber(seconds)or 60,5,600)
+        local template
+        for _,seed in ipairs(self.Map.Chests)do if seed.Stage==stage and seed.Body and seed.Body.Parent then template=seed;break end end
+        if not template then return false,'There is no pack spot in biome '..stage..' to copy.'end
+        local variant=string.format('Pack%02d',tier);local Shapes=require(game:GetService('ReplicatedStorage'):WaitForChild('PackShapes151'))
+        local chest={Stage=stage,BagVariant=variant,PackSize=1,PackMutation='None',Weather='None',Body=template.Body,Model=template.Model,TestGrant=true,
+            SeedScale=PackRules.NewSeedScale(stage,variant,1),PackShape=Shapes.Applies(variant)and Shapes.Roll(variant)or nil}
+        local position=self:_getGroundedDropPosition({Character=character,HumanoidRootPart=root})
+        self.DropSerial+=1;local token=self.DropSerial
+        local model,prompt,label=self:_createDroppedChest(position,chest,token)
+        if not model then self.DropSerial-=1;return false,'There is no ground to drop it on here. Stand on the track or in your base.'end
+        self.Drops[token]={Token=token,Chest=chest,Stage=stage,Position=model.PrimaryPart.Position,Model=model,Prompt=prompt,Label=label,ExpiresAt=os.clock()+seconds,RecoveryDash=false}
+        return true,string.format('Dropped a TEST pack (biome %d, tier %d) at your feet for %d s. Hold E to take it back; the outline, the marker and the beam are the R158b highlight.',stage,tier,seconds)
+    end
+
     function Service:Finish(success, caught, run, hit)
         if not run or self.Runs[run.Player] ~= run or run.Finishing then return end
         if success and not require(script.Parent.MovementGuard).Check(run.Player)then return end

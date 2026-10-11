@@ -45,9 +45,9 @@ for f in ('DailyProgress', 'RarePackTests', 'MysteryPackService', 'TreadmillBonu
     t = rd('ServerScriptService/ChestChaseServer/%s.lua' % f)
     need('RollCoat' not in t and 'RollMutation' not in t, "%s must not roll coats (free and test packs stay plain)" % f)
 rpt = rd('ServerScriptService/ChestChaseServer/RarePackTests.lua')
-need("PackMutation=Packs.MutationKey(coat),TestGrant=true" in rpt and 'function T.Grant(data,player,selector,requester,coat)' in rpt and 'RollMutation' not in rpt, "/test rarepacks packs are plain unless the owner names a coat (never rolled)")
+need("PackMutation=Packs.MutationKey(coat),TestGrant=true" in rpt and 'function T.Grant(data,player,selector,requester,coat,owner)' in rpt and 'RollMutation' not in rpt, "/test rarepacks packs are plain unless the owner names a coat (never rolled)")
 std = rd('ServerScriptService/ChestChaseServer/StudioTestCommands.lua')
-need("Use /test rarepacks [rarity] [gold|diamond]." in std and "Grant(data,player,a[1],requester,coat)" in std and 'RollMutation' not in std, "/test rarepacks takes an optional gold / diamond and refuses another word")
+need("Use /test rarepacks [rarity] [gold|diamond]." in std and "Grant(data,player,a[1],requester,coat,owner)" in std and 'RollMutation' not in std, "/test rarepacks takes an optional gold / diamond and refuses another word")
 # 2. the world's numbers did not move; the odds / prices / saved shape did not move
 need("None={Weight=95}" in rules and "Gold={Weight=4.5," in rules and "Diamond={Weight=.5," in rules, "SeedPackRules.PackMutations must still be None 95 / Gold 4.5 / Diamond .5")
 need("B.MutationWeights={None=95,Gold=4.5,Diamond=.5}" in balance and "B.MutationInheritance=.20" in balance and "B.MutationMultipliers={Gold=3,Diamond=6}" in balance, "BalanceRules coat constants moved")

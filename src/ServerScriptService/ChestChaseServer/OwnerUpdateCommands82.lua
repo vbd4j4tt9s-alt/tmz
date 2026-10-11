@@ -13,7 +13,9 @@ local function seedId(s)
  local query=tostring(s or''):lower()
  for _,spec in ipairs(Packs.SeedDesigns)do if spec.id:lower()==query then return spec.id end end
 end
-local function safe(ctx,p)
+-- R158f: owner = the command was typed by the GAME OWNER (OwnerCommandAccess.IsOwner): the owner is never refused for a chase, a carry or an opening; an admin is, as before.
+local function safe(ctx,p,owner)
+ if owner==true then return true end
  if p:GetAttribute('ChestChaseRunActive')or ctx.Chase:IsPlayerBusy(p)or ctx.Chests:IsOpening(p)or p:GetAttribute('ChestChaseSeedCarrying')then return false,'Finish the target’s chase or pack opening first.'end
  return true
 end
@@ -35,21 +37,30 @@ X.Actions.hubtrees=true
 X.Actions.trampoline=true
 -- R152: keepermodels [off|auto]: the baked rev 6 keeper models (KeeperMeshCommand152): bake status, which model each keeper shows, a switch back.
 X.Actions.keepermodels=true
--- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only (VoidGiveaway152).
+-- R152: voidgift [reset me | left <n>]: the free Void Pack pedestal's status; the two edits are Studio only for admins and open to the game owner on a live server (R158f; VoidGiveaway152).
 X.Actions.voidgift=true
--- R157: playtime [<minutes>] (per player, Studio only to set): the play time counter (VoidGiveaway152; since R158c the free Void Pack's claim needs a finished tutorial, not play time): /test playtime @name <minutes>.
+-- R157: playtime [<minutes>] (per player; setting it is Studio only for admins, open to the game owner on a live server since R158f): the play time counter (VoidGiveaway152; since R158c the free Void Pack's claim needs a finished tutorial, not play time): /test playtime @name <minutes>.
 X.Actions.playtime=true
--- R158d: starterverity [reset] (per player, Studio only to reset): the new-player gift (a Verity Pack guaranteed Mythic or better + 2 bonus rolls): /test starterverity @name (StarterVerity158d).
+-- R158d: starterverity [reset] (per player; reset is Studio only for admins, open to the game owner on a live server since R158f): the new-player gift (a Verity Pack guaranteed Mythic or better + 2 bonus rolls): /test starterverity @name (StarterVerity158d).
 X.Actions.starterverity=true
 -- R156: pyramid [@username] (status), pyramid @username reset (clears the secret pyramid pack's claim; saved): SecretPyramid156.
 X.Actions.pyramid=true
-function X.Execute(ctx,p,action,a)
+-- R158f: creative mode and the test commands for everything new (OwnerCreative158f); bonusrolls <n> = bonus ready <n>.
+for name in pairs(require(script.Parent.OwnerCreative158f).Actions)do X.Actions[name]=true end
+X.Actions.bonusrolls=true
+function X.Execute(ctx,p,action,a,requester)
+ local Access=require(script.Parent.OwnerCommandAccess);local owner=requester~=nil and type(Access.IsOwner)=='function'and Access.IsOwner(requester)==true -- R158f: the game owner's commands are absolute (admins keep today's limits)
+ if require(script.Parent.OwnerCreative158f).Actions[action]then return require(script.Parent.OwnerCreative158f).Execute(ctx,p,action,a,requester)end
+ if action=='bonusrolls'then
+  if#a~=1 or not integer(a[1],0,50)then return false,'Use bonusrolls <0-2> [@username] (the game keeps at most 2 ready; the timer pauses at 2).'end
+  action='bonus';a={'ready',tostring(math.min(2,tonumber(a[1])))}
+ end
  if action=='keepermodels'then return require(script.Parent.KeeperMeshCommand152).Execute(ctx,p,a)end
  if action=='hubtrees'then return require(script.Parent.HubTreeLoader151).Command(ctx,p,a)end
  if action=='trampoline'then return require(script.Parent.HubTrampoline153).Command(ctx,p,a)end
- if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a)end
- if action=='playtime'then return require(script.Parent.VoidGiveaway152).PlaytimeCommand(ctx,p,a)end
- if action=='starterverity'then return require(script.Parent.StarterVerity158d).Command(ctx,p,a)end
+ if action=='voidgift'then return require(script.Parent.VoidGiveaway152).Command(ctx,p,a,requester)end
+ if action=='playtime'then return require(script.Parent.VoidGiveaway152).PlaytimeCommand(ctx,p,a,requester)end
+ if action=='starterverity'then return require(script.Parent.StarterVerity158d).Command(ctx,p,a,requester)end
  if action=='pyramid'then return require(script.Parent.SecretPyramid156).Command(ctx,p,a)end
  if action=='rarepull'or action=='raresound'then return require(script.Parent.RarePullTestCommands).Execute(ctx,p,action,a)end
  if action=='plantnotify'then return require(script.Parent.SocialService).Command(ctx,p,a)end
@@ -179,7 +190,7 @@ function X.Execute(ctx,p,action,a)
    local cycle=(math.floor((map:GetAttribute('VeiledEventCycle')or 0)/3)+1)*3
    event:Spawn(cycle,true);return event.Seed~=nil,'Storm Peaks event spawned. Normal reset counter is unchanged.'
   elseif mode=='go'then
-   local okay,why=safe(ctx,p);if not okay then return false,why end
+   local okay,why=safe(ctx,p,owner);if not okay then return false,why end
    if not event.Seed or not event.Seed.Model.Parent or ctx.Map.Refreshing then return false,'Spawn the event first.'end
    local c=p.Character;local root=c and c:FindFirstChild('HumanoidRootPart');if not root then return false,'Wait for the target’s character.'end
    ctx.Bases:StopTraining(p,false);State.ClearMovement(p)
@@ -341,11 +352,11 @@ function X.Execute(ctx,p,action,a)
   if dark then h,v=K.SpecialKeeper.Horizontal,K.SpecialKeeper.Vertical
   else local settings=ctx.Chase:_getGuardianSettings(st);h,v=settings.FlingHorizontal,settings.FlingVertical end
   local back=-root.CFrame.LookVector;back=Vector3.new(back.X,0,back.Z);back=back.Magnitude>.01 and back.Unit or Vector3.new(0,0,-1)
-  if not ctx.Chase.Ragdoll:Apply(p,back*h+Vector3.new(0,v,0),'Keeper')then return false,'Target can’t be flung right now (already ragdolled or no character).'end
+  if not ctx.Chase.Ragdoll:Apply(p,back*h+Vector3.new(0,v,0),'Keeper',nil,true)then return false,'Target can’t be flung right now (already ragdolled or no character).'end
   return true,'Flung like the '..(dark and'The Darkened'or ctx.Config.BiomeNames[st])..' keeper: '..h..' sideways / '..v..' up. Nothing dropped.'
  elseif action=='ragdoll'then
   local seconds=tonumber(a[1]or'4');if #a>1 or not seconds or seconds~=seconds or seconds<.5 or seconds>10 then return false,'Use ragdoll [0.5–10 seconds] [@username].'end
-  if not ctx.Chase.Ragdoll:Apply(p,Vector3.new(0,12,0),'Hole',seconds)then return false,'Target can’t be ragdolled right now.'end
+  if not ctx.Chase.Ragdoll:Apply(p,Vector3.new(0,12,0),'Hole',seconds,true)then return false,'Target can’t be ragdolled right now.'end
   return true,'Ragdolled for '..seconds..' s (same as falling in a hole). Nothing dropped.'
  elseif action=='holes'then
   local holes=ctx.Chase.TrackHoles;if not holes then return false,'Track holes are not running.'end
@@ -358,7 +369,7 @@ function X.Execute(ctx,p,action,a)
   if #a~=0 then return false,'Use dig [@username] (the target must hold the shovel on the track).'end
   local holes=ctx.Chase.TrackHoles;if not holes then return false,'Track holes are not running.'end
   holes.NextDig[p]=nil;pcall(function()require(script.Parent.SecurityGate).Cleanup(p)end)
-  local ok,why=holes:Request(p)
+  local ok,why=holes:Request(p,nil,owner) -- (R158f: the owner's dig also skips the carrying and hole-count limits)
   local reasons={Shovel='Equip the shovel first.',OffTrack='Stand on the track.',Carrying='Can’t dig while carrying a pack.',PlayerCap='Already has the maximum number of holes.',Pack='Too close to a pack.',Camp='Too close to a keeper.',Spacing='Too close to another hole.',Entrance='Too close to the entrance.',Ground='No ground here.',Refreshing='The track is refreshing.',Downed='Target is ragdolled.'}
   return ok,ok and(why=='Covered'and'Covered one of the target’s holes.'or'Dug a hole at the target’s feet (cooldown skipped).')or(reasons[why]or tostring(why))
  elseif action=='gifts'then
@@ -395,7 +406,7 @@ function X.Execute(ctx,p,action,a)
   for _,other in ipairs(Players:GetPlayers())do if require(script.Parent.OwnerCommandAccess).IsAllowed(other)then lines[#lines+1]='In this server with access: @'..other.Name end end
   return true,table.concat(lines,'\n')
  end
- local okay,why=safe(ctx,p);if not okay then return false,why end
+ local okay,why=safe(ctx,p,owner);if not okay then return false,why end
  if action=='fence'then
   local tier=integer(a[1],1,7);if #a~=1 or not tier then return false,'Use fence <1–7>.'end
   data.Fences=data.Fences or{};data.Fences[p]=tier;data:PublishFenceData(p)
@@ -415,18 +426,21 @@ function X.Execute(ctx,p,action,a)
   -- R147: verity [1-20] = Verity packs, like eclipse = Void packs. (A bad number is refused for verity; eclipse keeps its old
   -- "or 6" fallback, which silently gave 6 Void packs for a bad number.)
   local count,st
-  if action=='verity'then count=integer(a[1]or'1',1,20);st=7
-  else count=action=='eclipse'and integer(a[1]or'1',1,20)or 6;st=action=='eclipse'and 7 or stage(a[1])end
-  if #a>1 or not count or not st or st>=8 then return false,action=='eclipse'and'Use eclipse [1–20].'or action=='verity'and'Use verity [1–20].'or'Use packset <biome>.'end
-  if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests or not data:RoomFor(p,count)then return false,'Make space in the target inventory (200 items max).'end -- R155: the cap counts owner grants too
+  local most=owner and 500 or 20 -- R158f: the game owner may ask for any sane number (the storage ceiling, Config.MaxSavedChests, still holds); admins keep 20
+  if action=='verity'then count=integer(a[1]or'1',1,most);st=7
+  else count=action=='eclipse'and integer(a[1]or'1',1,most)or 6;st=action=='eclipse'and 7 or stage(a[1])end
+  if #a>1 or not count or not st or st>=8 then return false,action=='eclipse'and('Use eclipse [1–'..most..'].')or action=='verity'and('Use verity [1–'..most..'].')or'Use packset <biome>.'end
+  if #data:GetChestRecords(p)+count>ctx.Config.MaxSavedChests then return false,'The save holds at most '..ctx.Config.MaxSavedChests..' packs and seeds; make space in the target inventory.'end -- R158f: the storage ceiling (the save format) stays for everyone
+  if not data:RoomFor(p,count,{Owner=owner})then return false,'Make space in the target inventory (200 items max).'end -- R155: the cap counts admin grants too (R158f: not the game owner's)
   for i=1,count do
-   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',i),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true}) -- R151: TEST packs (never announced)
+   local record,reason=data:AddChest(p,{Stage=st,BagVariant=action=='eclipse'and'EclipseReliquary'or action=='verity'and'VerityReliquary'or string.format('Pack%02d',(i-1)%6+1),PackSize=1,PackMutation='None',OddsVersion=Packs.OddsVersion},{TestGrant=true,Owner=owner}) -- R151: TEST packs (never announced)
    if not record then return false,'Stopped after '..(i-1)..' packs: '..tostring(reason)end
   end
   ctx.Chests:SyncTools(p);save(ctx,p);return true,'Added '..count..' packs with the current odds.'
  elseif action=='gems'then
+  if #a==1 and integer(a[1],0,require(RS.MechCatalog).MaxGems)then a={'set',a[1]}end -- R158f: gems <n> = gems set <n>
   local amount=integer(a[2],0,require(RS.MechCatalog).MaxGems)
-  if #a~=2 or(a[1]~='set'and a[1]~='add')or not amount then return false,'Use gems set/add <amount>.'end
+  if #a~=2 or(a[1]~='set'and a[1]~='add')or not amount then return false,'Use gems <amount> (set), gems set <amount> or gems add <amount>.'end
   local premium=data:GetPremium(p);if a[1]=='add'then amount+=premium.Gems end
   local pending=require(RS.SaleReceiptRules).Total(data.Gardens[p].PendingSales or{},'Gems')
   if amount+pending>require(RS.MechCatalog).MaxGems then return false,'Gem limit includes pending rewards.'end

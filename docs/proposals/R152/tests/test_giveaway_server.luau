@@ -392,7 +392,7 @@ do
  check(Cmd(nil,p,{'reset'})==false and Cmd(nil,p,{'reset','all'})==false and Cmd(nil,p,{'bogus'})==false,'reset needs "me"; unknown words are refused')
  -- a LIVE server: status works, the edits are refused and change nothing
  local b2=G.backend();seedStore(b2,40,filler(1,40));local live=new(b2,nil,{Studio=false,Name='Live'});local o=G.player(live,1301,'Owner Live')
- ok,text=Cmd(nil,o,{});check(ok==true and text:find('40 claimed',1,true)and text:find('LIVE',1,true)and text:find('Studio-only tools are off',1,true),'live: status works, says LIVE')
+ ok,text=Cmd(nil,o,{});check(ok==true and text:find('40 claimed',1,true)and text:find('LIVE',1,true)and text:find('work for the GAME OWNER only',1,true),'live: status works, says LIVE and that the edits are the game owner\'s (R158f)')
  local before=stored(b2).Count
  local okr,tr=Cmd(nil,o,{'reset','me'});local okl,tl=Cmd(nil,o,{'left','0'})
  check(okr==false and okl==false and tr:find('^voidgift reset works in Studio only')and tl:find('^voidgift left works in Studio only'),'live: reset me and left are refused by the service itself ("works in Studio only")')

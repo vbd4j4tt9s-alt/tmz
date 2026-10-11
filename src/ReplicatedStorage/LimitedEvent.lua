@@ -1,7 +1,14 @@
 -- R148 (owner: "place a timer at the limited section for 27 days, hrs, mins, s; same for the event for Verity"): one end time
 -- for the limited event, shared by the Index LIMITED tab and Verity's quest. UTC seconds; change EndsAt to extend or shorten it.
 local L={EndsAt=1793491200} -- 2026-11-01 00:00:00 UTC
-function L.Left(now)return math.max(0,L.EndsAt-math.floor(now or os.time()))end
+-- R158f (owner: "give me cmds to test everything"): the owner's /test verityevent on|off sets the attribute EndsAtOverride on this module (a UTC second; the server sets it, every client sees
+-- it) so the event can be started and stopped to test the Verity gift and Verity things; /test verityevent auto removes it (the real EndsAt again). Nothing is saved.
+local function endsAt()
+ local ok,override=pcall(function()return script:GetAttribute('EndsAtOverride')end)
+ if ok and type(override)=='number'and override==override and math.abs(override)<math.huge then return override end
+ return L.EndsAt
+end
+function L.Left(now)return math.max(0,endsAt()-math.floor(now or os.time()))end
 function L.Active(now)return L.Left(now)>0 end
 -- "27d 04h 12m 09s"
 function L.Text(seconds)

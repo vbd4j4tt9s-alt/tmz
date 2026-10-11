@@ -13,6 +13,12 @@ local Hitbox=require(RS:WaitForChild('BatHitbox'))
 local Art=require(script.Parent.BatArt)
 local Lag=require(script.Parent.BatLagComp)
 local M={};M.__index=M
+-- R158f: creative mode (the owner's /test creative, OwnerTestState82): no swing cooldown, no drift limit on its claims; nobody's bat can hit it (Ragdoll:CanHit says so).
+local testState
+local function creative(player)
+ if testState==nil then local ok,state=pcall(require,script.Parent.OwnerTestState82);testState=ok and type(state)=='table'and state or false end
+ return testState~=false and type(testState.Creative)=='function'and testState.Creative(player)==true
+end
 function M.new(chase)
  return setmetatable({Chase=chase,Tools={},Characters={},Connections={},Swings={},NextSwing={},NextRequest={},LastStart={},StartHeld={},StartEarly={},SpawnAt={},Serial=0,
   History={},LastRecord=-math.huge,Counts={},Check={}},M)
@@ -43,10 +49,10 @@ end
 -- payload = {Kind='Swing', Start = the click's server time (workspace:GetServerTimeNow() on the swinger's client), Id = the client's swing number}
 function M:Request(player,payload)
  if not require(script.Parent.SecurityGate).Allow(player,'BatSwing',payload)or not require(script.Parent.MovementGuard).Check(player)then return false end
- local now=os.clock()
+ local now=os.clock();local free=creative(player)
  if now<(self.NextRequest[player]or 0)then return false end
  self.NextRequest[player]=now+.08
- if now<(self.NextSwing[player]or 0)-C.CooldownSlack then return false end
+ if not free and now<(self.NextSwing[player]or 0)-C.CooldownSlack then return false end
  local character,_,root=self:_eligible(player,true);local tool=self.Tools[player]
  if not character or not tool or tool.Parent~=character or not tool.Enabled
   or self.Chase.Chests:IsOpening(player)then return false end
@@ -60,7 +66,7 @@ function M:Request(player,payload)
  local start=math.clamp(asked,server-M.LagOf(player),server+C.StartAhead)
  local held=math.abs(start-asked)>1e-3
  local early=(self.LastStart[player]or-math.huge)+C.Cooldown-start;local owed=self.StartEarly[player]or 0
- if early>1e-3 and not((held or self.StartHeld[player])and owed+early<=C.CooldownSlack)then return false end
+ if not free and early>1e-3 and not((held or self.StartHeld[player])and owed+early<=C.CooldownSlack)then return false end
  local id=type(payload)=='table'and payload.Id
  if type(id)~='number'or id~=id then id=nil end
  self.NextSwing[player]=now+C.Cooldown;self.LastStart[player]=start;self.StartHeld[player]=held;self.StartEarly[player]=math.max(0,owed+early);self.Serial+=1
@@ -102,6 +108,7 @@ function M:Claim(player,payload)
  -- R158 review: the lag the server measures, where it had the swinger at the request and how far its earned walk speed carries it in a swing
  local speed=walkSpeed(player,swing.Character:FindFirstChildOfClass('Humanoid'));local origin=swing.Origin
  c.Lag=M.LagOf(player);c.WalkSpeed=speed;c.MaxDrift=maxDrift(speed);c.OriginX,c.OriginY,c.OriginZ=origin.X,origin.Y,origin.Z
+ if creative(player)then c.WalkSpeed=nil;c.MaxDrift=nil end -- R158f: a flying / very fast owner is not held to an earned walk speed
  c.Swinger=self.History[player];c.Victim=self.History[victim];c.SwingerCharacter=swing.Character;c.VictimCharacter=victim.Character
  local ok,why=Lag.Validate(c,workspace:GetServerTimeNow(),blocked)
  c.SwingerCharacter=nil;c.VictimCharacter=nil;c.Swinger=nil;c.Victim=nil
@@ -137,7 +144,7 @@ function M:Step()
   local character,hum,root=self:_eligible(player,true)
   if character~=swing.Character or self.Tools[player]~=swing.Tool or swing.Tool.Parent~=character
    or not swing.Tool.Enabled or not root or server>swing.Expires
-   or server<=swing.Start+C.HitTo+C.StrikeSlack and (root.Position-swing.Origin).Magnitude>maxDrift(walkSpeed(player,hum))then
+   or server<=swing.Start+C.HitTo+C.StrikeSlack and not creative(player)and (root.Position-swing.Origin).Magnitude>maxDrift(walkSpeed(player,hum))then
    self.Swings[player]=nil -- (no claim by Expires: a miss)
   end
  end

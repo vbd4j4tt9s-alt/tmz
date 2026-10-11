@@ -1,9 +1,26 @@
 -- R123: owner/admin command list for the F4 panel and /test help. Grouped by area; one row per command.
--- Works in Studio and in public servers for the owner and AdminUserIds. Add @username, @me or @all at the end
+-- Works in Studio and in public servers for the owner and AdminUserIds. R158f: the GAME OWNER's commands are absolute (no Studio-only gate, no cooldown, no cap that refuses them);
+-- admins keep today's limits and cannot use creative, tutorial, newplayer or verityevent. Add @username, @me or @all at the end
 -- to run a player command on someone else (rows marked "server" affect the whole server and take no @target).
 return {
- {'HOW IT WORKS','Type in chat as /test <command> or open F4 / TOOLS. Add @username or @all at the end for other players. Saved changes: inventory, cash, gems, speed, treadmill, boots, trails, fence. Temporary: fly, noclip, movespeed, animrate.'},
+ {'HOW IT WORKS','Type in chat as /test <command> or open F4 / TOOLS. Add @username or @all at the end for other players. Saved changes: inventory, cash, gems, speed, treadmill, boots, trails, fence. Temporary: fly, noclip, movespeed, animrate, creative mode. The game owner has no limits (any count, any time, Studio or a live server); admins keep the 200 Bag cap, the chase and opening waits and the Studio-only tools.'},
  {'/test admins','server: Show who can use these commands (owner + AdminUserIds) and who in this server has access.'},
+
+ {'— CREATIVE MODE & TESTING EVERYTHING (R158f) —',''},
+ {'/test creative on','Game owner only: creative mode for you, this session only (leaving the game ends it). No cooldowns (bat, shovel, bonus roll, the steal hold is instant), keepers, The Darkened, bats, lightning and holes cannot hit you, no 200 Bag cap, plants ripen at once and regrow at once, walk speed 200, fly works, the anti-cheat leaves you alone, a CREATIVE badge shows on your screen. Every pack you open is a TEST open (never announced). Robux purchases stay real. creative off ends it; creative status shows it; creative speed 300 sets the walk speed (speed off = your earned speed); creative on @username does it for someone else.'},
+ {'/test fly','Toggle flying (WASD, Space/E up, Ctrl/Q down). fly 100 sets the speed 10-300. In creative mode it keeps working during a chase. noclip walks through walls, clip restores.'},
+ {'/test cash 5000000 @username','Set cash (cash add <amount> adds). gems 500 sets Gems (gems add <amount> adds).'},
+ {'/test droppack storm 6','Drop a TEST pack at your feet as a dropped pack: biome (forest ... storm) and tier 1-6 are optional, then the seconds it stays (60 by default). Shows the R158b outline, marker and beam; hold E to pick it up.'},
+ {'/test tutorial reset @username','Game owner only: restart the new wordless tutorial at step 1 right now, also on a live server (clears TutorialDone, the steps and the saved 10-second-fruit flags; the red arrow shows at once). tutorial step 7 jumps to step 1-10, tutorial done finishes it (the free Forest pack comes once). Normal players still cannot replay it.'},
+ {'/test newplayer @username','Game owner only: the whole new-player experience again in one go: tutorial reset + the starter Verity gift owed again + the free Forest starter pack flag cleared + the Void pedestal claim cleared. WARNING: it resets those flags on that profile (saved).'},
+ {'/test fastfruit @username','Your crops ripen now (the same as growall). In creative mode every new plant and every regrowth is ripe at once.'},
+ {'/test verityevent on','Game owner only, this server: on, off, auto (the real end date) or status. Starts or stops the limited event (Verity, the new-player Verity gift, the Mech pack sale) so they can be tested.'},
+ {'/test bonusrolls 2 @username','Make 0-2 bonus rolls ready at once (the game keeps at most 2; the timer pauses at 2). Same as bonus ready.'},
+ {'/test holo @username','Add the Holo Melon seed and the Holo Apple Tree seed to the Bag. (Any seed: /test seed <SeedId>.)'},
+ {'/test reveal king @username','Preview a pull reveal with a demo seed, nothing granted (the same as rarepull). rarepacks gives real TEST packs that reveal that rarity.'},
+ {'/test starterverity @username','Check the new-player Verity gift. Its reset works for the game owner on a live server too (see below).'},
+ {'/test walls','server: The R158 track walls, the outer track models (which loaded and from where), the volcano and the lava streams that should be gone.'},
+ {'/test batstats','server: The bat hit counters (BatSwing Claims_*): how many claims were a hit and why the others were refused.'},
 
  {'— PLAYER —',''},
  {'/test stats @username','Seeds, packs, plants, harvests, cash and speed points.'},
@@ -101,14 +118,14 @@ return {
 
  {'— FREE VOID PACK PEDESTAL (R152) —',''},
  {'/test voidgift','server: The giveaway pedestal: how many of the 500 are claimed / left, whether YOU have claimed (profile flag and the shared list), whether your tutorial is finished (the claim needs it), which store this server uses (live DataStore, Studio test store or the in-memory counter), messages and the pedestal.'},
- {'/test voidgift reset me','Studio only: clears YOUR claim and flag so you can claim again (the pack you got stays in your Bag). A live server refuses: it never changes the shared count.'},
- {'/test voidgift left 3','Studio only: sets how many the pedestal shows as left (0 = ALL CLAIMED). Studio uses its own store or an in-memory counter, never the live count.'},
+ {'/test voidgift reset me','Clears YOUR claim and flag so you can claim again (the pack you got stays in your Bag). Studio, or the game owner on a live server (it changes the LIVE shared count; other running servers keep the number they saw until they restart). Admins: Studio only.'},
+ {'/test voidgift left 3','Sets how many the pedestal shows as left (0 = ALL CLAIMED). Studio uses its own store or an in-memory counter; the game owner on a live server edits the LIVE count. Admins: Studio only.'},
  {'/test playtime @username','R157: how long that player has played in total (saved; only a counter now: the free Void Pack needs a finished tutorial, not play time). voidgift shows yours too.'},
- {'/test playtime @username 12','Studio only: sets that player\'s play time to 12 minutes (0 to 180; /test playtime 12 @username works too). A live server refuses: it never changes play time.'},
+ {'/test playtime @username 12','Sets that player\'s play time to 12 minutes (0 to 180; /test playtime 12 @username works too). Studio, or the game owner on a live server. Admins: Studio only.'},
 
  {'— NEW-PLAYER GIFT (R158d) —',''},
  {'/test starterverity @username','R158d: the new-player gift (one Verity Pack guaranteed Mythic or better + 2 bonus rolls, given once to a brand-new player at their first spawn (R158e), only while the Verity event runs): is it owed / given, is the event running, gift packs in the Bag, starter rolls left.'},
- {'/test starterverity @username reset','Studio only: marks that player as owed the gift again and gives it at once if they have spawned and the event runs (the pack and rolls they got before stay). A live server refuses.'},
+ {'/test starterverity @username reset','Marks that player as owed the gift again and gives it at once if they have spawned and the event runs (verityevent on starts it; the pack and rolls they got before stay). Studio, or the game owner on a live server. Admins: Studio only.'},
 
  {'— DESERT PYRAMID (R157) —',''},
  {'/test pyramid @username','R156 the Desert pyramid\'s secret Mythic pack: does the player have it (saved), are they carrying it now, the pyramid\'s spot, size and Hold E reach.'},

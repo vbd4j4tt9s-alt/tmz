@@ -19,8 +19,18 @@ function G.Valid(value)
  end
  return visit(value,0)
 end
+-- R158f: creative mode (the owner's /test creative, OwnerTestState82) is never rate limited; its payloads are still checked below.
+local testState
+local function creative(player)
+ if testState==nil then local ok,state=pcall(require,script.Parent.OwnerTestState82);testState=ok and type(state)=='table'and state or false end
+ return testState~=false and type(testState.Creative)=='function'and testState.Creative(player)==true
+end
 function G.Allow(player,route,...)
  if select('#',...)>16 then G.Rejected+=1;return false end
+ if creative(player)then
+  for i=1,select('#',...)do if not G.Valid(select(i,...))then G.Rejected+=1;return false end end
+  return true
+ end
  local now=os.clock();local all=G.Records[player]
  if not all then all={};G.Records[player]=all end
  local policy=policies[route]or{Rate=6,Burst=10};local b=all[route]

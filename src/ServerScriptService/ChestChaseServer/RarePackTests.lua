@@ -21,7 +21,8 @@ function T.Pick(config,rarity)
  return list[T.Random:NextInteger(1,#list)]
 end
 -- coat (R155, optional): 'Gold' / 'Diamond' for every TEST pack made (/test rarepacks mech gold); nothing = plain, as always. A bought Mech pack rolls its own coat (PremiumProgress).
-function T.Grant(data,player,selector,requester,coat)
+-- owner (R158f): the command was made by the GAME OWNER: the 200 cap does not refuse it (the storage ceiling still does).
+function T.Grant(data,player,selector,requester,coat,owner)
  if not require(script.Parent.OwnerCommandAccess).IsAllowed(requester or player)then return false,'Owner or configured admin required.'end
  if not data:IsLoaded(player)then return false,'Wait for your data to load.'end
  selector=tostring(selector or'all'):lower();local selected={}
@@ -37,7 +38,7 @@ function T.Grant(data,player,selector,requester,coat)
  if selector=='roster'then for _,id in ipairs({'FirePepperSeed','MoonflowerSeed','DesertAloeSeed','SandFruitSeed'})do table.insert(selected,Packs.SeedDesignById[id])end end
  if #selected==0 then return false,'Use /test rarepacks [mech|verity|roster|legendary|mythic|secret|cosmic|king].'end
  local records=data:GetChestRecords(player)
- if #records+#selected>data.Config.MaxSavedChests or(type(data.RoomFor)=='function'and not data:RoomFor(player,#selected))then return false,'Inventory full (200 items max). Make space first.'end -- R155: the cap
+ if #records+#selected>data.Config.MaxSavedChests or(type(data.RoomFor)=='function'and not data:RoomFor(player,#selected,{Owner=owner==true}))then return false,'Inventory full (200 items max). Make space first.'end -- R155: the cap
  local pending={};local serial=player:GetAttribute('ChestInventorySerial')or 0
  for _,pick in ipairs(selected)do
   if pick.Spec==nil then pick={Spec=pick}end -- (mech / verity / roster: a plain spec)

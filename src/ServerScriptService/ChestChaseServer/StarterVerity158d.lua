@@ -30,9 +30,9 @@ function S:_active()return Limited.Active(self.Time())end
 function S:_premium(player)local ok,p=pcall(self.Data.GetPremium,self.Data,player);return ok and type(p)=='table'and p or nil end
 function S:_fresh(player)local f=self.Data.FreshProfile;return f~=nil and f[player]==true end
 function S:State(player)local p=self:_premium(player);return p and Rules.CleanState(p[Rules.Flag])or nil end
-function S:_room(player)
+function S:_room(player,owner)
  local data=self.Data
- return #data:GetChestRecords(player)<self.Config.MaxSavedChests and(type(data.RoomFor)~='function'or(data:RoomFor(player,1)))
+ return #data:GetChestRecords(player)<self.Config.MaxSavedChests and(type(data.RoomFor)~='function'or(data:RoomFor(player,1,{Owner=owner==true})))
 end
 -- The one notice. Shown once per player (Told), a moment after the grant.
 function S:_notify(player)
@@ -44,7 +44,7 @@ function S:_notify(player)
 end
 -- Gives the gift. NEVER yields. Returns the pack record, or nil and why:
 -- 'loading' / 'notowed' / 'given' / 'ended' (the event is over) / 'spawn' (no character yet) / 'cannotsave' / 'room' / 'add'.
-function S:Grant(player)
+function S:Grant(player,owner)
  local data=self.Data
  if not player or not player.Parent or not data:IsLoaded(player)then return nil,'loading'end
  local premium=self:_premium(player);if not premium then return nil,'loading'end
@@ -54,9 +54,9 @@ function S:Grant(player)
  if not self:_active()then return nil,'ended'end
  if not player.Character then return nil,'spawn'end -- (R158e: at the first spawn; CharacterAdded tries again)
  if not data.CanSave[player]and not self.Studio then return nil,'cannotsave'end
- if not self:_room(player)then return nil,'room'end
+ if not self:_room(player,owner)then return nil,'room'end
  local records=data:GetChestRecords(player);local before=#records
- local ok,record,why=pcall(function()return data:AddChest(player,Rules.Pack(PackRules))end) -- a real pack: no options (no TestGrant, no luck roll)
+ local ok,record,why=pcall(function()return data:AddChest(player,Rules.Pack(PackRules),owner==true and{Owner=true}or nil)end) -- a real pack: no TestGrant, no luck roll (R158f: Owner = the game owner's own reset: the 200 cap does not refuse it)
  local added=records[before+1]
  -- A hook that throws after AddChest committed still counts (the inventory is the commit point, as in VoidGiveaway152:_grant).
  if not(#records==before+1 and type(added)=='table'and added.Kind=='Pack'and Rules.PackFloor(added)==Rules.Floor)then
@@ -134,23 +134,25 @@ function S:StatusText(player)
   self:_active()and('running ('..Limited.Text(left)..' left)')or'ENDED (new players get nothing)',
   player.Character and'yes'or'no',packs,Rules.CleanRolls(premium[Rules.RollsField]),self:_fresh(player)and'yes'or'no')
 end
-function S:_command(player,a)
+-- owner = true: the command was made by the GAME OWNER (R158f: no Studio-only gate for the owner; an admin or a plain call on a live server is still refused)
+function S:_command(player,a,owner)
  local sub=a[1]and tostring(a[1]):lower()
  if sub==nil or sub=='status'then return true,self:StatusText(player)end
  if sub~='reset'or #a~=1 then return false,'Use starterverity @username (status) or starterverity @username reset.'end
- if not self.Studio then return false,'starterverity reset works in Studio only: a live server never changes the gift flag. Test it in Studio.'end
+ if not self.Studio and owner~=true then return false,'starterverity reset works in Studio only: a live server never changes the gift flag. Test it in Studio.'end
  local premium=self:_premium(player);if not premium then return false,'Wait for the player data to load.'end
  premium[Rules.Flag]=Rules.Owed;premium[Rules.RollsField]=nil;self.Told[player]=nil
  self.Data:MarkDirty(player)
- local record,why=self:Grant(player)
+ local record,why=self:Grant(player,owner==true)
  if record then return true,'The flag was reset and the gift is given again (the pack and rolls you got before stay). '..self:StatusText(player)end
  self:Setup(player) -- (owed again: given at the next spawn)
  return true,'The flag was reset: the gift is owed ('..tostring(why)..'). '..self:StatusText(player)
 end
 -- OwnerUpdateCommands82 -> here (`starterverity @name [reset]`): the service running in this server.
-function S.Command(_,player,a)
+function S.Command(_,player,a,requester)
  local self=S.Current
  if not self then return false,'The starter gift is not running in this server.'end
- return self:_command(player,a or{})
+ local okAccess,Access=pcall(function()return require(script.Parent.OwnerCommandAccess)end)
+ return self:_command(player,a or{},requester~=nil and okAccess and type(Access.IsOwner)=='function'and Access.IsOwner(requester)==true)
 end
 return S
