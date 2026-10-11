@@ -72,7 +72,9 @@ local function paintSignR151(sign,config,level,balance)
   local a,b=gain(level),gain(nextLevel)
   setIf(T.Gain,'Text',(a and b)and(a:gsub('/step','')..'  >  '..b)or'');setIf(T.Gain,'TextColor3',c3(shown.Trim))
   local cost=tonumber(tiers[nextLevel].Cost)or 0
-  setIf(T.Price,'Text','$'..look.Format(cost));setIf(T.Price,'Visible',true)
+  local short=look.Format(cost) -- R158k (owner: "make sure store prices are always the same"): the sign's short price only when it reads exactly the cost, else in full
+  if not require(RS:WaitForChild('CashNumbers')).Reads(short,cost)then short=require(RS:WaitForChild('CashNumbers')).Exact(cost)end
+  setIf(T.Price,'Text','$'..short);setIf(T.Price,'Visible',true)
   setIf(T.Price,'BackgroundColor3',(tonumber(balance)or 0)>=cost and RGB(67,185,98)or RGB(200,66,65))
  else
   setIf(T.Title,'Text','MAX LEVEL');setIf(T.Levels,'Text','');setIf(T.Gain,'Text',gain(level)or'');setIf(T.Gain,'TextColor3',c3(shown.Glow))
@@ -131,6 +133,9 @@ function U.Refresh(self,player)
    -- Even a rejected purchase gives a short tactile press without a debit.
    cap:SetAttribute('PressedAt153',workspace:GetServerTimeNow()) -- (every client sinks the cap .35 studs and brings it back: InteractionFeedback)
    if not okay then note.Text=message or'Try again';note.Visible=true end
+   -- R158k (owner: "it just tells the player not enough cash"): a press the money cannot pay also shows the plain red notice every store shows (the Denied click is the refused serial above)
+   local money=require(RS:WaitForChild('StoreMoney158k'))
+   if not okay and money.Refusal(message)and self.Notifications then pcall(self.Notifications.Show,self.Notifications,sender,money.Words(money.Refusal(message)),require(RS:WaitForChild('SimpleGameText')).Red,2.5,'Denied')end
    task.delay(.34,function()
     if self.GardenUpgradeRecords[record.Index]~=state then return end
     state.Busy=false
@@ -151,7 +156,7 @@ function U.Refresh(self,player)
    local nextTier=kind=='Fence'and Rules.Tiers[current+1]or self.Config.TreadmillTiers[current+1]
    b.Expected=nextTier and current+1 or nil
    local unlocked=true
-   local affordable=nextTier and balance>=nextTier.Cost
+   local affordable=nextTier and require(RS:WaitForChild('StoreMoney158k')).CanAfford(balance,nextTier.Cost)==true -- R158k: the server's own rule (equal money pays)
    b.Cap.Color=not nextTier and RGB(101,124,108)or affordable and unlocked and RGB(67,185,98)or RGB(200,66,65)
    b.Cap:SetAttribute('Affordable',affordable==true);b.Cap:SetAttribute('NextTier',b.Expected);b.Cap:SetAttribute('Price',nextTier and nextTier.Cost or 0)
    b.Price.Text=nextTier and cash(nextTier.Cost)or'MAX'

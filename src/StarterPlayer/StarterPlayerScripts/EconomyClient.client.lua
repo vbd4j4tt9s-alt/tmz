@@ -356,6 +356,11 @@ local function setStatus(message, isError)
 end
 
 local function runServerRequest(callback)
+	-- R158k: a press made while another request (the window's state refresh) is on its way waits for it, up to ~15 s; it used to be dropped without a word
+	for _ = 1, 300 do
+		if not requestBusy then break end
+		task.wait(0.05)
+	end
 	if requestBusy then
 		return nil
 	end
@@ -367,7 +372,9 @@ local function runServerRequest(callback)
 		return nil
 	end
 	if type(result) == "table" and result.Success == false then
-		setStatus(result.Message or "REQUEST FAILED", true)
+		-- R158k: the server's "Not enough cash!" (or an older server's words) is the plain notice every store shows (StoreMoney158k), not the status line
+		local money = require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Refusal(result.Message)
+		if money then setStatus("", false); require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Notice(money) else setStatus(result.Message or "REQUEST FAILED", true) end
 		return nil
 	end
 	return result
@@ -383,7 +390,11 @@ local function adoptState(state)
 		return
 	end
 	currentState = state
-	cashLabel.Text = "Cash  $" .. CashNumbers.Compact(state.Cash)
+	-- R158k: the market's Cash is the live Cash stat the HUD shows (a reply's Cash is a snapshot that can be older than a coin that landed meanwhile),
+	-- written rounded DOWN like the HUD (CashNumbers.Balance: never more than the player has)
+	local live = require(ReplicatedStorage:WaitForChild("StoreMoney158k")).Balance(player, "Cash")
+	if live ~= nil then state.Cash = live end
+	cashLabel.Text = "Cash  $" .. CashNumbers.Balance(state.Cash)
 	if panel.Visible and renderCurrentTab then
 		renderCurrentTab()
 	end
@@ -401,13 +412,17 @@ for i,mode in ipairs({'Buy','Sell crops'})do
 end
 local shopMenu=require(ReplicatedStorage:WaitForChild('ShopMenu')).new(panel,function(tab)
  currentTab=tab;renderCurrentTab()
-end,function(id)
- local state=runServerRequest(function()return purchaseShopItem:InvokeServer(id)end)
- if state then InteractionAudio.Transaction('Buy');adoptState(state)end
+end,function(id,price)
+ -- R158k: the shown price goes with the purchase; a refusal that carries the shop's state (the price changed) shows the new prices at once
+ local reply
+ local state=runServerRequest(function()reply=purchaseShopItem:InvokeServer(id,price);return reply end)
+ if state then InteractionAudio.Transaction('Buy');adoptState(state)
+ elseif type(reply)=='table'and type(reply.Products)=='table'then reply.Message=nil;adoptState(reply)end
 end,function(id,equipped)
  local state=runServerRequest(function()return equipShopItem:InvokeServer(id,equipped)end)
  if state then InteractionAudio.Transaction('Equip');adoptState(state)end
 end)
+shopMenu.OnShort=function()setStatus('',false)end -- R158k: a press the cash cannot pay clears the status line (an older "BOUGHT!" must not sit beside "Not enough cash!")
 screenGui.Destroying:Connect(function()shopMenu:Destroy()end)
 renderCurrentTab = function()
  local itemMode=currentTab=='Sell'
@@ -502,7 +517,7 @@ do
    local amount=cashValue.Value;if type(amount)~='number'then return end
    wallet:SetValue(amount)
    if currentState then
-    currentState.Cash=amount;cashLabel.Text='Cash  $'..CashNumbers.Compact(amount)
+    currentState.Cash=amount;cashLabel.Text='Cash  $'..CashNumbers.Balance(amount) -- R158k: rounded down, like the HUD
     if panel.Visible and currentTab~='Sell'then shopMenu:Render()end
    end
   end

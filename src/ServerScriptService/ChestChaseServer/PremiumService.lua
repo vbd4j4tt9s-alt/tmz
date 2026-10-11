@@ -38,8 +38,8 @@ end
 function Service.new(data,chests,passes)
  local remote=Instance.new('RemoteFunction');remote.Name='PremiumRequest';remote.Parent=RS:WaitForChild('ChestChaseRemotes')
  local self=setmetatable({Data=data,Chests=chests,Passes=passes,Last={},Busy={},Unannounced={},Announcer=announcer(data),Product=nil,PackProducts={},Products={},GiftProducts={},Gifts=require(script.Parent.PassGiftService).new(data,passes),Remote=remote},Service)
- remote.OnServerInvoke=function(p,action,value)
-  if not Gate.Allow(p,'PremiumRequest',action,value)then return {Success=false,Message='Wait a sec!'}end
+ remote.OnServerInvoke=function(p,action,value,shown) -- R158k: shown = the price the player's button showed (optional; an older client sends none)
+  if not Gate.Allow(p,'PremiumRequest',action,value,shown)then return {Success=false,Message='Wait a sec!'}end
   if not data:IsLoaded(p)then return {Success=false,Message='HOLD ON, YOUR DATA IS LOADING!'}end
   if action=='Tutorial'then
    self.Last[p]=self.Last[p]or{};local now=os.clock()
@@ -98,7 +98,11 @@ function Service.new(data,chests,passes)
    local state=self:State(p);state.Success=false;state.Message='ROBUX PURCHASES AREN\'T ON FOR THIS SAVE';return state
   end
   local okay,message,extra
-  if action=='ClaimSeed'then okay,message=data:ClaimIndexSeed(p,value)
+  -- R158k (owner: "make sure store prices are always the same"): a gem / Cash to Gems press pays the price its button showed or nothing: when that is not this server's
+  -- price (StoreMoney158k.PriceOf, the catalogs it charges from) it is refused with nothing charged, and the State below brings the client the right prices.
+  local Money=require(RS:WaitForChild('StoreMoney158k'));local _,price=Money.PriceOf(action,value)
+  if shown~=nil and price~=nil and shown~=price then okay,message=false,Money.PriceChanged
+  elseif action=='ClaimSeed'then okay,message=data:ClaimIndexSeed(p,value)
   elseif action=='ClaimBiome'then okay,message=data:ClaimIndexBiome(p,value)
   elseif action=='ClaimBiomeHalf'then okay,message=data:ClaimIndexBiomeHalf(p,value)
   elseif action=='Convert'then okay,message=data:ConvertGems(p,value)
@@ -195,7 +199,7 @@ function Service:State(player)
    Amount=quote and quote.Amount,GemPrice=quote and quote.GemPrice,RobuxAmount=row.Amount}
  end
  for _,pass in ipairs(require(RS.GamePassCatalog))do local route,key=Routing.Resolve(Gifts.ProductId(pass.Key));local info=(self.GiftProducts or{})[pass.Key];giftProducts[pass.Key]={Available=robuxReady and route=='Gift'and key==pass.Key and info~=nil and info.IsForSale~=false}end
- return {PackOffers=offers,GiftProducts=giftProducts,GiftCredits=state.GiftCredits,Bundles=bundles,Success=true,Gems=state.Gems,Cash=self.Data:GetCash(player),GemPrice=Catalog.GemPrice,CashPerGem=Catalog.CashPerGem,
+ return {PackOffers=offers,GiftProducts=giftProducts,GiftCredits=state.GiftCredits,Bundles=bundles,Success=true,Gems=state.Gems,Cash=self.Data:GetCash(player),GemPrice=Catalog.GemPrice,CashPerGem=Catalog.CashPerGem,PassGemPrices=Catalog.PassGemPrices, -- R158k: the pass prices the shop shows are the server's
   OnSale=Catalog.OnSale(),GemPackAvailable=offers['1'].GemAvailable,RobuxPrice=self.Product and self.Product.PriceInRobux,
   RobuxAvailable=offers['1'].RobuxAvailable,
   PendingSales=self.Data:GetPendingSales(player),Entitlements=state.Entitlements,BiomeRewards=state.Biomes}

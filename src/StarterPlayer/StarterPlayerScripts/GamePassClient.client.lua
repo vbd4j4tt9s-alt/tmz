@@ -158,7 +158,7 @@ local rate=Art.Text(gems,'Rate',Cash.Compact(Catalog.CashPerGem)..' Cash = 1 Gem
 local quantityLabel=Art.Text(gems,'QuantityLabel','How many Gems?',15);quantityLabel.ZIndex=4;quantityLabel.TextXAlignment=Enum.TextXAlignment.Left
 local quantity=Instance.new('TextBox');quantity.Name='GemQuantity';quantity.Text='1';quantity.ClearTextOnFocus=false;quantity.PlaceholderText='Type a number';quantity.BackgroundColor3=C(24,26,40);quantity.BorderSizePixel=0;quantity.ZIndex=5;Bright.Text(quantity,20);Theme.Corner(quantity,8);Art.Stroke(quantity,Art.Ink,2);quantity.Parent=gems
 local maxButton=button(gems,'Maximum','MAX',UDim2.new(),UDim2.new(),C(255,196,52))
-local cost=Art.Text(gems,'Cost','Cost: '..Cash.Compact(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
+local cost=Art.Text(gems,'Cost','Cost: '..Cash.Price(Catalog.CashPerGem)..' Cash',15);cost.ZIndex=4;cost.TextXAlignment=Enum.TextXAlignment.Left
 local convert=button(gems,'Convert','CONVERT',UDim2.new(),UDim2.new(),C(98,211,255))
 local ways=Art.Card(page,'EarnGems',{C(90,94,124),C(58,60,86)},false)
 local waysTitle=Art.Text(ways,'Title','FILL YOUR PLANT INDEX',20,Theme.Colors.Gold);waysTitle.ZIndex=4;waysTitle.TextXAlignment=Enum.TextXAlignment.Left
@@ -182,12 +182,27 @@ local function updateEvent()
  timerNote.TextColor3=over and C(255,255,255)or C(255,236,90)
  if eventOver~=over then eventOver=over;if refresh then refresh()end end
 end
+-- R158k (owner: "if clicking on something and players don't have enough money, it just tells the player not enough cash"): what a press costs (the Gems of a
+-- Mech pack / bundle / pass, the Cash of Cash to Gems); a press the money this screen shows cannot pay says "Not enough gems!" / "Not enough cash!" and sends
+-- nothing (StoreMoney158k: the server's own rule); an unknown balance (data still loading) leaves it to the server, whose money refusal gets the same notice.
+-- (owner: "make sure store prices are always the same") one function gives the price a button SHOWS and the price its press sends: the server's own number from
+-- its last State (the Mech offers, the pass prices, Cash per Gem, a bundle's quote), else the shared catalogs it charges from (StoreMoney158k.PriceOf). A server
+-- whose price differs refuses ("The price changed!"), charges nothing, and its reply (a State) puts its prices on the buttons.
+local Money=require(RS:WaitForChild('StoreMoney158k'))
+local function priceOf(action,value)
+ local currency,price=Money.PriceOf(action,value)
+ if action=='BuyPack'then local offer=type(state.PackOffers)=='table'and state.PackOffers[tostring(value)];if type(offer)=='table'and type(offer.GemPrice)=='number'then price=offer.GemPrice end
+ elseif action=='BuyBundle'then if type(value)=='table'then price=value.GemPrice end
+ elseif action=='BuyPerk'then local known=type(state.PassGemPrices)=='table'and state.PassGemPrices[value];if type(known)=='number'then price=known end
+ elseif action=='Convert'and price and type(state.CashPerGem)=='number'then price=value*state.CashPerGem end
+ return currency,price
+end
 refresh=function()
  local offer=Catalog.Offer(packCount);local available=state.PackOffers and state.PackOffers[tostring(packCount)]or{}
  local over=Catalog.EventOver(workspace:GetServerTimeNow());eventOver=over -- R155: after the end both buy buttons say "Event over" and are off (the server refuses a new purchase too)
  local bagFull=available.BagFull==true and not over and state.OnSale~=false -- R157: the server says the Bag is the only thing in the way
  local gemLive=available.GemAvailable==true and not over and not bagFull
- setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or bagFull and Catalog.BagFull.Button or(gemLive and tostring(offer.GemPrice)or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
+ setPrice(gemBuy,over and Catalog.Event.Button or state.OnSale==false and'Off sale'or bagFull and Catalog.BagFull.Button or(gemLive and tostring(select(2,priceOf('BuyPack',packCount)))or'Unavailable'),gemLive);active(gemBuy,gemLive and not busy)
  local packInfo=packInfos[packCount];local packPrice=packInfo and packInfo.PriceInRobux
  local packLive=available.RobuxAvailable==true and packPrice~=nil and packInfo.IsForSale~=false and not over and not bagFull
  setPrice(robuxBuy,over and Catalog.Event.Button or bagFull and Catalog.BagFull.Button or packLive and Art.RobuxText(packPrice)or'Unavailable',packLive);active(robuxBuy,packLive and not busy)
@@ -214,7 +229,7 @@ refresh=function()
    if v.Robux.Visible==soon then v.Robux.Visible=not soon;reflow=true end
    local tag=v.Card:FindFirstChild('Permanent');local tagText=soon and'ROBUX SOON'or'PERMANENT'
    if tag and v.Card:GetAttribute('Tag')~=tagText and(soon or v.Card:GetAttribute('Tag')~=nil)then v.Card:SetAttribute('Tag',tagText);tag.Text=tagText end
-   setPrice(v.Gem,owned and'Owned'or not ownershipReady and'Checking…'or tostring(Catalog.PassGemPrices[row.Pass.Key]),ownershipReady and not owned);active(v.Gem,ownershipReady and not owned and not busy)
+   setPrice(v.Gem,owned and'Owned'or not ownershipReady and'Checking…'or tostring(select(2,priceOf('BuyPerk',row.Pass.Key))),ownershipReady and not owned);active(v.Gem,ownershipReady and not owned and not busy)
    setPrice(v.Robux,owned and'OWNED'or forSale and Art.RobuxText(info.PriceInRobux)or'Unavailable',forSale and not owned,owned and Art.Colors.Owned or Art.Colors.Robux)
    active(v.Robux,not owned and not busy and info~=nil and info.IsForSale==true)
    v.Card:SetAttribute('Owned',owned)
@@ -224,11 +239,16 @@ refresh=function()
 end
 local pendingState=false
 local function act(action,value,onDone)
- if busy then return end;busy=true;setStatus('');refresh()
+ if busy then return end
+ local currency,shown=priceOf(action,value)
+ if currency and shown and Money.Short(player,currency,shown)then setStatus('');Money.Notice(currency);return end
+ busy=true;setStatus('');refresh()
  task.spawn(function()
-  local okay,result=pcall(request.InvokeServer,request,action,value);busy=false
+  local okay,result=pcall(request.InvokeServer,request,action,value,shown);busy=false
   if not gui.Parent then return end
-  if okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success==false then Audio.Play('Denied')end -- R150: a refused purchase
+  local money=okay and type(result)=='table'and action~='State'and result.Success==false and Money.Refusal(result.Message)
+  if money then if result.Gems~=nil then state=result end;setStatus('');Money.Notice(money) -- R158k: the server said the money is short: the same notice, no strip
+  elseif okay and type(result)=='table'then if result.Gems~=nil then state=result end;setStatus(result.Message);if action~='State'and result.Success==false then Audio.Play('Denied')end -- R150: a refused purchase
   if action~='State'and result.Success and action~='RobuxPack'and action~='RobuxBundle'and action~='RobuxGift'and not celebrated[action]then Audio.Transaction('Buy')end
   else setStatus('Try again in a sec!');if action~='State'then Audio.Play('Denied')end end;refresh()
   if onDone then onDone(okay and result or nil)end
@@ -250,8 +270,8 @@ for _,row in pairs(passButtons)do
  watch(player:GetAttributeChangedSignal(row.Pass.Key..'OwnershipReady'),refresh)
 end
 local function count()local n=tonumber(quantity.Text);return n and n==n and n%1==0 and n>=1 and n<=9000 and n or nil end
-quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Compact(n*Catalog.CashPerGem)..' Cash')or'Pick 1–9,000 Gems.'end)
-maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem)))end)
+quantity:GetPropertyChangedSignal('Text'):Connect(function()local n=count();cost.Text=n and('Cost: '..Cash.Price(select(2,priceOf('Convert',n)))..' Cash')or'Pick 1–9,000 Gems.'end) -- R158k: the very cost a CONVERT press sends, written exactly
+maxButton.Activated:Connect(function()local stats=player:FindFirstChild('ChestChaseStats');local cash=stats and stats:FindFirstChild('Cash');quantity.Text=tostring(math.max(1,math.min(9000,math.floor((cash and cash.Value or 0)/Catalog.CashPerGem))))end) -- R158k: at least 1 (CONVERT then says "Not enough cash!", not "Type a whole number")
 convert.Activated:Connect(function()local n=count();if n then act('Convert',n)else setStatus('Type a whole number of Gems.')end end)
 -- Layout ----------------------------------------------------------------------------------------
 local function place(item,r,dx,dy)item.Position=UDim2.fromOffset(r.X+(dx or 0),r.Y+(dy or 0));item.Size=UDim2.fromOffset(r.W,r.H)end

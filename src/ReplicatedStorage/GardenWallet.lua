@@ -90,7 +90,8 @@ function Wallet.new(parent)
  self:SetValue(0);self.Gems:SetValue(player:GetAttribute('Gems')or 0);bindLeader();layout();return self
 end
 function Wallet:SetValue(value)
- local content=(self.Kind=='Cash'and'$'or'')..Numbers.Compact(value)
+ -- R158k: Cash and Gems are the player's own money: rounded DOWN (CashNumbers.Balance), never shown as more than they are ($10,350,000 read "$10.4M" beside a $10.4M price)
+ local content=(self.Kind=='Cash'and'$'or'')..(self.Kind=='Speed'and Numbers.Compact(value)or Numbers.Balance(value))
  if self.Amount.Text~=content then self.Amount.Text=content end
  -- R116: cash and gems jump when they go up, like speed. Not while the save is first loading in (first 3 s).
  if self.Kind~='Speed'and type(value)=='number'then

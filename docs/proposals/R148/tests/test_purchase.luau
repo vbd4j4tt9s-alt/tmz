@@ -297,7 +297,7 @@ check(Data:GetPremium(buyer).Gems==100000-80-375-700,'the Gems were spent ('..Da
 -- refusals
 m=mark();r=invoke(buyer,'BuyPack',7);check(r.Success==false and r.Message=='TRY AGAIN!','BuyPack 7 is refused with its message');expectNone(m,'BuyPack with a bad quantity')
 local gems=Data:GetPremium(buyer).Gems;Data:GetPremium(buyer).Gems=10
-m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyPack without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyPack without Gems')
+m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==false and r.Message=='Not enough gems!','BuyPack without Gems says "Not enough gems!" (R158k: the shared words, was NOT ENOUGH GEMS)');expectNone(m,'BuyPack without Gems')
 Data:GetPremium(buyer).Gems=gems
 RS.MechCatalog:SetAttribute('SaleEnabled',false)
 m=mark();r=invoke(buyer,'BuyPack',1);check(r.Success==false and r.Message=='THIS PACK IS OFF SALE','BuyPack off sale says so');expectNone(m,'BuyPack off sale')
@@ -315,7 +315,7 @@ check(r.Success==true and r.Message=='Your Cash is on the way!','BuyBundle Cash 
 m=mark();r=invoke(buyer,'BuyBundle',{Key='CashSmall',Amount=1,GemPrice=1});check(r.Success==false and r.Message=='The offer changed! Check the new amount.','a stale quote is refused');expectNone(m,'BuyBundle with a stale quote')
 m=mark();r=invoke(buyer,'BuyBundle','Nope');check(r.Success==false and r.Message=='NOT AVAILABLE RIGHT NOW','an unknown bundle is refused');expectNone(m,'BuyBundle unknown')
 Data:GetPremium(buyer).Gems=5
-m=mark();r=invoke(buyer,'BuyBundle',quote('Speed'));check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyBundle without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyBundle without Gems')
+m=mark();r=invoke(buyer,'BuyBundle',quote('Speed'));check(r.Success==false and r.Message=='Not enough gems!','BuyBundle without Gems says "Not enough gems!" (R158k)');expectNone(m,'BuyBundle without Gems')
 Data:GetPremium(buyer).Gems=gems
 -- BuyPerk
 m=mark();r=invoke(buyer,'BuyPerk','Growth')
@@ -323,7 +323,7 @@ check(r.Success==true and r.Message==nil,'BuyPerk: succeeds, its "unlocked." lin
 m=mark();r=invoke(buyer,'BuyPerk','Growth');check(r.Success==false and r.Message=='YOU ALREADY HAVE THIS!','a second BuyPerk says YOU ALREADY HAVE THIS!');expectNone(m,'BuyPerk twice')
 m=mark();r=invoke(buyer,'BuyPerk','Nope');check(r.Success==false and r.Message=='TRY AGAIN!','BuyPerk unknown says TRY AGAIN!');expectNone(m,'BuyPerk unknown')
 Data:GetPremium(buyer).Gems=3
-m=mark();r=invoke(buyer,'BuyPerk','Speed');check(r.Success==false and r.Message=='NOT ENOUGH GEMS','BuyPerk without Gems says NOT ENOUGH GEMS');expectNone(m,'BuyPerk without Gems')
+m=mark();r=invoke(buyer,'BuyPerk','Speed');check(r.Success==false and r.Message=='Not enough gems!','BuyPerk without Gems says "Not enough gems!" (R158k)');expectNone(m,'BuyPerk without Gems')
 Data:GetPremium(buyer).Gems=gems
 m=mark();r=invoke(buyer,'BuyPerk','Speed');expectOne(m,buyer,'Pass','Double Speed Pass','BuyPerk Speed')
 -- Convert (Cash -> Gems): a purchase of Gems; its "Gems on the way." hint stays
@@ -333,7 +333,7 @@ m=mark();r=invoke(buyer,'Convert',1);expectOne(m,buyer,'Gems','1 Gem','Convert 1
 m=mark();r=invoke(buyer,'Convert',9001);check(r.Success==false and r.Message=='TYPE A WHOLE NUMBER OF GEMS','Convert 9001 is refused');expectNone(m,'Convert out of range')
 m=mark();r=invoke(buyer,'Convert',2.5);check(r.Success==false,'Convert 2.5 is refused');expectNone(m,'Convert fractional')
 Data.Cash[buyer]=5
-m=mark();r=invoke(buyer,'Convert',3);check(r.Success==false and r.Message=='NOT ENOUGH CASH','Convert without Cash says NOT ENOUGH CASH');expectNone(m,'Convert without Cash')
+m=mark();r=invoke(buyer,'Convert',3);check(r.Success==false and r.Message=='Not enough cash!','Convert without Cash says "Not enough cash!" (R158k: the shared words, was NOT ENOUGH CASH)');expectNone(m,'Convert without Cash')
 Data.Cash[buyer]=5e13
 -- Other actions that are not purchases announce nothing.
 m=mark();invoke(buyer,'State');invoke(buyer,'ClaimSeed','Nope');invoke(buyer,'Nonsense');expectNone(m,'State / a refused claim / an unknown action')

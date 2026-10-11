@@ -57,7 +57,7 @@ function S:Send(from,key,userId,payment)
   if count(state.PassOutbox)>=Catalog.MaxOutbox then return false,'Your other gifts are still saving.'end
   for _,v in pairs(state.PassOutbox)do if v.RecipientId==userId and v.PassKey==key then return false,'This gift is already on its way!'end end
   local price=Mech.PassGemPrices[key]
-  if payment=='Gems'and state.Gems<price then return false,'Not enough Gems!'end
+  if payment=='Gems'and not require(game:GetService('ReplicatedStorage'):WaitForChild('StoreMoney158k')).CanAfford(state.Gems,price)then return false,require(game:GetService('ReplicatedStorage'):WaitForChild('StoreMoney158k')).Gems end -- R158k: the shared rule and words
   if payment=='Credit'and(state.GiftCredits[key]or 0)<1 then return false,'No gift is ready to send.'end
   local id=Http:GenerateGUID(false)
   -- This debit and outbox insertion cannot yield or be separated by another request.

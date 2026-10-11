@@ -2,6 +2,7 @@
 local RS=game:GetService('ReplicatedStorage');local Http=game:GetService('HttpService')
 local Catalog=require(RS.MechCatalog);local PackRules=require(RS.SeedPackRules);local Receipts=require(RS.SaleReceiptRules)
 local T=require(RS.BalanceValues81)
+local Money=require(RS:WaitForChild('StoreMoney158k')) -- R158k: the one money rule and words, shared with the store screens
 local P={}
 -- R126 (owner): bought Mech packs roll a pack size like world packs (BalanceRules.PackSizes).
 local SizeRandom=Random.new()
@@ -159,9 +160,9 @@ function P.Attach(Data)
  function Data:ConvertGems(player,count)
   if not integer(count,1,9000)then return false,'TYPE A WHOLE NUMBER OF GEMS'end
   local cost=count*Catalog.CashPerGem
-  if self:GetCash(player)<cost then return false,'NOT ENOUGH CASH'end
+  if not Money.CanAfford(self:GetCash(player),cost)then return false,Money.Cash end
   local receipt,why=self:CurrencyReceipt(player,count,'Gems');if not receipt then return false,why end
-  if not self:SpendCash(player,cost)then return false,'NOT ENOUGH CASH'end
+  if not self:SpendCash(player,cost)then return false,Money.Cash end
   local garden=self.Gardens[player];garden.PendingSales=garden.PendingSales or{};table.insert(garden.PendingSales,receipt)
   self:_gardenChanged(player);self:QueueGardenSave(player);return true,'Your Gems are on the way!'
  end
@@ -209,7 +210,7 @@ function P.Attach(Data)
   if not Catalog.OnSale()then return false,'THIS PACK IS OFF SALE'end
   local fits,full=self:CanReceiveMechPacks(player,offer.Count);if not fits then return false,full end -- R157: a full Bag is told first (before "not enough gems"), with the same words as the Robux path
   local state=self:GetPremium(player)
-  if state.Gems<offer.GemPrice then return false,'NOT ENOUGH GEMS'end
+  if not Money.CanAfford(state.Gems,offer.GemPrice)then return false,Money.Gems end
   local packs,why=self:GrantMechPacks(player,true,offer.Count);if not packs then return false,why end
   state.Gems-=offer.GemPrice;self:PublishPremium(player);self:MarkDirty(player)
   return true,offer.Count==1 and'Mech pack is in your bag!'or offer.Count..' Mech packs are in your bag!',packs -- R155: the third result is the new records (their coats go in the "Bought" notice)
@@ -243,7 +244,7 @@ function P.Attach(Data)
   local quote=self:BundleQuote(player,key);if not quote then return false,'NOT AVAILABLE RIGHT NOW'end
   -- Reject stale displayed quotes; prices/rewards never come from the client.
   if type(value)=='table'and(value.Amount~=quote.Amount or value.GemPrice~=quote.GemPrice)then return false,'The offer changed! Check the new amount.'end
-  local state=self:GetPremium(player);if state.Gems<quote.GemPrice then return false,'NOT ENOUGH GEMS'end
+  local state=self:GetPremium(player);if not Money.CanAfford(state.Gems,quote.GemPrice)then return false,Money.Gems end
   local okay,why
   if quote.Kind=='Cash'then okay,why=self:QueueCurrency(player,quote.Amount,'Cash')
   else okay,why=self:GrantPremiumBundle(player,key)end
@@ -257,14 +258,14 @@ function P.Attach(Data)
   local state=self:GetPremium(player);local pass
   for _,p in ipairs(require(RS.GamePassCatalog))do if p.Key==key then pass=p;break end end
   if not pass or state.Entitlements[key]or player:GetAttribute(pass.Attribute)then return false,'YOU ALREADY HAVE THIS!'end
-  if state.Gems<price then return false,'NOT ENOUGH GEMS'end
+  if not Money.CanAfford(state.Gems,price)then return false,Money.Gems end
   if type(self.PassOwnership)~='function'then return false,'STILL CHECKING WHAT YOU OWN...'end
   local okay,owned=pcall(self.PassOwnership,player,key)
   if not player.Parent or not self:IsLoaded(player)or not self.CanSave[player]or self:GetPremium(player)~=state then return false,'HOLD ON, YOUR DATA IS LOADING!'end
   -- Recheck after the ownership request; a purchase or gift may have completed.
   if state.Entitlements[key]or player:GetAttribute(pass.Attribute)or owned==true then return false,'YOU ALREADY HAVE THIS!'end
   if not okay or owned~=false then return false,'STILL CHECKING WHAT YOU OWN...'end
-  if state.Gems<price then return false,'NOT ENOUGH GEMS'end
+  if not Money.CanAfford(state.Gems,price)then return false,Money.Gems end
   state.Gems-=price;state.Entitlements[key]=true;self:PublishPremium(player);self:MarkDirty(player);self:QueueGardenSave(player)
   return true,pass.Name..' unlocked!'
  end

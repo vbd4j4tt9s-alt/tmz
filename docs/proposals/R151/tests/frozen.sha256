@@ -11,8 +11,9 @@
 # R158h release: Config.Version 'V150 R158h' (nothing else changed)
 # R158i release: Config.Version 'V150 R158i' (and Config.SpeedFloor / DefaultSpeed, see the R158i line)
 # R158j release: Config.Version 'V150 R158j' (nothing else changed)
+# R158k release: Config.Version 'V150 R158k' (nothing else changed)
 # R158i (on purpose): Config.lua: Config.SpeedFloor = 20000 and Config.DefaultSpeed = SpeedFloor (was 0): every speed starts at 20,000 points, the screens show points - 19,999 (never below 1); Validate checks the curve starts at 0 points (not at the default); no other value changed
-fe584e58ef0500137d0a3a5715e9effb9705138a625101cf638b0b644b29f44d  src/ServerScriptService/ChestChaseServer/Config.lua
+98c83a402ba7c23197f203613e93b63ab041a9d103572a2bdc6cd77026d17c4a  src/ServerScriptService/ChestChaseServer/Config.lua
 052c0df01f4e131396996df31a2e3a64d2be1aa3dafa3172e2dc59b66eeab696  src/ReplicatedStorage/EconomyBalance90.lua
 e0056ebd12983a74ddd20e3393286862f3da4faeb8f0bba0e3d5cd9d28ff6afb  src/ReplicatedStorage/EconomyScaling91.lua
 b9dbf155ff24c0f63fa3189165814a71d18797b97b8e28b21c296d254be5438b  src/ReplicatedStorage/ItemWeight.lua
@@ -37,7 +38,8 @@ a866bdc4e1a2872bd985c816c50224d9043b8c532b933b72c87cfb74bb45cf50  src/Replicated
 7f769e802f2324c2b322c5f7a79299a538ce9f90d6199f1f1b782064b2b9b573  src/ReplicatedStorage/VerityPackOdds.lua
 aa1d6d9ac03ce00b1b494cae6965a5228fa0f1e157a354d3e39264cb588f9043  src/ReplicatedStorage/VoidPackOdds85.lua
 026ddf5e79b8fdd84ea3ed4832cc2cc66f3cbfa619b070c480ebcf00da5d624e  src/ReplicatedStorage/MysteryPackRules.lua
-f6ab026611779a832edb8079b5f3237bc86174edeeccb02a26b1b610689751f9  src/ServerScriptService/ChestChaseServer/EconomyService.lua
+# R158k (on purpose): EconomyService.lua: _purchase's money refusal reads StoreMoney158k.Cash ("Not enough cash!", the words every store shows; was "NOT ENOUGH CASH"); PurchaseShopItem takes the price the button showed (optional) and a different price is refused with StoreMoney158k.PriceChanged and the shop's state, nothing charged; the check itself (PlayerDataService.SpendCash), the prices and everything else are as they were
+5a8e0a73cc5f15cdf5b3448cc4cf4f79211f47adb8ec760f23990a158778e5f9  src/ServerScriptService/ChestChaseServer/EconomyService.lua
 53f60dd8a42aa1ec5c0c0303458517dd9c6294f23c65caa22d4566c16445aca6  src/ServerScriptService/ChestChaseServer/PackSizePityData.lua
 c3890a3e6022dd3000eb7d0b8994d96cb6373990c2191df4ea8d0c488b18e918  src/ReplicatedStorage/PlantCatalog.lua
 # R156 (on purpose): BackgroundMusic.client.lua: the track playlist (Nature Inspiration + 74095461107598 + 132448918728086, alternating, .07) and three base tracks

@@ -39,8 +39,9 @@ remote.InvokeServer=function(_,action,value)
  if failing then error('the server did not answer')end
  local s=serverState();s.Success=successful;if action~='State'then s.Message=reply.Message end;return s
 end
-local buys=0;local plays={}
+local buys=0;local plays={};local notices={}
 W.stub('InteractionAudio',{Transaction=function(kind)if kind=='Buy'then buys+=1 end end,Play=function(key)plays[#plays+1]=key end,Preload=function()end})
+W.stub('NoticeFeed83',{Plain=function(text)notices[#notices+1]=text end,Preload=function()end}) -- R158k: a money refusal is the plain notice (StoreMoney158k)
 W.stub('ShopViewport',{Visible=function()return true end,CachedVisible=function()return true end})
 W.stub('ShopSeedReveal',{Attach=function()return {Refresh=function()end,Destroy=function()end}end})
 W.stub('PackViewport89',{DecorateCard=function()end,Create=function(parent)
@@ -83,12 +84,17 @@ reply.Message=nil;act(pack.BuyWithRobux)
 check(shut(),'the next action without a message clears the strip at once')
 -- 3. Real errors and hints still show, for 3 seconds ----------------------------------------------------------------------------------
 successful=false
-for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS RIGHT NOW','CAN\'T GIFT THIS RIGHT NOW','NOT ENOUGH GEMS','NO PURCHASES UNTIL YOUR DATA CAN SAVE','TRY AGAIN IN A SEC!'})do
+-- (R158k, on purpose: "NOT ENOUGH GEMS" left this list: a money refusal is the plain notice "Not enough gems!", not the strip; checked just below)
+for _,text in ipairs({'Couldn\'t open the purchase. Try again!','CAN\'T BUY THIS RIGHT NOW','CAN\'T GIFT THIS RIGHT NOW','NO PURCHASES UNTIL YOUR DATA CAN SAVE','TRY AGAIN IN A SEC!'})do
  plays={};reply.Message=text;act(pack.BuyWithRobux)
  check(plays[#plays]=='Denied','R150: the refused purchase "'..text..'" clicks Denied')
  check(status.Visible and said()==text,'"'..text..'" is shown')
  R.advance(2.9);check(status.Visible and said()==text,'"'..text..'" is still shown at 2.9 s')
  R.advance(.3);check(shut(),'"'..text..'" hides after 3 s')
+end
+for _,text in ipairs({'NOT ENOUGH GEMS','Not enough gems!'})do
+ plays={};notices={};R.advance(1);reply.Message=text;act(pack.BuyWithRobux)
+ check(plays[1]=='Denied'and notices[1]=='Not enough gems!'and shut(),'R158k: the server\'s "'..text..'" is the plain notice "Not enough gems!" with the Denied click, no strip')
 end
 successful=true
 local gems_=page.ConvertCash;reply.Message='Your Gems are on the way!';gems_.GemQuantity.Text='5';plays={};act(gems_.Convert)

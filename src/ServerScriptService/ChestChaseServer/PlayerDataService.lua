@@ -558,7 +558,8 @@ end
 function PlayerDataService:SpendCash(player, amount)
 	amount = math.max(0, math.floor(tonumber(amount) or 0))
 	local cashValue = self:GetOrCreateCashValue(player)
-	if amount <= 0 or not self:IsLoaded(player) or cashValue.Value < amount then
+	-- R158k: StoreMoney158k.CanAfford is the one money rule (the store screens ask the same function): equal money pays, a balance that is not an amount pays nothing
+	if amount <= 0 or not self:IsLoaded(player) or not require(game:GetService("ReplicatedStorage").StoreMoney158k).CanAfford(cashValue.Value, amount) then
 		return false
 	end
 	cashValue.Value = cashValue.Value - amount
@@ -1939,7 +1940,7 @@ function PlayerDataService:BuyTreadmill(player,expectedTier)
     if expectedTier~=d.Tier+1 then return false,'The upgrade changed! Try again.'end
     local nextTier=self.Config.TreadmillTiers[expectedTier]
     if not nextTier then return false,'Fully upgraded!'end
-    if not self:SpendCash(player,nextTier.Cost)then return false,'Not enough cash!'end
+    if not self:SpendCash(player,nextTier.Cost)then return false,require(game:GetService('ReplicatedStorage').StoreMoney158k).Cash end -- R158k: the shared words ("Not enough cash!")
     -- Spend and level change do not yield; duplicate clicks cannot buy this level twice.
     d.Tier=expectedTier;d.Skin=expectedTier;self:PublishTreadmillData(player)
     self:MarkDirty(player);self:QueueGardenSave(player)

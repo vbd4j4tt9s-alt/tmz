@@ -18,7 +18,7 @@ function D.Install(Service)
   local current=self:GetFenceTier(player)
   if expected~=current+1 then return false,'The upgrade changed! Try again.'end
   local tier=Rules.Tiers[expected];if not tier then return false,'Fully upgraded!'end
-  if not self:SpendCash(player,tier.Cost)then return false,'Not enough cash!'end
+  if not self:SpendCash(player,tier.Cost)then return false,require(game:GetService('ReplicatedStorage').StoreMoney158k).Cash end -- R158k: the shared words ("Not enough cash!")
   self.Fences=self.Fences or{};self.Fences[player]=expected
   self:PublishFenceData(player);self:MarkDirty(player);self:QueueGardenSave(player)
   return true,tier.Name..' fence unlocked!'
